@@ -43,6 +43,18 @@ CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser);
  */
 void cz_semantic_analyzer_free(CZ_SemanticAnalyzer* sa);
 
+/**
+ * @brief Invoke semantic analyzer to analyze the AST.
+ * 
+ * @param sa Pointer to CZ_SemanticAnalyzer
+ * @return int 1 on success, 0 on failure.
+ * 
+ * This decorates the AST and populates symbol table and global type table.
+ * Note that just because 1 is returned does not mean the code is error free.
+ * Always check the error list afterwards.
+ */
+int cz_semantic_analyzer_analyze(CZ_SemanticAnalyzer* sa);
+
 #ifdef __cplusplus
 }
 #endif

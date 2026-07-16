@@ -65,3 +65,12 @@ void cz_semantic_analyzer_free(CZ_SemanticAnalyzer* sa) {
     }
     free(sa);
 }
+
+// Will be invoking pass 1 and pass 2.
+int cz_semantic_analyzer_analyze(CZ_SemanticAnalyzer* sa) {
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+
+    return 1;
+error_cleanup:
+    return 0;
+}
