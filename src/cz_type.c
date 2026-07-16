@@ -4,14 +4,13 @@
 
 #define NULL_POINTER_TO_GOTO(ptr, label) do { if ((ptr) == NULL) goto label; } while (0)
 
-CZ_Type* cz_type_create(CZ_PrimitiveType primitive, bool is_const) {
+CZ_Type* cz_type_create(CZ_TypeKind type_kind) {
     CZ_Type* type = NULL;
     
     type = (CZ_Type*) calloc(1, sizeof(CZ_Type));
     NULL_POINTER_TO_GOTO(type, error_cleanup);
 
-    type->primitive = primitive;
-    type->is_const = is_const;
+    type->kind = type_kind;
 
     return type;
 
@@ -48,6 +47,7 @@ void cz_type_free(CZ_Type* type) {
                 type->structure.layout = NULL;
                 break;
             case CZ_TYPE_KIND_REFERENCE:
+            case CZ_TYPE_KIND_CONST:
                 // Nothing to do
                 break;
             case CZ_TYPE_KIND_NEWTYPE:
@@ -169,7 +169,7 @@ error_cleanup:
 static bool cz_type_equals(const CZ_Type* a, const CZ_Type* b) {
     if (a == b) return true; // Fast-path: identical pointers
     if (!a || !b) return false;
-    if (a->kind != b->kind || a->is_const != b->is_const) return false;
+    if (a->kind != b->kind) return false;
 
     switch (a->kind) {
         case CZ_TYPE_KIND_PRIMITIVE:
@@ -178,6 +178,9 @@ static bool cz_type_equals(const CZ_Type* a, const CZ_Type* b) {
         case CZ_TYPE_KIND_REFERENCE:
             // Recursively compare the pointed-to types
             return cz_type_equals(a->reference_to, b->reference_to);
+
+        case CZ_TYPE_KIND_CONST:
+            return cz_type_equals(a->const_of, b->const_of);
 
         case CZ_TYPE_KIND_NEWTYPE:
             // Newtypes are unique by name

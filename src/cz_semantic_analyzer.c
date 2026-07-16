@@ -6,8 +6,9 @@
 #define INVALID_NODE_TYPE_TO_GOTO(node, node_type_enum, label) do { if ((node)->node_type != (node_type_enum)) goto label; } while (0)
 
 const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTypeTable* gtt) {
-    CZ_Type* type = NULL;       // Resolved type
-    char* query_name = NULL;
+    const CZ_Type* base_type = NULL;
+    const char* query_name = NULL;
+
     NULL_POINTER_TO_GOTO(type_node, error_cleanup);
     NULL_POINTER_TO_GOTO(gtt, error_cleanup);
     if (type_node->node_type != CZ_AST_TypeNodeType) goto error_cleanup;
@@ -17,116 +18,106 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
         goto error_cleanup;
     }
 
+    // --- PHASE 1: Resolve the base, non-const canonical type ---
     switch (type_node->type_expression.primitive.kind) {
-        case CZ_AST_TYPE_KIND_INT32:
-            {
-                CZ_Type query = {
-                    .kind = CZ_TYPE_KIND_PRIMITIVE,
-                    .is_const = type_node->type_expression.is_const,
-                    .primitive = CZ_PRIMITIVE_INT32
-                };
-
-                type = cz_global_type_table_find_type(gtt, &query);
-
-                if (type == NULL) {
-                    // Create and add to GTT
-                    type = cz_type_create(CZ_PRIMITIVE_INT32, type_node->type_expression.is_const);
-                    NULL_POINTER_TO_GOTO(type, error_cleanup);
-
-                    if (cz_global_type_table_push_type(gtt, NULL, type) != 1) {
-                        goto error_cleanup;
-                    }
+        case CZ_AST_TYPE_KIND_INT32: {
+            CZ_Type query = {
+                .kind = CZ_TYPE_KIND_PRIMITIVE,
+                .primitive = CZ_PRIMITIVE_INT32
+            };
+            base_type = cz_global_type_table_find_type(gtt, &query);
+            if (base_type == NULL) {
+                CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+                new_type->primitive = CZ_PRIMITIVE_INT32;
+                NULL_POINTER_TO_GOTO(new_type, error_cleanup);
+                if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
+                    cz_type_free(new_type);
+                    goto error_cleanup;
                 }
+                base_type = new_type;
             }
             break;
-        case CZ_AST_TYPE_KIND_BOOL:
-            {
-                CZ_Type query = {
-                    .kind = CZ_TYPE_KIND_PRIMITIVE,
-                    .is_const = type_node->type_expression.is_const,
-                    .primitive = CZ_PRIMITIVE_BOOL
-                };
-
-                type = cz_global_type_table_find_type(gtt, &query);
-
-                if (type == NULL) {
-                    // Create and add to GTT
-                    type = cz_type_create(CZ_PRIMITIVE_BOOL, type_node->type_expression.is_const);
-                    NULL_POINTER_TO_GOTO(type, error_cleanup);
-
-                    if (cz_global_type_table_push_type(gtt, NULL, type) != 1) {
-                        goto error_cleanup;
-                    }
+        }
+        case CZ_AST_TYPE_KIND_BOOL: {
+            CZ_Type query = {
+                .kind = CZ_TYPE_KIND_PRIMITIVE,
+                .primitive = CZ_PRIMITIVE_BOOL
+            };
+            base_type = cz_global_type_table_find_type(gtt, &query);
+            if (base_type == NULL) {
+                CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+                new_type->primitive = CZ_PRIMITIVE_BOOL;
+                NULL_POINTER_TO_GOTO(new_type, error_cleanup);
+                if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
+                    cz_type_free(new_type);
+                    goto error_cleanup;
                 }
+                base_type = new_type;
             }
             break;
-        case CZ_AST_TYPE_KIND_FLOAT:
-            {
-                CZ_Type query = {
-                    .kind = CZ_TYPE_KIND_PRIMITIVE,
-                    .is_const = type_node->type_expression.is_const,
-                    .primitive = CZ_PRIMITIVE_FLOAT
-                };
-
-                type = cz_global_type_table_find_type(gtt, &query);
-                if (type == NULL) {
-                    // Create and add to GTT
-                    type = cz_type_create(CZ_PRIMITIVE_FLOAT, type_node->type_expression.is_const);
-                    NULL_POINTER_TO_GOTO(type, error_cleanup);
-
-                    if (cz_global_type_table_push_type(gtt, NULL, type) != 1) {
-                        goto error_cleanup;
-                    }
+        }
+        case CZ_AST_TYPE_KIND_FLOAT: {
+            CZ_Type query = {
+                .kind = CZ_TYPE_KIND_PRIMITIVE,
+                .primitive = CZ_PRIMITIVE_FLOAT
+            };
+            base_type = cz_global_type_table_find_type(gtt, &query);
+            if (base_type == NULL) {
+                CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+                new_type->primitive = CZ_PRIMITIVE_FLOAT;
+                NULL_POINTER_TO_GOTO(new_type, error_cleanup);
+                if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
+                    cz_type_free(new_type);
+                    goto error_cleanup;
                 }
+                base_type = new_type;
             }
             break;
-        case CZ_AST_TYPE_KIND_IDENTIFIER:
-            //{
-            //    query_name = create_null_terminated_string(type_node->type_expression.primitive.name, type_node->type_expression.primitive.name_len);
-            //    NULL_POINTER_TO_GOTO(query_name, error_cleanup);
+        }
+        case CZ_AST_TYPE_KIND_IDENTIFIER: {
+            query_name = type_node->type_expression.primitive.name;
+            NULL_POINTER_TO_GOTO(query_name, error_cleanup);
 
-            //    type = cz_global_type_table_find_type_by_name(gtt, query_name);
-            //    NULL_POINTER_TO_GOTO(type, error_cleanup);
-
-            //    if (type_node->type_expression.is_const && !type->is_const) {
-            //        CZ_Type query = *type;
-            //        query.is_const = true;
-
-            //        const CZ_Type* const_version = cz_global_type_table_find_type(gtt, &query);
-            //        if (const_version == NULL) {
-            //            // Create and add to GTT
-            //            CZ_Type* new_const_type = cz_type_create(type->kind, true);
-            //        }
-
-            //    }
-            //}
+            // Lookup the named type (which is inherently non-const in the registry)
+            base_type = cz_global_type_table_find_type_by_name(gtt, query_name);
+            NULL_POINTER_TO_GOTO(base_type, error_cleanup);
             break;
-    }
-
-    /*
-    switch (type_node->type_expression.primitive.kind) {
-        case CZ_TYPE_KIND_INT32:
-            type = cz_type_create(CZ_PRIMITIVE_INT32, type_node->type_expression.is_const);
-            break;
-        case CZ_TYPE_KIND_BOOL:
-            type = cz_type_create(CZ_PRIMITIVE_BOOL, type_node->type_expression.is_const);
-            break;
-        case CZ_TYPE_KIND_FLOAT:
-            type = cz_type_create(CZ_PRIMITIVE_FLOAT, type_node->type_expression.is_const);
-            break;
-        case CZ_TYPE_KIND_IDENTIFIER:
-            type = cz_type_create()
-            break;
+        }
         default:
             goto error_cleanup;
     }
-    */
-    
-    free(query_name);
-    return type;
+
+    // --- PHASE 2: Apply the const wrapper if requested by the AST ---
+    if (type_node->type_expression.is_const) {
+        // Build a temporary query for the const wrapper pointing to our base type
+        CZ_Type const_query = {
+            .kind = CZ_TYPE_KIND_CONST,
+            .const_of = (CZ_Type*)base_type
+        };
+
+        const CZ_Type* existing_const = cz_global_type_table_find_type(gtt, &const_query);
+        if (existing_const != NULL) {
+            return existing_const;
+        }
+
+        // It doesn't exist, allocate the wrapper type
+        CZ_Type* new_const_type = cz_type_create(CZ_TYPE_KIND_CONST);
+        NULL_POINTER_TO_GOTO(new_const_type, error_cleanup);
+        new_const_type->const_of = base_type;
+
+        if (cz_global_type_table_push_type(gtt, NULL, new_const_type) != 1) {
+            cz_type_free(new_const_type);
+            goto error_cleanup;
+        }
+        return new_const_type;
+    }
+
+    return base_type;
+
 error_cleanup:
-    cz_type_free(type);
-    free(query_name);
+    // Notice that we don't have to clean up `type` here anymore. 
+    // Any newly created types were either pushed to the GTT successfully 
+    // or freed immediately upon failure. No leaks!
     return NULL;
 }
 
@@ -147,9 +138,9 @@ CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser) {
     NULL_POINTER_TO_GOTO(gtt, error_cleanup);
 
     // Populate with primitive types.
-    cz_global_type_table_push_type(gtt, "int32", cz_type_create(CZ_PRIMITIVE_INT32, false));
-    cz_global_type_table_push_type(gtt, "bool", cz_type_create(CZ_PRIMITIVE_BOOL, false));
-    cz_global_type_table_push_type(gtt, "float", cz_type_create(CZ_PRIMITIVE_FLOAT, false));
+    // cz_global_type_table_push_type(gtt, "int32", cz_type_create(CZ_PRIMITIVE_INT32));
+    // cz_global_type_table_push_type(gtt, "bool", cz_type_create(CZ_PRIMITIVE_BOOL));
+    // cz_global_type_table_push_type(gtt, "float", cz_type_create(CZ_PRIMITIVE_FLOAT));
 
     error_list = cz_error_list_create();
     NULL_POINTER_TO_GOTO(error_list, error_cleanup);

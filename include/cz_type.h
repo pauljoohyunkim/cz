@@ -19,9 +19,10 @@ typedef enum {
 typedef enum {
     CZ_TYPE_KIND_PRIMITIVE,
     CZ_TYPE_KIND_STRUCT,
+    CZ_TYPE_KIND_CONST,
     CZ_TYPE_KIND_REFERENCE,
     CZ_TYPE_KIND_NEWTYPE,
-    CZ_TYPE_KIND_FUNCTION
+    CZ_TYPE_KIND_FUNCTION,
 } CZ_TypeKind;
 
 typedef struct {
@@ -37,7 +38,6 @@ typedef struct {
 
 struct CZ_Type {
     CZ_TypeKind kind;
-    bool is_const;
 
     union {
         CZ_PrimitiveType primitive;
@@ -46,6 +46,8 @@ struct CZ_Type {
             const char* name;
             const CZ_StructLayout* layout;
         } structure;
+
+        CZ_Type* const_of;
 
         CZ_Type* reference_to;
 
@@ -76,11 +78,10 @@ typedef struct {
 /**
  * @brief Create CZ_Type
  * 
- * @param primitive Primitive type
- * @param is_const Constness of type
+ * @param typekind CZ_Type kind
  * @return CZ_Type* Allocated CZ_Type on success, NULL on failure.
  */
-CZ_Type* cz_type_create(CZ_PrimitiveType primitive, bool is_const);
+CZ_Type* cz_type_create(CZ_TypeKind typekind);
 
 /**
  * @brief Free CZ_Type
