@@ -158,6 +158,9 @@ CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser) {
     sa->global_env = global_env;
     global_env = NULL;
 
+    sa->gtt = gtt;
+    gtt = NULL;
+
     // Transfer error list created.
     sa->error_list = error_list;
     error_list = NULL;
@@ -176,6 +179,9 @@ CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser) {
     sa->program = parser->program;
     parser->program = NULL;
 
+    sa->sp = parser->sp;
+    parser->sp = NULL;
+
     return sa;
 error_cleanup:
     cz_environment_free(global_env);
@@ -190,6 +196,7 @@ void cz_semantic_analyzer_free(CZ_SemanticAnalyzer* sa) {
         free(sa->code);
         free(sa->tokens);
         cz_ast_root_free(sa->program);
+        cz_string_pool_free(sa->sp);
         cz_environment_free(sa->global_env);
         cz_global_type_table_free(sa->gtt);
         cz_error_list_free(sa->error_list);

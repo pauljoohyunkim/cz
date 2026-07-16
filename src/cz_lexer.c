@@ -50,6 +50,7 @@ void cz_string_pool_free(CZ_StringPool* sp) {
             free((void*)sp->strings[i]);
             sp->strings[i] = NULL;
         }
+        free(sp->strings);
     }
     free(sp);
 }
@@ -725,6 +726,7 @@ void cz_lexer_free(CZ_Lexer* lexer) {
         free(lexer->tokens);
         free(lexer->code);
         cz_error_list_free(lexer->error_list);
+        cz_string_pool_free(lexer->sp);
         free(lexer);
     }
 }

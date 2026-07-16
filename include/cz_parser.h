@@ -20,6 +20,7 @@ typedef struct {
     size_t idx;
     CZ_AST_Node* program;
     CZ_ErrorList* error_list;
+    CZ_StringPool* sp;
 } CZ_Parser;
 
 

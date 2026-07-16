@@ -84,6 +84,9 @@ CZ_Parser* cz_parser_create(CZ_Lexer* lexer) {
 
     parser->filename = lexer->filename;
 
+    parser->sp = lexer->sp;
+    lexer->sp = NULL;
+
     return parser;
 }
 
@@ -109,6 +112,8 @@ void cz_parser_free(CZ_Parser* parser) {
         parser->error_list = NULL;
         cz_ast_root_free(parser->program);
         parser->program = NULL;
+        cz_string_pool_free(parser->sp);
+        parser->sp = NULL;
     }
     free(parser);
 }
