@@ -137,11 +137,6 @@ CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser) {
     gtt = cz_global_type_table_create();
     NULL_POINTER_TO_GOTO(gtt, error_cleanup);
 
-    // Populate with primitive types.
-    // cz_global_type_table_push_type(gtt, "int32", cz_type_create(CZ_PRIMITIVE_INT32));
-    // cz_global_type_table_push_type(gtt, "bool", cz_type_create(CZ_PRIMITIVE_BOOL));
-    // cz_global_type_table_push_type(gtt, "float", cz_type_create(CZ_PRIMITIVE_FLOAT));
-
     error_list = cz_error_list_create();
     NULL_POINTER_TO_GOTO(error_list, error_cleanup);
 
@@ -177,8 +172,8 @@ CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser) {
 error_cleanup:
     cz_environment_free(global_env);
     cz_global_type_table_free(gtt);
-    cz_semantic_analyzer_free(sa);
     cz_error_list_free(error_list);
+    cz_semantic_analyzer_free(sa);
     return NULL;
 }
 
@@ -209,11 +204,11 @@ error_cleanup:
 }
 
 /* --- PASS 1 ---*/
-static int cz_semantic_analyzer_register_function_decl(CZ_Environment* env, const CZ_AST_Node* decl);
-static int cz_semantic_analyzer_register_struct_decl(CZ_Environment* env, const CZ_AST_Node* decl);
-static int cz_semantic_analyzer_register_variable_decl(CZ_Environment* env, const CZ_AST_Node* decl);
-static int cz_semantic_analyzer_register_typedef(CZ_Environment* env, const CZ_AST_Node* decl);
-static int cz_semantic_analyzer_register_newtypedef(CZ_Environment* env, const CZ_AST_Node* decl);
+static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl);
+static int cz_semantic_analyzer_register_struct_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl);
+static int cz_semantic_analyzer_register_variable_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl);
+static int cz_semantic_analyzer_register_typedef(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl);
+static int cz_semantic_analyzer_register_newtypedef(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl);
 
 /**
  * @brief Pass 1 Function: Scans through global statements.
@@ -245,7 +240,7 @@ static int cz_semantic_analyzer_build_global_table(CZ_SemanticAnalyzer* sa) {
                 //cz_semantic_analyzer_register_variable_decl(sa->global_env, statement);
                 break;
             case CZ_AST_TypedefDeclarationNodeType:
-                cz_semantic_analyzer_register_typedef(sa->global_env, statement);
+                cz_semantic_analyzer_register_typedef(sa, sa->global_env, statement);
                 break;
             case CZ_AST_NewtypeDeclarationNodeType:
                 //cz_semantic_analyzer_register_newtypedef(sa->global_env, statement);
@@ -260,12 +255,37 @@ error_cleanup:
     return 0;
 }
 
-static int cz_semantic_analyzer_register_typedef(CZ_Environment* env, const CZ_AST_Node* decl) {
+static int cz_semantic_analyzer_register_typedef(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl) {
     NULL_POINTER_TO_GOTO(env, error_cleanup);
     NULL_POINTER_TO_GOTO(decl, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_TypedefDeclarationNodeType, error_cleanup);
 
+    // typedef x y;
+    const CZ_AST_Node* base_type_node = decl->typedef_declaration.type;
+    const CZ_AST_Node* alias_type_node = decl->typedef_declaration.new_type;
 
+    // 1. Check if x exists in the global type table. (If not, this is bad)
+    const CZ_Type* base_type = cz_type_from_type_node(base_type_node, sa->gtt);
+    if (base_type == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, base_type_node->line, base_type_node->col,
+                                 "Base type could not be deduced.");
+        goto error_cleanup;
+    }
+
+    // 2. Check if y exists in the symbol table. (If yes, this is bad since duplicate definition)
+    const CZ_Type* alias_type_attempt = cz_global_type_table_find_type_by_name(sa->gtt, alias_type_node->identifier.name);
+    if (alias_type_attempt != NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, base_type_node->line, base_type_node->col,
+                                 "Type \"%s\" previously defined.", alias_type_node->identifier.name);
+        goto error_cleanup;
+    }
+
+    // 3. Add y to symbol table, where in the global type table, it is added with name.
+    if (cz_global_type_table_push_type(sa->gtt, alias_type_node->identifier.name, base_type) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, base_type_node->line, base_type_node->col,
+                                 "Type \"%s\" could not be registered.", alias_type_node->identifier.name);
+        goto error_cleanup;
+    }
 
     return 1;
 

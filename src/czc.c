@@ -106,13 +106,13 @@ int main(int argc, char** argv) {
         printf("Semantic Analyzer creation failure\n");
         goto error_cleanup_exit;
     }
-    /*
-    ret = cz_semantic_analyzer_build_global_symbol_table(sa);
+    ret = cz_semantic_analyzer_analyze(sa);
     if (ret != 1) {
-        printf("Failure semantic analysis (pass I)\n");
+        printf("Failure semantic analysis\n");
         goto error_cleanup_exit;
     }
 
+    /*
     printf("--- Global Environment ---\n");
     cz_environment_print(sa->global_env, 0);
     ret = cz_semantic_analyzer_full_analyze(sa);

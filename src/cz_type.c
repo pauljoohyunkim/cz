@@ -126,17 +126,27 @@ int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, co
     NULL_POINTER_TO_GOTO(gtt, error_cleanup);
     NULL_POINTER_TO_GOTO(type, error_cleanup);
 
-    // All allocation
-    if (gtt->all_allocations_capacity == gtt->all_entry_count) {
-        new_all_allocations = (CZ_Type**) realloc(gtt->all_allocations, sizeof(CZ_Type*) * (gtt->all_allocations_capacity) * 2);
-        NULL_POINTER_TO_GOTO(new_all_allocations, error_cleanup);
+    // Check if type already exists.
+    // If not, add.
+    // Otherwise, skip.
+    const CZ_Type* lookup_type = cz_global_type_table_find_type(gtt, type);
+    if (lookup_type == NULL) {
+        // All allocation
+        if (gtt->all_allocations_capacity == gtt->all_entry_count) {
+            new_all_allocations = (CZ_Type**) realloc(gtt->all_allocations, sizeof(CZ_Type*) * (gtt->all_allocations_capacity) * 2);
+            NULL_POINTER_TO_GOTO(new_all_allocations, error_cleanup);
 
-        gtt->all_allocations = new_all_allocations;
-        new_all_allocations = NULL;
-        gtt->all_allocations_capacity *= 2;
+            gtt->all_allocations = new_all_allocations;
+            new_all_allocations = NULL;
+            gtt->all_allocations_capacity *= 2;
+        }
+        gtt->all_allocations[gtt->all_entry_count] = (CZ_Type*) type;
+        gtt->all_entry_count++;
+
+        // Share the pointer so that it can be used for named type adding.
+        lookup_type = type;
     }
-    gtt->all_allocations[gtt->all_entry_count] = (CZ_Type*) type;
-    gtt->all_entry_count++;
+
     if (name != NULL) {
         if (gtt->named_entry_count == gtt->named_entry_capacity) {
             new_names = (const char**) realloc(gtt->names, sizeof(const char*) * (gtt->named_entry_capacity) * 2);
@@ -152,7 +162,7 @@ int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, co
             gtt->named_entry_capacity *= 2;
         }
 
-        gtt->named_types[gtt->named_entry_count] = (CZ_Type*) type;
+        gtt->named_types[gtt->named_entry_count] = (CZ_Type*) lookup_type;
         gtt->names[gtt->named_entry_count] = name;
         gtt->named_entry_count++;
     }
