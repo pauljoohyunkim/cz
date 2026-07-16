@@ -231,7 +231,7 @@ static int cz_semantic_analyzer_build_global_table(CZ_SemanticAnalyzer* sa) {
         // TODO: Log errors.
         switch (statement->node_type) {
             case CZ_AST_FunctionDeclarationNodeType:
-                //cz_semantic_analyzer_register_function_decl(sa->global_env, statement);
+                cz_semantic_analyzer_register_function_decl(sa, sa->global_env, statement);
                 break;
             case CZ_AST_StructDeclarationNodeType:
                 //cz_semantic_analyzer_register_struct_decl(sa->global_env, statement);
@@ -250,6 +250,23 @@ static int cz_semantic_analyzer_build_global_table(CZ_SemanticAnalyzer* sa) {
                 break;
         }
     }
+
+error_cleanup:
+    return 0;
+}
+
+static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl) {
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(decl, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_FunctionDeclarationNodeType, error_cleanup);
+
+    // func addone :: (x :: int32, y :: int32) -> int
+    // 1. Check if symbol exists. (If yes, bad: duplicate symbol)
+    // 2. Build type for function.
+    // 3. Check if GTT contains it. If not add it. Otherwise get the function type from GTT, and free the query type.
+    // 4. Add symbol.
+
+    return 1;
 
 error_cleanup:
     return 0;
