@@ -189,10 +189,10 @@ struct CZ_AST_Node {
                     size_t name_len;
 
                     enum {
-                        CZ_TYPE_KIND_INT32,
-                        CZ_TYPE_KIND_BOOL,
-                        CZ_TYPE_KIND_FLOAT,
-                        CZ_TYPE_KIND_IDENTIFIER
+                        CZ_AST_TYPE_KIND_INT32,
+                        CZ_AST_TYPE_KIND_BOOL,
+                        CZ_AST_TYPE_KIND_FLOAT,
+                        CZ_AST_TYPE_KIND_IDENTIFIER
                     } kind;
                 } primitive;
 

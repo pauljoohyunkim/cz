@@ -1210,16 +1210,16 @@ static CZ_AST_Node* cz_parser_create_base_type(CZ_Parser* parser) {
                 node->type_expression.primitive.name_len = token->length;
                 switch (peeked) {
                     case CZ_TT_BOOL:
-                        node->type_expression.primitive.kind = CZ_TYPE_KIND_BOOL;
+                        node->type_expression.primitive.kind = CZ_AST_TYPE_KIND_BOOL;
                         break;
                     case CZ_TT_INT32:
-                        node->type_expression.primitive.kind = CZ_TYPE_KIND_INT32;
+                        node->type_expression.primitive.kind = CZ_AST_TYPE_KIND_INT32;
                         break;
                     case CZ_TT_FLOAT:
-                        node->type_expression.primitive.kind = CZ_TYPE_KIND_FLOAT;
+                        node->type_expression.primitive.kind = CZ_AST_TYPE_KIND_FLOAT;
                         break;
                     case CZ_TT_IDENTIFIER:
-                        node->type_expression.primitive.kind = CZ_TYPE_KIND_IDENTIFIER;
+                        node->type_expression.primitive.kind = CZ_AST_TYPE_KIND_IDENTIFIER;
                     default:
                         break;
                 }

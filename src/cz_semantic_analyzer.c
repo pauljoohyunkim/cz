@@ -1,11 +1,29 @@
+#include <string.h>
 #include "cz_parser.h"
 #include "cz_semantic_analyzer.h"
 
 #define NULL_POINTER_TO_GOTO(ptr, label) do { if ((ptr) == NULL) goto label; } while (0)
 #define INVALID_NODE_TYPE_TO_GOTO(node, node_type_enum, label) do { if ((node)->node_type != (node_type_enum)) goto label; } while (0)
 
+static inline char* create_null_terminated_string(const char* text, size_t length) {
+    char* nt_str = NULL;
+    if (text == NULL || length == 0) goto error_cleanup;
+
+    nt_str = (char*) malloc(sizeof(char) * (length + 1));
+    NULL_POINTER_TO_GOTO(nt_str, error_cleanup);
+
+    memcpy(nt_str, text, length);
+    nt_str[length] = '\0';
+
+    return nt_str;
+
+error_cleanup:
+    return NULL;
+}
+
 const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTypeTable* gtt) {
-    CZ_Type* type = NULL;
+    CZ_Type* type = NULL;       // Resolved type
+    char* query_name = NULL;
     NULL_POINTER_TO_GOTO(type_node, error_cleanup);
     NULL_POINTER_TO_GOTO(gtt, error_cleanup);
     if (type_node->node_type != CZ_AST_TypeNodeType) goto error_cleanup;
@@ -13,6 +31,92 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
     if (type_node->type_expression.is_function_type) {
         printf("Currently function type not supported.\n");
         goto error_cleanup;
+    }
+
+    switch (type_node->type_expression.primitive.kind) {
+        case CZ_AST_TYPE_KIND_INT32:
+            {
+                CZ_Type query = {
+                    .kind = CZ_TYPE_KIND_PRIMITIVE,
+                    .is_const = type_node->type_expression.is_const,
+                    .primitive = CZ_PRIMITIVE_INT32
+                };
+
+                type = cz_global_type_table_find_type(gtt, &query);
+
+                if (type == NULL) {
+                    // Create and add to GTT
+                    type = cz_type_create(CZ_PRIMITIVE_INT32, type_node->type_expression.is_const);
+                    NULL_POINTER_TO_GOTO(type, error_cleanup);
+
+                    if (cz_global_type_table_push_type(gtt, NULL, type) != 1) {
+                        goto error_cleanup;
+                    }
+                }
+            }
+            break;
+        case CZ_AST_TYPE_KIND_BOOL:
+            {
+                CZ_Type query = {
+                    .kind = CZ_TYPE_KIND_PRIMITIVE,
+                    .is_const = type_node->type_expression.is_const,
+                    .primitive = CZ_PRIMITIVE_BOOL
+                };
+
+                type = cz_global_type_table_find_type(gtt, &query);
+
+                if (type == NULL) {
+                    // Create and add to GTT
+                    type = cz_type_create(CZ_PRIMITIVE_BOOL, type_node->type_expression.is_const);
+                    NULL_POINTER_TO_GOTO(type, error_cleanup);
+
+                    if (cz_global_type_table_push_type(gtt, NULL, type) != 1) {
+                        goto error_cleanup;
+                    }
+                }
+            }
+            break;
+        case CZ_AST_TYPE_KIND_FLOAT:
+            {
+                CZ_Type query = {
+                    .kind = CZ_TYPE_KIND_PRIMITIVE,
+                    .is_const = type_node->type_expression.is_const,
+                    .primitive = CZ_PRIMITIVE_FLOAT
+                };
+
+                type = cz_global_type_table_find_type(gtt, &query);
+                if (type == NULL) {
+                    // Create and add to GTT
+                    type = cz_type_create(CZ_PRIMITIVE_FLOAT, type_node->type_expression.is_const);
+                    NULL_POINTER_TO_GOTO(type, error_cleanup);
+
+                    if (cz_global_type_table_push_type(gtt, NULL, type) != 1) {
+                        goto error_cleanup;
+                    }
+                }
+            }
+            break;
+        case CZ_AST_TYPE_KIND_IDENTIFIER:
+            //{
+            //    query_name = create_null_terminated_string(type_node->type_expression.primitive.name, type_node->type_expression.primitive.name_len);
+            //    NULL_POINTER_TO_GOTO(query_name, error_cleanup);
+
+            //    type = cz_global_type_table_find_type_by_name(gtt, query_name);
+            //    NULL_POINTER_TO_GOTO(type, error_cleanup);
+
+            //    if (type_node->type_expression.is_const && !type->is_const) {
+            //        CZ_Type query = *type;
+            //        query.is_const = true;
+
+            //        const CZ_Type* const_version = cz_global_type_table_find_type(gtt, &query);
+            //        if (const_version == NULL) {
+            //            // Create and add to GTT
+            //            CZ_Type* new_const_type = cz_type_create(type->kind, true);
+            //        }
+
+            //    }
+            //}
+            break;
     }
 
     /*
@@ -34,9 +138,11 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
     }
     */
     
+    free(query_name);
     return type;
 error_cleanup:
     cz_type_free(type);
+    free(query_name);
     return NULL;
 }
 
