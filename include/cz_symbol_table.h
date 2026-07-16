@@ -52,6 +52,22 @@ struct CZ_Environment {
     unsigned int scope_level;
 };
 
+/**
+ * @brief Create CZ_Symbol
+ * 
+ * @param kind Symbol kind
+ * @param name Name of the symbol. Will internally copy.
+ * @return CZ_Symbol* Allocated CZ_Symbol on success, NULL on failure.
+ */
+CZ_Symbol* cz_symbol_create(CZ_SymbolKind kind, const char* name);
+
+/**
+ * @brief Frees allocated CZ_Symbol
+ * 
+ * @param symbol Pointer to CZ_Symbol
+ */
+void cz_symbol_free(CZ_Symbol* symbol);
+
 #ifdef __cplusplus
 }
 #endif

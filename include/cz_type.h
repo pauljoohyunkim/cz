@@ -99,6 +99,13 @@ void cz_type_free(CZ_Type* type);
 CZ_GlobalTypeTable* cz_global_type_table_create(void);
 
 /**
+ * @brief Free CZ_GlobalTypeTable
+ * 
+ * @param gtt Pointer to CZ_GlobalTypeTable
+ */
+void cz_global_type_table_free(CZ_GlobalTypeTable* gtt);
+
+/**
  * @brief Push a type to global type table.
  * 
  * @param gtt Pointer to CZ_GlobalTypeTable
