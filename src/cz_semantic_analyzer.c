@@ -7,6 +7,7 @@
 CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser) {
     CZ_SemanticAnalyzer* sa = NULL;
     CZ_Environment* global_env = NULL;
+    CZ_GlobalTypeTable* gtt = NULL;
     CZ_ErrorList* error_list = NULL;
     if (parser == NULL) return NULL;
 
@@ -15,6 +16,9 @@ CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser) {
 
     global_env = cz_environment_create();
     NULL_POINTER_TO_GOTO(global_env, error_cleanup);
+
+    gtt = cz_global_type_table_create();
+    NULL_POINTER_TO_GOTO(gtt, error_cleanup);
 
     error_list = cz_error_list_create();
     NULL_POINTER_TO_GOTO(error_list, error_cleanup);
@@ -44,6 +48,7 @@ CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser) {
     return sa;
 error_cleanup:
     cz_environment_free(global_env);
+    cz_global_type_table_free(gtt);
     cz_semantic_analyzer_free(sa);
     cz_error_list_free(error_list);
     return NULL;
@@ -55,6 +60,7 @@ void cz_semantic_analyzer_free(CZ_SemanticAnalyzer* sa) {
         free(sa->tokens);
         cz_ast_root_free(sa->program);
         cz_environment_free(sa->global_env);
+        cz_global_type_table_free(sa->gtt);
         cz_error_list_free(sa->error_list);
     }
     free(sa);

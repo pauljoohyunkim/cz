@@ -18,7 +18,9 @@ typedef struct {
     CZ_AST_Node* program;
 
     CZ_Environment* global_env;
-    CZ_Type current_function_return;
+    CZ_GlobalTypeTable* gtt;
+
+    CZ_Type* current_function_return;
     //bool is_inside_loop;
 
     CZ_ErrorList* error_list;
