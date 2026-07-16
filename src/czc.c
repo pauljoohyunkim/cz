@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "cz_lexer.h"
 #include "cz_parser.h"
-//#include "cz_semantic_analyzer.h"
+#include "cz_semantic_analyzer.h"
 //#include "cz_code_generator.h"
 
 static long get_file_size(const char *filename) {
@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
     CZ_Lexer* lexer = NULL;
     CZ_Parser* parser = NULL;
     CZ_SemanticAnalyzer* sa = NULL;
-    CZ_CodeGenerator* cg = NULL;
+    //CZ_CodeGenerator* cg = NULL;
     bool generate_code = true;
 
     FILE* fp = fopen(source_filename, "r");
@@ -100,13 +100,13 @@ int main(int argc, char** argv) {
 
     cz_ast_root_print(parser->program, 0);
 
-    /*
     // Semantic Analyzer
     sa = cz_semantic_analyzer_create(parser);
     if (sa == NULL) {
         printf("Semantic Analyzer creation failure\n");
         goto error_cleanup_exit;
     }
+    /*
     ret = cz_semantic_analyzer_build_global_symbol_table(sa);
     if (ret != 1) {
         printf("Failure semantic analysis (pass I)\n");
@@ -175,7 +175,7 @@ int main(int argc, char** argv) {
     return 0;
 
 error_cleanup_exit:
-    cz_code_generator_free(cg);
+    //cz_code_generator_free(cg);
     cz_semantic_analyzer_free(sa);
     cz_parser_free(parser);
     cz_lexer_free(lexer);
