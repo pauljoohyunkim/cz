@@ -293,6 +293,52 @@ error_cleanup:
     return 0;
 }
 
+static bool cz_semantic_analyzer_newtypedef_detect_cycle(const CZ_Type* type, const char* name) {
+    NULL_POINTER_TO_GOTO(type, error_cleanup);
+    NULL_POINTER_TO_GOTO(name, error_cleanup);
+
+    switch (type->kind) {
+        case CZ_TYPE_KIND_NEWTYPE:
+            // 1. Base Case: If this newtype's name matches the target name, we've found a cycle!
+            // (Using pointer equality assuming your names are pooled in your String Pool)
+            if (type->newtype.name == name || strcmp(type->newtype.name, name) == 0) {
+                return true;
+            }
+            // 2. Recursive Case: Check the underlying type this newtype wraps
+            return cz_semantic_analyzer_newtypedef_detect_cycle(type->newtype.underlying, name);
+
+        case CZ_TYPE_KIND_CONST:
+            // A const wrapper (e.g. const T) is a cycle if T is a cycle
+            return cz_semantic_analyzer_newtypedef_detect_cycle(type->const_of, name);
+
+        case CZ_TYPE_KIND_REFERENCE:
+            // A reference type (e.g. ref T) is a cycle if T is a cycle
+            return cz_semantic_analyzer_newtypedef_detect_cycle(type->reference_to, name);
+
+        case CZ_TYPE_KIND_FUNCTION:
+            // Check return type
+            if (cz_semantic_analyzer_newtypedef_detect_cycle(type->function.return_type, name)) {
+                return true;
+            }
+            // Check all parameter types
+            for (unsigned int i = 0; i < type->function.param_count; i++) {
+                if (cz_semantic_analyzer_newtypedef_detect_cycle(type->function.param_types[i], name)) {
+                    return true;
+                }
+            }
+            return false;
+
+        case CZ_TYPE_KIND_PRIMITIVE:
+        case CZ_TYPE_KIND_STRUCT:
+            // Primitives and nominal structs are leaf types; they can't recursively contain 'name'
+            return false;
+    }
+
+    return false;
+error_cleanup:
+    return false;
+}
+
 static int cz_semantic_analyzer_register_newtypedef(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl) {
     CZ_Type* new_type = NULL;
     NULL_POINTER_TO_GOTO(env, error_cleanup);
@@ -319,7 +365,15 @@ static int cz_semantic_analyzer_register_newtypedef(CZ_SemanticAnalyzer* sa, CZ_
         goto error_cleanup;
     }
 
-    // 3. Construct and push.
+    // 3. Newtype cycle detection. (If cycle, bad)
+    // While this is not possible, added for future extension.
+    if (cz_semantic_analyzer_newtypedef_detect_cycle(base_type, alias_type_node->identifier.name)) {
+        cz_error_list_push_error(sa->error_list, sa->filename, base_type_node->line, base_type_node->col,
+                                 "Type \"%s\" cannot be a newtype due to it being cyclically defined.", alias_type_node->identifier.name);
+        goto error_cleanup;
+    }
+
+    // 4. Construct and push.
     new_type = cz_type_create(CZ_TYPE_KIND_NEWTYPE);
     new_type->newtype.name = alias_type_node->identifier.name;
     new_type->newtype.underlying = base_type;
