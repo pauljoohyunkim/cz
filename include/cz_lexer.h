@@ -31,10 +31,30 @@ typedef struct {
     CZ_StringPool* sp;
 } CZ_Lexer;
 
+/**
+ * @brief Allocate CZ_StringPool
+ * 
+ * @return CZ_StringPool* Pointer to CZ_StringPool allocated on success, NULL on failure.
+ */
 CZ_StringPool* cz_string_pool_create(void);
 
+/**
+ * @brief Free CZ_StringPool
+ * 
+ * @param sp Pointer to CZ_StringPool.
+ */
 void cz_string_pool_free(CZ_StringPool* sp);
 
+/**
+ * @brief Push string of specific length and return the pointer. In the case that it already exists, it simply returns the pointer.
+ * 
+ * @param sp Pointer to CZ_StringPool
+ * @param text Pointer to text.
+ * @param length Length of text
+ * @return const char* Pointer to string stored inside string pool.
+ * 
+ * Note that text is coped internally.
+ */
 const char* cz_string_pool_push(CZ_StringPool* sp, const char* text, size_t length);
 
 /**

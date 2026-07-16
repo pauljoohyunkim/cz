@@ -1,19 +1,2 @@
-i :: const int32 = 1;
-j :: int32 = i + 1;
-
-typedef int32 int;
-
-func fibo :: (n :: int) -> int {
-    if (n == 1) {
-        return 1;
-    } else {
-
-    }
-    if (n == 2) {
-        return 1;
-    } else {
-        
-    }
-
-    return fibo(n-2) + fibo(n-1);
-}
+typedef int32 MyNewType;
+newtype MyNewType MyNewType;

@@ -112,14 +112,13 @@ int main(int argc, char** argv) {
         goto error_cleanup_exit;
     }
 
-    /*
-    printf("--- Global Environment ---\n");
-    cz_environment_print(sa->global_env, 0);
-    ret = cz_semantic_analyzer_full_analyze(sa);
-    if (ret != 1) {
-        printf("Failure semantic analysis (pass II)\n");
-        goto error_cleanup_exit;
-    }
+    //printf("--- Global Environment ---\n");
+    //cz_environment_print(sa->global_env, 0);
+    //ret = cz_semantic_analyzer_full_analyze(sa);
+    //if (ret != 1) {
+    //    printf("Failure semantic analysis (pass II)\n");
+    //    goto error_cleanup_exit;
+    //}
 
     if (sa->error_list->n_errors > 0) {
         for (unsigned int i = 0; i < sa->error_list->n_errors; i++) {
@@ -130,6 +129,7 @@ int main(int argc, char** argv) {
         }
         generate_code = false;
     }
+    /*
 
     if (!generate_code) {
         printf("Skipping code generation\n");

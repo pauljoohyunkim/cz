@@ -243,7 +243,7 @@ static int cz_semantic_analyzer_build_global_table(CZ_SemanticAnalyzer* sa) {
                 cz_semantic_analyzer_register_typedef(sa, sa->global_env, statement);
                 break;
             case CZ_AST_NewtypeDeclarationNodeType:
-                //cz_semantic_analyzer_register_newtypedef(sa->global_env, statement);
+                cz_semantic_analyzer_register_newtypedef(sa, sa->global_env, statement);
                 break;
             default:
                 cz_error_list_push_error(sa->error_list, sa->filename, statement->line, statement->col, "Unrecognized global statement.");
@@ -290,5 +290,48 @@ static int cz_semantic_analyzer_register_typedef(CZ_SemanticAnalyzer* sa, CZ_Env
     return 1;
 
 error_cleanup:
+    return 0;
+}
+
+static int cz_semantic_analyzer_register_newtypedef(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl) {
+    CZ_Type* new_type = NULL;
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(decl, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_NewtypeDeclarationNodeType, error_cleanup);
+
+    // newtype x y;
+    const CZ_AST_Node* base_type_node = decl->typedef_declaration.type;
+    const CZ_AST_Node* alias_type_node = decl->typedef_declaration.new_type;
+
+    // 1. Check if x is in global type table. (If not, this is bad)
+    const CZ_Type* base_type = cz_type_from_type_node(base_type_node, sa->gtt);
+    if (base_type == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, base_type_node->line, base_type_node->col,
+                                 "Base type could not be deduced.");
+        goto error_cleanup;
+    }
+
+    // 2. Check if y is not in global type table. (If yes, this is bad: duplicate definition)
+    const CZ_Type* new_type_lookup_attempt = cz_global_type_table_find_type_by_name(sa->gtt, alias_type_node->identifier.name);
+    if (new_type_lookup_attempt != NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, base_type_node->line, base_type_node->col,
+                                 "Type \"%s\" previously defined.", alias_type_node->identifier.name);
+        goto error_cleanup;
+    }
+
+    // 3. Construct and push.
+    new_type = cz_type_create(CZ_TYPE_KIND_NEWTYPE);
+    new_type->newtype.name = alias_type_node->identifier.name;
+    new_type->newtype.underlying = base_type;
+    if (cz_global_type_table_push_type(sa->gtt, alias_type_node->identifier.name, new_type) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, base_type_node->line, base_type_node->col,
+                                 "Newtype \"%s\" could not be registered.", alias_type_node->identifier.name);
+        goto error_cleanup;
+    }
+
+    return 1;
+
+error_cleanup:
+    cz_type_free(new_type);
     return 0;
 }

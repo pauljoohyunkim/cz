@@ -147,6 +147,7 @@ int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, co
         lookup_type = type;
     }
 
+    // TODO: Fail when another push with the same name.
     if (name != NULL) {
         if (gtt->named_entry_count == gtt->named_entry_capacity) {
             new_names = (const char**) realloc(gtt->names, sizeof(const char*) * (gtt->named_entry_capacity) * 2);
