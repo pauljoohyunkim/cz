@@ -23,7 +23,7 @@ error_cleanup:
 static void cz_struct_layout_free(CZ_StructLayout* layout) {
     if (layout != NULL) {
         for (unsigned int i = 0; i < layout->field_count; i++) {
-            free((void*)layout->fields[i].name);
+            //free((void*)layout->fields[i].name);
             layout->fields[i].name = NULL;
 
             // Type is owned by type table.
@@ -42,7 +42,7 @@ void cz_type_free(CZ_Type* type) {
                 // Nothing to do
                 break;
             case CZ_TYPE_KIND_STRUCT:
-                free((void*)type->structure.name);
+                //free((void*)type->structure.name);
                 type->structure.name = NULL;
                 cz_struct_layout_free((void*)type->structure.layout);
                 type->structure.layout = NULL;
@@ -51,7 +51,7 @@ void cz_type_free(CZ_Type* type) {
                 // Nothing to do
                 break;
             case CZ_TYPE_KIND_NEWTYPE:
-                free((void*)type->newtype.name);
+                //free((void*)type->newtype.name);
                 type->newtype.name = NULL;
                 break;
             case CZ_TYPE_KIND_FUNCTION:
@@ -103,7 +103,7 @@ error_cleanup:
 void cz_global_type_table_free(CZ_GlobalTypeTable* gtt) {
     if (gtt != NULL) {
         for (unsigned int i = 0; i < gtt->named_entry_count; i++) {
-            free((void*)gtt->names[i]);
+            //free((void*)gtt->names[i]);
             gtt->names[i] = NULL;
             // Do not free types inside named_types.
         }
@@ -123,7 +123,6 @@ int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, co
     const char** new_names = NULL;
     CZ_Type** new_named_types = NULL;
     CZ_Type** new_all_allocations = NULL;
-    char* name_cpy = NULL;
     NULL_POINTER_TO_GOTO(gtt, error_cleanup);
     NULL_POINTER_TO_GOTO(type, error_cleanup);
 
@@ -152,11 +151,9 @@ int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, co
             new_named_types = NULL;
             gtt->named_entry_capacity *= 2;
         }
-        name_cpy = strdup(name);
-        NULL_POINTER_TO_GOTO(name_cpy, error_cleanup);
 
         gtt->named_types[gtt->named_entry_count] = (CZ_Type*) type;
-        gtt->names[gtt->named_entry_count] = (char*) name_cpy;
+        gtt->names[gtt->named_entry_count] = name;
         gtt->named_entry_count++;
     }
 
@@ -166,7 +163,6 @@ error_cleanup:
     free(new_names);
     free(new_named_types);
     free(new_all_allocations);
-    free(name_cpy);
     return 0;
 }
 
