@@ -4,6 +4,101 @@
 #include <ctype.h>
 #include "cz_lexer.h"
 
+#define NULL_POINTER_TO_GOTO(ptr, label) do { if ((ptr) == NULL) goto label; } while (0)
+
+static inline char* create_null_terminated_string(const char* text, size_t length) {
+    char* nt_str = NULL;
+    if (text == NULL || length == 0) goto error_cleanup;
+
+    nt_str = (char*) malloc(sizeof(char) * (length + 1));
+    NULL_POINTER_TO_GOTO(nt_str, error_cleanup);
+
+    memcpy(nt_str, text, length);
+    nt_str[length] = '\0';
+
+    return nt_str;
+
+error_cleanup:
+    return NULL;
+}
+
+
+CZ_StringPool* cz_string_pool_create(void) {
+    const char** strings = NULL;
+    CZ_StringPool* sp = NULL;
+
+    sp = (CZ_StringPool*) calloc(1, sizeof(CZ_StringPool));
+    NULL_POINTER_TO_GOTO(sp, error_cleanup);
+
+    sp->capacity = 8;
+    strings = (const char**) calloc(sp->capacity, sizeof(const char*));
+    NULL_POINTER_TO_GOTO(strings, error_cleanup);
+
+    return sp;
+error_cleanup:
+    free(strings);
+    cz_string_pool_free(sp);
+    return NULL;
+}
+
+void cz_string_pool_free(CZ_StringPool* sp) {
+    if (sp != NULL) {
+        for (unsigned int i = 0; i < sp->count; i++) {
+            free((void*)sp->strings[i]);
+            sp->strings[i] = NULL;
+        }
+    }
+    free(sp);
+}
+
+const char* cz_string_pool_push(CZ_StringPool* sp, const char* text, size_t length) {
+    const char* nt_str = NULL;
+    const char** new_strings = NULL;
+    NULL_POINTER_TO_GOTO(sp, error_cleanup);
+    NULL_POINTER_TO_GOTO(text, error_cleanup);
+    if (length == 0) goto error_cleanup;
+
+    // Search pool
+    for (unsigned int i = 0; sp->count; i++) {
+        if (length == strlen(sp->strings[i]) && strncmp(sp->strings[i], text, length) == 0) {
+            nt_str = sp->strings[i];
+            break;
+        }
+    }
+
+    if (nt_str == NULL) {
+        // Create and push.
+        if (sp->capacity == sp->count) {
+            // Increase capacity.
+            new_strings = (const char**) realloc(sp->strings, sizeof(const char*) * sp->capacity * 2);
+            NULL_POINTER_TO_GOTO(new_strings, error_cleanup);
+
+            // Move ownership of newly allocated strings.
+            sp->strings = new_strings;
+            new_strings = NULL;
+            sp->capacity *= 2;
+
+            // Create string
+            nt_str = create_null_terminated_string(text, length);
+            NULL_POINTER_TO_GOTO(nt_str, error_cleanup);
+
+            // Transfer string
+            sp->strings[sp->count] = nt_str;
+            nt_str = NULL;
+
+            sp->count++;
+        }
+
+    }
+
+    // Return the pointer to inside string pool
+    return nt_str;
+error_cleanup:
+    free((void*)nt_str);
+    free(new_strings);
+    return NULL;
+}
+
 CZ_Lexer* cz_lexer_create(const char* code, const char* filename) {
     if (code == NULL) {
         return NULL;
