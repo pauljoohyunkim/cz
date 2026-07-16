@@ -185,8 +185,7 @@ struct CZ_AST_Node {
                 struct {
                     // for is_function_type == false
                     /** Type name (not a node) */
-                    char* name;
-                    size_t name_len;
+                    const char* name;
 
                     enum {
                         CZ_AST_TYPE_KIND_INT32,
@@ -234,14 +233,12 @@ struct CZ_AST_Node {
             CZ_TokenType literal_type;
             /** Lexeme text (not a node) */
             char* lexeme;
-            size_t lexeme_length;
         } literal;
 
         /** Used for node_type == CZ_AST_IdentifierNodeType */
         struct {
             /** Identifier name (not a node) */
             char* name;
-            size_t name_len;
         } identifier;
 
         /** Used for node_type == CZ_AST_CastExpressionNodeType */

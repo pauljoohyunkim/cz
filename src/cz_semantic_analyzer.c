@@ -5,22 +5,6 @@
 #define NULL_POINTER_TO_GOTO(ptr, label) do { if ((ptr) == NULL) goto label; } while (0)
 #define INVALID_NODE_TYPE_TO_GOTO(node, node_type_enum, label) do { if ((node)->node_type != (node_type_enum)) goto label; } while (0)
 
-static inline char* create_null_terminated_string(const char* text, size_t length) {
-    char* nt_str = NULL;
-    if (text == NULL || length == 0) goto error_cleanup;
-
-    nt_str = (char*) malloc(sizeof(char) * (length + 1));
-    NULL_POINTER_TO_GOTO(nt_str, error_cleanup);
-
-    memcpy(nt_str, text, length);
-    nt_str[length] = '\0';
-
-    return nt_str;
-
-error_cleanup:
-    return NULL;
-}
-
 const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTypeTable* gtt) {
     CZ_Type* type = NULL;       // Resolved type
     char* query_name = NULL;
@@ -174,6 +158,9 @@ CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser) {
     sa->global_env = global_env;
     global_env = NULL;
 
+    sa->gtt = gtt;
+    gtt = NULL;
+
     // Transfer error list created.
     sa->error_list = error_list;
     error_list = NULL;
@@ -192,6 +179,9 @@ CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser) {
     sa->program = parser->program;
     parser->program = NULL;
 
+    sa->sp = parser->sp;
+    parser->sp = NULL;
+
     return sa;
 error_cleanup:
     cz_environment_free(global_env);
@@ -206,6 +196,7 @@ void cz_semantic_analyzer_free(CZ_SemanticAnalyzer* sa) {
         free(sa->code);
         free(sa->tokens);
         cz_ast_root_free(sa->program);
+        cz_string_pool_free(sa->sp);
         cz_environment_free(sa->global_env);
         cz_global_type_table_free(sa->gtt);
         cz_error_list_free(sa->error_list);

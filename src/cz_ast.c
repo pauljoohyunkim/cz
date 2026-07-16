@@ -294,7 +294,7 @@ void cz_ast_root_print(const CZ_AST_Node* node, unsigned int depth) {
                 cz_ast_root_print(node->type_expression.function_signature.parameter_list, depth+1);
                 cz_ast_root_print(node->type_expression.function_signature.return_type, depth+1);
             } else {
-                printf("TypeNode: %s %.*s\n", node->type_expression.is_const ? "(const)" : "", (int)node->type_expression.primitive.name_len, node->type_expression.primitive.name);
+                printf("TypeNode: %s %s\n", node->type_expression.is_const ? "(const)" : "", node->type_expression.primitive.name);
             }
             break;
         case CZ_AST_BinaryExpressionNodeType:
@@ -372,10 +372,10 @@ void cz_ast_root_print(const CZ_AST_Node* node, unsigned int depth) {
             }
             break;
         case CZ_AST_LiteralNodeType:
-            printf("Literal: %.*s\n", (unsigned int) node->literal.lexeme_length, node->literal.lexeme);
+            printf("Literal: %s\n", node->literal.lexeme);
             break;
         case CZ_AST_IdentifierNodeType:
-            printf("Identifier: %.*s\n", (unsigned int) node->identifier.name_len, node->identifier.name);
+            printf("Identifier: %s\n", node->identifier.name);
             break;
         case CZ_AST_CastExpressionNodeType:
             printf("CastExpression\n");

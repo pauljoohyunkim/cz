@@ -84,6 +84,9 @@ CZ_Parser* cz_parser_create(CZ_Lexer* lexer) {
 
     parser->filename = lexer->filename;
 
+    parser->sp = lexer->sp;
+    lexer->sp = NULL;
+
     return parser;
 }
 
@@ -109,6 +112,8 @@ void cz_parser_free(CZ_Parser* parser) {
         parser->error_list = NULL;
         cz_ast_root_free(parser->program);
         parser->program = NULL;
+        cz_string_pool_free(parser->sp);
+        parser->sp = NULL;
     }
     free(parser);
 }
@@ -1206,8 +1211,7 @@ static CZ_AST_Node* cz_parser_create_base_type(CZ_Parser* parser) {
 
                 node->type_expression.is_reference = false;
                 node->type_expression.is_function_type = false;
-                node->type_expression.primitive.name = (char*) token->lexeme;
-                node->type_expression.primitive.name_len = token->length;
+                node->type_expression.primitive.name = (const char*) token->lexeme;
                 switch (peeked) {
                     case CZ_TT_BOOL:
                         node->type_expression.primitive.kind = CZ_AST_TYPE_KIND_BOOL;
@@ -1257,8 +1261,7 @@ static CZ_AST_Node* cz_parser_create_literal(CZ_Parser* parser) {
             if (node == NULL) return NULL;
 
             node->literal.literal_type = token->token_type;
-            node->literal.lexeme = (char*) token->lexeme;
-            node->literal.lexeme_length = token->length;
+            node->literal.lexeme = (const char*) token->lexeme;
             break;
         default:
             return NULL;
@@ -1280,8 +1283,7 @@ static CZ_AST_Node* cz_parser_create_identifier(CZ_Parser* parser) {
     node = cz_ast_node_create(CZ_AST_IdentifierNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
     if (node == NULL) return NULL;
 
-    node->identifier.name = (char*) token->lexeme;
-    node->identifier.name_len = token->length;
+    node->identifier.name = (const char*) token->lexeme;
 
     return node;
 }

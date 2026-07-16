@@ -166,9 +166,9 @@ int main(int argc, char** argv) {
 
 
     cz_code_generator_free(cg);
-    cz_semantic_analyzer_free(sa);
     */
 
+    cz_semantic_analyzer_free(sa);
     cz_parser_free(parser);
     cz_lexer_free(lexer);
 

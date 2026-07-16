@@ -16,6 +16,7 @@ typedef struct {
     CZ_Token* tokens;
     size_t n_tokens;
     CZ_AST_Node* program;
+    CZ_StringPool* sp;
 
     CZ_Environment* global_env;
     CZ_GlobalTypeTable* gtt;

@@ -11,6 +11,12 @@ extern "C" {
 #include "cz_error.h"
 
 typedef struct {
+    const char** strings;
+    unsigned int count;
+    unsigned int capacity;
+} CZ_StringPool;
+
+typedef struct {
     const char* filename;
     char* code;
     size_t code_length;
@@ -21,7 +27,15 @@ typedef struct {
     size_t n_tokens_capacity;
     size_t n_tokens;
     CZ_ErrorList* error_list;
+
+    CZ_StringPool* sp;
 } CZ_Lexer;
+
+CZ_StringPool* cz_string_pool_create(void);
+
+void cz_string_pool_free(CZ_StringPool* sp);
+
+const char* cz_string_pool_push(CZ_StringPool* sp, const char* text, size_t length);
 
 /**
  * @brief Creates CZ_Lexer.
