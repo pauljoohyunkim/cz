@@ -66,11 +66,67 @@ void cz_semantic_analyzer_free(CZ_SemanticAnalyzer* sa) {
     free(sa);
 }
 
+static int cz_semantic_analyzer_build_global_table(CZ_SemanticAnalyzer* sa);
+
 // Will be invoking pass 1 and pass 2.
 int cz_semantic_analyzer_analyze(CZ_SemanticAnalyzer* sa) {
     NULL_POINTER_TO_GOTO(sa, error_cleanup);
 
+    cz_semantic_analyzer_build_global_table(sa);
+
     return 1;
+error_cleanup:
+    return 0;
+}
+
+/* --- PASS 1 ---*/
+static int cz_semantic_analyzer_register_function_decl(CZ_Environment* env, const CZ_AST_Node* decl);
+static int cz_semantic_analyzer_register_struct_decl(CZ_Environment* env, const CZ_AST_Node* decl);
+static int cz_semantic_analyzer_register_variable_decl(CZ_Environment* env, const CZ_AST_Node* decl);
+static int cz_semantic_analyzer_register_typedef(CZ_Environment* env, const CZ_AST_Node* decl);
+static int cz_semantic_analyzer_register_newtypedef(CZ_Environment* env, const CZ_AST_Node* decl);
+
+/**
+ * @brief Pass 1 Function: Scans through global statements.
+ * 
+ * @param sa Pointer to CZ_SemanticAnalyzer
+ * @return int 1 on success, 0 on failure
+ * 
+ * Type checking is not done at this stage.
+ */
+static int cz_semantic_analyzer_build_global_table(CZ_SemanticAnalyzer* sa) {
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(sa->program, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(sa->program, CZ_AST_ProgramNodeType, error_cleanup);
+    NULL_POINTER_TO_GOTO(sa->program->program.global_declaration_list, error_cleanup);
+
+    for (unsigned int i = 0; i < sa->program->program.declaration_count; i++) {
+        const CZ_AST_Node* statement = sa->program->program.global_declaration_list[i];
+        if (statement == NULL) return 0;
+
+        // TODO: Log errors.
+        switch (statement->node_type) {
+            case CZ_AST_FunctionDeclarationNodeType:
+                cz_semantic_analyzer_register_function_decl(sa->global_env, statement);
+                break;
+            case CZ_AST_StructDeclarationNodeType:
+                cz_semantic_analyzer_register_struct_decl(sa->global_env, statement);
+                break;
+            case CZ_AST_VariableDeclarationNodeType:
+                cz_semantic_analyzer_register_variable_decl(sa->global_env, statement);
+                break;
+            case CZ_AST_TypedefDeclarationNodeType:
+                cz_semantic_analyzer_register_typedef(sa->global_env, statement);
+                break;
+            case CZ_AST_NewtypeDeclarationNodeType:
+                cz_semantic_analyzer_register_newtypedef(sa->global_env, statement);
+                break;
+            default:
+                cz_error_list_push_error(sa->error_list, sa->filename, statement->line, statement->col, "Unrecognized global statement.");
+                break;
+        }
+    }
+
 error_cleanup:
     return 0;
 }
