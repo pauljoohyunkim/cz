@@ -27,6 +27,8 @@ typedef struct {
     size_t n_tokens_capacity;
     size_t n_tokens;
     CZ_ErrorList* error_list;
+
+    CZ_StringPool* sp;
 } CZ_Lexer;
 
 CZ_StringPool* cz_string_pool_create(void);

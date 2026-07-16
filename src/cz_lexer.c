@@ -34,6 +34,9 @@ CZ_StringPool* cz_string_pool_create(void) {
     strings = (const char**) calloc(sp->capacity, sizeof(const char*));
     NULL_POINTER_TO_GOTO(strings, error_cleanup);
 
+    sp->strings = strings;
+    strings = NULL;
+
     return sp;
 error_cleanup:
     free(strings);
@@ -59,7 +62,7 @@ const char* cz_string_pool_push(CZ_StringPool* sp, const char* text, size_t leng
     if (length == 0) goto error_cleanup;
 
     // Search pool
-    for (unsigned int i = 0; sp->count; i++) {
+    for (unsigned int i = 0; i < sp->count; i++) {
         if (length == strlen(sp->strings[i]) && strncmp(sp->strings[i], text, length) == 0) {
             nt_str = sp->strings[i];
             break;
@@ -77,18 +80,16 @@ const char* cz_string_pool_push(CZ_StringPool* sp, const char* text, size_t leng
             sp->strings = new_strings;
             new_strings = NULL;
             sp->capacity *= 2;
-
-            // Create string
-            nt_str = create_null_terminated_string(text, length);
-            NULL_POINTER_TO_GOTO(nt_str, error_cleanup);
-
-            // Transfer string
-            sp->strings[sp->count] = nt_str;
-            nt_str = NULL;
-
-            sp->count++;
         }
 
+        // Create string
+        nt_str = create_null_terminated_string(text, length);
+        NULL_POINTER_TO_GOTO(nt_str, error_cleanup);
+
+        // Transfer string (but keep the shallow copy)
+        sp->strings[sp->count] = nt_str;
+
+        sp->count++;
     }
 
     // Return the pointer to inside string pool
@@ -128,6 +129,12 @@ CZ_Lexer* cz_lexer_create(const char* code, const char* filename) {
     // Add error list
     lexer->error_list = cz_error_list_create();
     if (lexer->error_list == NULL) {
+        cz_lexer_free(lexer);
+        return NULL;
+    }
+
+    lexer->sp = cz_string_pool_create();
+    if (lexer->sp == NULL) {
         cz_lexer_free(lexer);
         return NULL;
     }
@@ -225,10 +232,12 @@ static inline char peek(CZ_Lexer* lexer, unsigned int n) { return lexer->idx + n
  * @return int 1 if successful, 0 if failure.
  */
 static inline int cz_lexer_push_token_helper(CZ_Lexer* lexer, CZ_TokenType token_type, size_t length) {
+    const char* lexeme = cz_string_pool_push(lexer->sp, lexer->code + lexer->idx, length);
+    if (lexeme == NULL) return 0;
+
     return cz_lexer_push_token(lexer, (CZ_Token){
                                         .token_type = token_type,
-                                        .lexeme = lexer->code + lexer->idx,
-                                        .length = length,
+                                        .lexeme = lexeme,
                                         .line = lexer->row,
                                         .column = lexer->col
                                     });
@@ -699,7 +708,12 @@ int cz_lexer_analyze(CZ_Lexer* lexer) {
         }
     }
 
-    if (cz_lexer_push_token_helper(lexer, CZ_TT_EOF, 0) != 1) {
+    if (cz_lexer_push_token(lexer, (CZ_Token){
+            .token_type = CZ_TT_EOF,
+            .lexeme = NULL,
+            .line = lexer->row,
+            .column = lexer->col
+        }) != 1) {
         return 0;
     }
 

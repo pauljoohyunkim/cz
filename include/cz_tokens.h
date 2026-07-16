@@ -81,7 +81,6 @@ typedef enum {
 typedef struct {
     CZ_TokenType token_type;
     const char* lexeme;
-    unsigned int length;
     unsigned int line;
     unsigned int column;
 } CZ_Token;
