@@ -4,6 +4,42 @@
 #define NULL_POINTER_TO_GOTO(ptr, label) do { if ((ptr) == NULL) goto label; } while (0)
 #define INVALID_NODE_TYPE_TO_GOTO(node, node_type_enum, label) do { if ((node)->node_type != (node_type_enum)) goto label; } while (0)
 
+const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTypeTable* gtt) {
+    CZ_Type* type = NULL;
+    NULL_POINTER_TO_GOTO(type_node, error_cleanup);
+    NULL_POINTER_TO_GOTO(gtt, error_cleanup);
+    if (type_node->node_type != CZ_AST_TypeNodeType) goto error_cleanup;
+
+    if (type_node->type_expression.is_function_type) {
+        printf("Currently function type not supported.\n");
+        goto error_cleanup;
+    }
+
+    /*
+    switch (type_node->type_expression.primitive.kind) {
+        case CZ_TYPE_KIND_INT32:
+            type = cz_type_create(CZ_PRIMITIVE_INT32, type_node->type_expression.is_const);
+            break;
+        case CZ_TYPE_KIND_BOOL:
+            type = cz_type_create(CZ_PRIMITIVE_BOOL, type_node->type_expression.is_const);
+            break;
+        case CZ_TYPE_KIND_FLOAT:
+            type = cz_type_create(CZ_PRIMITIVE_FLOAT, type_node->type_expression.is_const);
+            break;
+        case CZ_TYPE_KIND_IDENTIFIER:
+            type = cz_type_create()
+            break;
+        default:
+            goto error_cleanup;
+    }
+    */
+    
+    return type;
+error_cleanup:
+    cz_type_free(type);
+    return NULL;
+}
+
 CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser) {
     CZ_SemanticAnalyzer* sa = NULL;
     CZ_Environment* global_env = NULL;
@@ -19,6 +55,11 @@ CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser) {
 
     gtt = cz_global_type_table_create();
     NULL_POINTER_TO_GOTO(gtt, error_cleanup);
+
+    // Populate with primitive types.
+    cz_global_type_table_push_type(gtt, "int32", cz_type_create(CZ_PRIMITIVE_INT32, false));
+    cz_global_type_table_push_type(gtt, "bool", cz_type_create(CZ_PRIMITIVE_BOOL, false));
+    cz_global_type_table_push_type(gtt, "float", cz_type_create(CZ_PRIMITIVE_FLOAT, false));
 
     error_list = cz_error_list_create();
     NULL_POINTER_TO_GOTO(error_list, error_cleanup);
@@ -107,25 +148,38 @@ static int cz_semantic_analyzer_build_global_table(CZ_SemanticAnalyzer* sa) {
         // TODO: Log errors.
         switch (statement->node_type) {
             case CZ_AST_FunctionDeclarationNodeType:
-                cz_semantic_analyzer_register_function_decl(sa->global_env, statement);
+                //cz_semantic_analyzer_register_function_decl(sa->global_env, statement);
                 break;
             case CZ_AST_StructDeclarationNodeType:
-                cz_semantic_analyzer_register_struct_decl(sa->global_env, statement);
+                //cz_semantic_analyzer_register_struct_decl(sa->global_env, statement);
                 break;
             case CZ_AST_VariableDeclarationNodeType:
-                cz_semantic_analyzer_register_variable_decl(sa->global_env, statement);
+                //cz_semantic_analyzer_register_variable_decl(sa->global_env, statement);
                 break;
             case CZ_AST_TypedefDeclarationNodeType:
                 cz_semantic_analyzer_register_typedef(sa->global_env, statement);
                 break;
             case CZ_AST_NewtypeDeclarationNodeType:
-                cz_semantic_analyzer_register_newtypedef(sa->global_env, statement);
+                //cz_semantic_analyzer_register_newtypedef(sa->global_env, statement);
                 break;
             default:
                 cz_error_list_push_error(sa->error_list, sa->filename, statement->line, statement->col, "Unrecognized global statement.");
                 break;
         }
     }
+
+error_cleanup:
+    return 0;
+}
+
+static int cz_semantic_analyzer_register_typedef(CZ_Environment* env, const CZ_AST_Node* decl) {
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(decl, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_TypedefDeclarationNodeType, error_cleanup);
+
+
+
+    return 1;
 
 error_cleanup:
     return 0;

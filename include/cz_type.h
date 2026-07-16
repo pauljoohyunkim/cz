@@ -12,6 +12,7 @@ typedef struct CZ_Type CZ_Type;
 typedef enum {
     CZ_PRIMITIVE_VOID,
     CZ_PRIMITIVE_INT32,
+    CZ_PRIMITIVE_BOOL,
     CZ_PRIMITIVE_FLOAT
 } CZ_PrimitiveType;
 
