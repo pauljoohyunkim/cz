@@ -48,6 +48,7 @@ struct CZ_Environment {
 
     CZ_Symbol** symbols;
     unsigned int symbol_count;
+    unsigned int symbol_capacity;
 
     unsigned int scope_level;
 };
@@ -67,6 +68,29 @@ CZ_Symbol* cz_symbol_create(CZ_SymbolKind kind, const char* name);
  * @param symbol Pointer to CZ_Symbol
  */
 void cz_symbol_free(CZ_Symbol* symbol);
+
+/**
+ * @brief Create CZ_Environment
+ * 
+ * @return CZ_Environment* Pointer to CZ_Environment on success, NULL on failure.
+ */
+CZ_Environment* cz_environment_create(void);
+
+/**
+ * @brief Frees environment
+ * 
+ * @param env Pointer to CZ_Environment
+ */
+void cz_environment_free(CZ_Environment* env);
+
+/**
+ * @brief Pushes symbol to environment.
+ * 
+ * @param env Pointer to CZ_Environment
+ * @param symbol Pointer to CZ_Symbol. (Do not free, as ownership is being transferred)
+ * @return int 1 on success, 0 on failure.
+ */
+int cz_environment_push_symbol(CZ_Environment* env, const CZ_Symbol* symbol);
 
 #ifdef __cplusplus
 }
