@@ -188,6 +188,7 @@ struct CZ_AST_Node {
                     const char* name;
 
                     enum {
+                        CZ_AST_TYPE_KIND_VOID,
                         CZ_AST_TYPE_KIND_INT32,
                         CZ_AST_TYPE_KIND_BOOL,
                         CZ_AST_TYPE_KIND_FLOAT,

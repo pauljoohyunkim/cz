@@ -658,6 +658,13 @@ static CZ_AST_Node* cz_parser_create_function_decl(CZ_Parser* parser) {
         // type
         type = cz_parser_create_type(parser);
         NULL_POINTER_TO_GOTO(type, error_free_node);
+    } else {
+        type = cz_ast_node_create(CZ_AST_TypeNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
+        NULL_POINTER_TO_GOTO(type, error_free_node);
+        type->type_expression.is_const = false;
+        type->type_expression.is_reference = false;
+        type->type_expression.is_function_type = false;
+        type->type_expression.primitive.kind = CZ_AST_TYPE_KIND_VOID;
     }
 
     

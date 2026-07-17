@@ -20,7 +20,28 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
 
     // --- PHASE 1: Resolve the base, non-const canonical type ---
     switch (type_node->type_expression.primitive.kind) {
-        case CZ_AST_TYPE_KIND_INT32: {
+        case CZ_AST_TYPE_KIND_VOID:
+        {
+            CZ_Type query = {
+                .kind = CZ_TYPE_KIND_PRIMITIVE,
+                .primitive = CZ_PRIMITIVE_VOID
+            };
+            base_type = cz_global_type_table_find_type(gtt, &query);
+            if (base_type == NULL) {
+                CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+                new_type->primitive = CZ_PRIMITIVE_VOID;
+                NULL_POINTER_TO_GOTO(new_type, error_cleanup);
+                if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
+                    cz_type_free(new_type);
+                    goto error_cleanup;
+                }
+                base_type = new_type;
+            }
+            return base_type;
+        }
+
+        case CZ_AST_TYPE_KIND_INT32:
+        {
             CZ_Type query = {
                 .kind = CZ_TYPE_KIND_PRIMITIVE,
                 .primitive = CZ_PRIMITIVE_INT32
@@ -38,7 +59,8 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
             }
             break;
         }
-        case CZ_AST_TYPE_KIND_BOOL: {
+        case CZ_AST_TYPE_KIND_BOOL:
+        {
             CZ_Type query = {
                 .kind = CZ_TYPE_KIND_PRIMITIVE,
                 .primitive = CZ_PRIMITIVE_BOOL
@@ -56,7 +78,8 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
             }
             break;
         }
-        case CZ_AST_TYPE_KIND_FLOAT: {
+        case CZ_AST_TYPE_KIND_FLOAT:
+        {
             CZ_Type query = {
                 .kind = CZ_TYPE_KIND_PRIMITIVE,
                 .primitive = CZ_PRIMITIVE_FLOAT
@@ -74,7 +97,8 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
             }
             break;
         }
-        case CZ_AST_TYPE_KIND_IDENTIFIER: {
+        case CZ_AST_TYPE_KIND_IDENTIFIER:
+        {
             query_name = type_node->type_expression.primitive.name;
             NULL_POINTER_TO_GOTO(query_name, error_cleanup);
 
@@ -276,11 +300,12 @@ static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, 
     // 2. Build type for function.
     // 2.1 Build return type
 
-    // 2.1.1 Check void return type
-
-
-    // 2.1.2
     const CZ_Type* func_ret_type = cz_type_from_type_node(decl->function_declaration.function.return_type, sa->gtt);
+    if (func_ret_type == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+                                 "Return type unrecognized.");
+        goto error_cleanup;
+    }
     // 2.2 Build param types
 
     // 2.2.1 Create parameter types list.
@@ -321,7 +346,7 @@ static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, 
         }
     } else {
         // 3.2 GTT already contains the function signature. Use the lookup and free the param_types
-        free(func_param_types);
+        free(func_type_query.function.param_types);
         func_type = func_type_lookup;
     }
     
