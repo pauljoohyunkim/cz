@@ -47,18 +47,18 @@ struct CZ_Type {
             const CZ_StructLayout* layout;
         } structure;
 
-        CZ_Type* const_of;
+        const CZ_Type* const_of;
 
-        CZ_Type* reference_to;
+        const CZ_Type* reference_to;
 
         struct {
             const char* name;
-            CZ_Type* underlying;
+            const CZ_Type* underlying;
         } newtype;
 
         struct {
-            CZ_Type* return_type;
-            CZ_Type** param_types;
+            const CZ_Type* return_type;
+            const CZ_Type** param_types;
             unsigned int param_count;
         } function;
     };
@@ -66,11 +66,11 @@ struct CZ_Type {
 
 typedef struct {
     const char** names;
-    CZ_Type** named_types;  // Shallow pointer! points to somewhere in all_allocations
+    const CZ_Type** named_types;  // Shallow pointer! points to somewhere in all_allocations
     unsigned int named_entry_count;
     unsigned int named_entry_capacity;
 
-    CZ_Type** all_allocations;      // Owner of all types!
+    const CZ_Type** all_allocations;      // Owner of all types!
     unsigned int all_entry_count;
     unsigned int all_allocations_capacity;
 } CZ_GlobalTypeTable;

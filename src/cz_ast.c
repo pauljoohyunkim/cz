@@ -2,6 +2,24 @@
 #include <stdlib.h>
 #include "cz_ast.h"
 
+CZ_AST_Decoration* cz_ast_decoration_create(const CZ_Type* type, CZ_ValueCategory val_category) {
+    CZ_AST_Decoration* decor = NULL;
+    if (type == NULL) return NULL;
+
+    decor = (CZ_AST_Decoration*) calloc(1, sizeof(CZ_AST_Decoration));
+    if (decor == NULL) return NULL;
+
+    decor->resolved_type = type;
+    decor->value_category = val_category;
+
+    return decor;
+}
+
+void cz_ast_decoration_free(CZ_AST_Decoration* decor) {
+    // Note that internal CZ_Type* should not be freed.
+    free(decor);
+}
+
 CZ_AST_Node* cz_ast_node_create(CZ_AST_NodeType node_type, unsigned int line, unsigned int col) {
     CZ_AST_Node* node = (CZ_AST_Node*) calloc(1, sizeof(CZ_AST_Node));
     if (node == NULL) return NULL;
@@ -115,6 +133,7 @@ void cz_ast_root_free(CZ_AST_Node* node) {
                 cz_ast_root_free(node->struct_member_access.member);
                 break;
         }
+        cz_ast_decoration_free(node->decoration);
     }
     free(node);
 }

@@ -233,13 +233,13 @@ struct CZ_AST_Node {
             /** Literal type token */
             CZ_TokenType literal_type;
             /** Lexeme text (not a node) */
-            char* lexeme;
+            const char* lexeme;
         } literal;
 
         /** Used for node_type == CZ_AST_IdentifierNodeType */
         struct {
             /** Identifier name (not a node) */
-            char* name;
+            const char* name;
         } identifier;
 
         /** Used for node_type == CZ_AST_CastExpressionNodeType */
@@ -259,6 +259,23 @@ struct CZ_AST_Node {
         } struct_member_access;
     };
 };
+
+/**
+ * @brief Creates decoration for AST node (for expressions)
+ * 
+ * @param type CZ_Type from global type table.
+ * @param val_category Whether or not expression is l-value or r-value.
+ * @return CZ_AST_Decoration* Pointer to CZ_AST_Decoration allocated on success, NULL on failure.
+ */
+CZ_AST_Decoration* cz_ast_decoration_create(const CZ_Type* type, CZ_ValueCategory val_category);
+
+/**
+ * @brief Frees AST node decoration.
+ * 
+ * @param decor Pointer to CZ_AST_Decoration
+ */
+void cz_ast_decoration_free(CZ_AST_Decoration* decor);
+
 
 /**
  * @brief Creates AST node from type.
