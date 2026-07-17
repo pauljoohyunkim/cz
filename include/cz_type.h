@@ -112,6 +112,8 @@ void cz_type_free(CZ_Type* type);
  * @brief Create global type table
  * 
  * @return CZ_GlobalTypeTable* Pointer to CZ_GlobalTypeTable on success, NULL on failure.
+ * 
+ * Note that this will also create primitive types such as int32 and float.
  */
 CZ_GlobalTypeTable* cz_global_type_table_create(void);
 

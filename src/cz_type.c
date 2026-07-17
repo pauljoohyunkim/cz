@@ -90,6 +90,7 @@ CZ_GlobalTypeTable* cz_global_type_table_create(void) {
     CZ_GlobalTypeTable* gtt = NULL;
     CZ_Type** named_types = NULL;
     CZ_Type** all_allocations = NULL;
+    CZ_Type* primitive_type = NULL;
     const char** names = NULL;
 
     gtt = (CZ_GlobalTypeTable*) calloc(1, sizeof(CZ_GlobalTypeTable));
@@ -113,6 +114,35 @@ CZ_GlobalTypeTable* cz_global_type_table_create(void) {
     gtt->names = names;
     names = NULL;
 
+    // Create int32
+    {
+        primitive_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+        primitive_type->primitive = CZ_PRIMITIVE_INT32;
+        if (cz_global_type_table_push_type(gtt, "int32", primitive_type) != 1) {
+            goto error_cleanup;
+        }
+        primitive_type = NULL;
+    }
+    // Create bool
+    {
+        primitive_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+        primitive_type->primitive = CZ_PRIMITIVE_BOOL;
+        if (cz_global_type_table_push_type(gtt, "bool", primitive_type) != 1) {
+            goto error_cleanup;
+        }
+        primitive_type = NULL;
+    }
+    // Create float
+    {
+        primitive_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+        primitive_type->primitive = CZ_PRIMITIVE_FLOAT;
+        if (cz_global_type_table_push_type(gtt, "float", primitive_type) != 1) {
+            goto error_cleanup;
+        }
+        primitive_type = NULL;
+    }
+
+
     return gtt;
 
 error_cleanup:
@@ -120,6 +150,7 @@ error_cleanup:
     free(named_types);
     free(all_allocations);
     free(names);
+    cz_type_free(primitive_type);
     return NULL;
 }
 

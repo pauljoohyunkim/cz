@@ -5,4 +5,6 @@ struct Vector {
     y :: float;
 }
 
-x :: Vector;
+func addone :: () -> int32& {
+    addone() = 2;
+}

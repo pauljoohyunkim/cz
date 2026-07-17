@@ -643,7 +643,16 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
 static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
 static int cz_semantic_analyzer_check_statement_list(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* block);
 static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
-//static CZ_ExpressionResult cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* expr);
+
+/**
+ * @brief Checks expression and decorates the AST node with CZ_AST_Decoration
+ * 
+ * @param sa Pointer to CZ_SemanticAnalyzer
+ * @param env Pointer to CZ_Environment
+ * @param expr Pointer to CZ_AST_Node
+ * @return int 1 if success, 0 if failure.
+ */
+static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 
 /**
  * @brief Pass 2 Function: Type checking after global statements have been resolved.
@@ -683,5 +692,144 @@ static int cz_semantic_analyzer_full_analyze(CZ_SemanticAnalyzer* sa) {
     }
 
 error_cleanup:
+    return 0;
+}
+
+static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+
+static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(expr, error_cleanup);
+
+    switch (expr->node_type) {
+        case CZ_AST_BinaryExpressionNodeType:
+            if (cz_semantic_analyzer_check_binary_expression(sa, env, expr) != 1) {
+                goto error_cleanup;
+            }
+            break;
+        case CZ_AST_UnaryExpressionNodeType:
+            if (cz_semantic_analyzer_check_unary_expression(sa, env, expr) != 1) {
+                goto error_cleanup;
+            }
+            break;
+        case CZ_AST_LiteralNodeType:
+            if (cz_semantic_analyzer_check_literal_expression(sa, env, expr) != 1) {
+                goto error_cleanup;
+            }
+            break;
+        default:
+            cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Not yet supported.");
+            break;
+            
+    }
+
+    return 1;
+
+error_cleanup:
+    return 0;
+}
+
+static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
+    CZ_AST_Decoration* decor = NULL;
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(expr, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_BinaryExpressionNodeType, error_cleanup);
+
+error_cleanup:
+    cz_ast_decoration_free(decor);
+    return 0;
+}
+
+static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
+    CZ_AST_Decoration* decor = NULL;
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(expr, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_UnaryExpressionNodeType, error_cleanup);
+
+error_cleanup:
+    cz_ast_decoration_free(decor);
+    return 0;
+}
+
+static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
+    CZ_AST_Decoration* decor = NULL;
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(expr, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_LiteralNodeType, error_cleanup);
+
+    const char* literal = expr->literal.lexeme;
+
+    switch (expr->literal.literal_type) {
+        case CZ_TT_NUMERICAL_LITERAL:
+            {
+                const char* decimal_point = strchr(literal, '.');
+                if (decimal_point == NULL) {
+                    // Integer
+                    const CZ_Type* int32_type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
+                    NULL_POINTER_TO_GOTO(int32_type, error_cleanup);
+
+                    // Create decoration
+                    decor = cz_ast_decoration_create(int32_type, CZ_VALUE_CATEGORY_RVALUE);
+                    if (decor == NULL) {
+                        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
+                        goto error_cleanup;
+                    }
+
+                    // Transfer ownership to node.
+                    expr->decoration = decor;
+                    decor = NULL;
+                } else {
+                    // Float
+                    const CZ_Type* float_type = cz_global_type_table_find_type_by_name(sa->gtt, "float");
+                    NULL_POINTER_TO_GOTO(float_type, error_cleanup);
+
+                    // Create decoration
+                    decor = cz_ast_decoration_create(float_type, CZ_VALUE_CATEGORY_RVALUE);
+                    if (decor == NULL) {
+                        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
+                        goto error_cleanup;
+                    }
+
+                    // Transfer ownership to node.
+                    expr->decoration = decor;
+                    decor = NULL;
+                }
+            }
+            break;
+        case CZ_TT_TRUE:
+        case CZ_TT_FALSE:
+            {
+                // Bool
+                const CZ_Type* bool_type = cz_global_type_table_find_type_by_name(sa->gtt, "bool");
+                NULL_POINTER_TO_GOTO(bool_type, error_cleanup);
+
+                // Create decoration
+                decor = cz_ast_decoration_create(bool_type, CZ_VALUE_CATEGORY_RVALUE);
+                if (decor == NULL) {
+                    cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
+                    goto error_cleanup;
+                }
+
+                // Transfer ownership to node.
+                expr->decoration = decor;
+                decor = NULL;
+            }
+            break;
+        case CZ_TT_STRING_LITERAL:
+            cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "String literal not yet supported.");
+            goto error_cleanup;
+            break;
+    }
+
+    return 1;
+
+error_cleanup:
+    cz_ast_decoration_free(decor);
     return 0;
 }
