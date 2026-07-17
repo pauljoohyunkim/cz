@@ -763,69 +763,49 @@ static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa
     NULL_POINTER_TO_GOTO(expr, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_LiteralNodeType, error_cleanup);
 
-    const char* literal = expr->literal.lexeme;
+    const CZ_Type* type = NULL;
 
     switch (expr->literal.literal_type) {
         case CZ_TT_NUMERICAL_LITERAL:
             {
+                const char* literal = expr->literal.lexeme;
                 const char* decimal_point = strchr(literal, '.');
                 if (decimal_point == NULL) {
                     // Integer
-                    const CZ_Type* int32_type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
-                    NULL_POINTER_TO_GOTO(int32_type, error_cleanup);
-
-                    // Create decoration
-                    decor = cz_ast_decoration_create(int32_type, CZ_VALUE_CATEGORY_RVALUE);
-                    if (decor == NULL) {
-                        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
-                        goto error_cleanup;
-                    }
-
-                    // Transfer ownership to node.
-                    expr->decoration = decor;
-                    decor = NULL;
+                    type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
                 } else {
                     // Float
-                    const CZ_Type* float_type = cz_global_type_table_find_type_by_name(sa->gtt, "float");
-                    NULL_POINTER_TO_GOTO(float_type, error_cleanup);
-
-                    // Create decoration
-                    decor = cz_ast_decoration_create(float_type, CZ_VALUE_CATEGORY_RVALUE);
-                    if (decor == NULL) {
-                        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
-                        goto error_cleanup;
-                    }
-
-                    // Transfer ownership to node.
-                    expr->decoration = decor;
-                    decor = NULL;
+                    type = cz_global_type_table_find_type_by_name(sa->gtt, "float");
                 }
             }
             break;
         case CZ_TT_TRUE:
         case CZ_TT_FALSE:
-            {
-                // Bool
-                const CZ_Type* bool_type = cz_global_type_table_find_type_by_name(sa->gtt, "bool");
-                NULL_POINTER_TO_GOTO(bool_type, error_cleanup);
-
-                // Create decoration
-                decor = cz_ast_decoration_create(bool_type, CZ_VALUE_CATEGORY_RVALUE);
-                if (decor == NULL) {
-                    cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
-                    goto error_cleanup;
-                }
-
-                // Transfer ownership to node.
-                expr->decoration = decor;
-                decor = NULL;
-            }
+            // Bool
+            type = cz_global_type_table_find_type_by_name(sa->gtt, "bool");
             break;
         case CZ_TT_STRING_LITERAL:
             cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "String literal not yet supported.");
             goto error_cleanup;
             break;
+        default:
+            cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Unknown literal type.");
+            goto error_cleanup;
+            break;
     }
+
+    NULL_POINTER_TO_GOTO(type, error_cleanup);
+
+    // Create decoration
+    decor = cz_ast_decoration_create(type, CZ_VALUE_CATEGORY_RVALUE);
+    if (decor == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
+        goto error_cleanup;
+    }
+
+    // Transfer ownership to node.
+    expr->decoration = decor;
+    decor = NULL;
 
     return 1;
 
