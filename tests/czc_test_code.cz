@@ -2,5 +2,5 @@ typedef int32 int;
 
 struct Vector {
     x :: int;
-    x :: float;
+    y :: float;
 }

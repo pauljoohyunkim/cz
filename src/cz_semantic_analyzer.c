@@ -436,6 +436,8 @@ static int cz_semantic_analyzer_register_struct_decl(CZ_SemanticAnalyzer* sa, CZ
     if (cz_global_type_table_push_type(sa->gtt, struct_name, struct_type) != 1) {
         cz_type_free(struct_type);
         struct_type = NULL;
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+                                "Error adding struct \"%s\" to the global type table", struct_name);
         goto error_cleanup;
     }
 
