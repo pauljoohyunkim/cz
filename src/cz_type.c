@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "cz_type.h"
@@ -259,4 +260,21 @@ const CZ_Type* cz_global_type_table_find_type_by_name(const CZ_GlobalTypeTable* 
     }
 
     return NULL;
+}
+
+void cz_global_type_table_print(const CZ_GlobalTypeTable* gtt) {
+    if (gtt == NULL) {
+        printf("NULL global type table\n");
+        return;
+    }
+
+    printf("Global Type Table:\n");
+    printf("  Named entries (%u/%u):\n", gtt->named_entry_count, gtt->named_entry_capacity);
+    for (unsigned int i = 0; i < gtt->named_entry_count; i++) {
+        printf("    [%u] Name: %s, Type: %p\n", i, gtt->names[i], (void*)gtt->named_types[i]);
+    }
+    printf("  All allocations (%u/%u):\n", gtt->all_entry_count, gtt->all_allocations_capacity);
+    for (unsigned int i = 0; i < gtt->all_entry_count; i++) {
+        printf("    [%u] Type: %p\n", i, (void*)gtt->all_allocations[i]);
+    }
 }

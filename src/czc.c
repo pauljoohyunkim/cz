@@ -112,8 +112,10 @@ int main(int argc, char** argv) {
         goto error_cleanup_exit;
     }
 
-    //printf("--- Global Environment ---\n");
-    //cz_environment_print(sa->global_env, 0);
+    printf("--- Global Environment ---\n");
+    cz_environment_print(sa->global_env, 0, false);
+    printf("\n--- Global Type Table ---\n");
+    cz_global_type_table_print(sa->gtt);
     //ret = cz_semantic_analyzer_full_analyze(sa);
     //if (ret != 1) {
     //    printf("Failure semantic analysis (pass II)\n");

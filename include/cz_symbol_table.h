@@ -100,3 +100,20 @@ int cz_environment_push_symbol(CZ_Environment* env, const CZ_Symbol* symbol);
 #endif
 
 #endif  /* CZ_SYMBOL_TABLE_H */
+
+/**
+ * @brief Print CZ_Symbol information with indentation
+ *
+ * @param symbol Pointer to CZ_Symbol to print
+ * @param depth Indentation level (number of tabs)
+ */
+void cz_symbol_print(const CZ_Symbol* symbol, unsigned int depth);
+
+/**
+ * @brief Print CZ_Environment information with indentation
+ *
+ * @param env Pointer to CZ_Environment to print
+ * @param depth Indentation level (number of tabs)
+ * @param cascade Set to true to print parent chain
+ */
+void cz_environment_print(const CZ_Environment* env, unsigned int depth, bool cascade);

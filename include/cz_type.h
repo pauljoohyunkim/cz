@@ -153,6 +153,13 @@ const CZ_Type* cz_global_type_table_find_type(const CZ_GlobalTypeTable* gtt, con
  */
 const CZ_Type* cz_global_type_table_find_type_by_name(const CZ_GlobalTypeTable* gtt, const char* query);
 
+/**
+ * @brief Print CZ_GlobalTypeTable information.
+ *
+ * @param gtt Pointer to CZ_GlobalTypeTable to print
+ */
+void cz_global_type_table_print(const CZ_GlobalTypeTable* gtt);
+
 #ifdef __cplusplus
 }
 #endif

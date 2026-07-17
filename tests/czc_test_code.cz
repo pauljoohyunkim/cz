@@ -4,3 +4,5 @@ struct Vector {
     x :: int;
     y :: float;
 }
+
+x :: Vector;
