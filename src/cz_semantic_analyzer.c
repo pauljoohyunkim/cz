@@ -342,6 +342,7 @@ static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, 
         if (cz_global_type_table_push_type(sa->gtt, NULL, func_type) != 1) {
             cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
                                     "Function type for \"%s\" cannot be added to global type table", decl->function_declaration.function_identifier->identifier.name);
+            cz_type_free(func_type);
             goto error_cleanup;
         }
     } else {
