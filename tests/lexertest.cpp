@@ -24,7 +24,7 @@ TEST(Lexer, Analysis_Length_1) {
     ASSERT_EQ(lexer->tokens[10].token_type, CZ_TT_EOF);
 
     for (size_t i = 0; i < 10; i++) {
-        ASSERT_EQ(lexer->tokens[i].length, 1);
+        ASSERT_EQ(strlen(lexer->tokens[i].lexeme), 1);
     }
     for (size_t i = 0; i < 5; i++) {
         ASSERT_EQ(lexer->tokens[i].line, 1);
@@ -102,9 +102,9 @@ TEST(Lexer, Identifiers) {
     ASSERT_EQ(lexer->tokens[2].token_type, CZ_TT_IDENTIFIER);
     ASSERT_EQ(lexer->tokens[3].token_type, CZ_TT_EOF);
 
-    ASSERT_EQ(std::string(lexer->tokens[0].lexeme, lexer->tokens[0].length), "return1");
-    ASSERT_EQ(std::string(lexer->tokens[1].lexeme, lexer->tokens[1].length), "inv");
-    ASSERT_EQ(std::string(lexer->tokens[2].lexeme, lexer->tokens[2].length), "func30j2");
+    ASSERT_EQ(std::string(lexer->tokens[0].lexeme), "return1");
+    ASSERT_EQ(std::string(lexer->tokens[1].lexeme), "inv");
+    ASSERT_EQ(std::string(lexer->tokens[2].lexeme), "func30j2");
 
     ASSERT_TRUE(lexer->n_tokens <= lexer->n_tokens_capacity);
 }
