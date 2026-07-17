@@ -256,19 +256,87 @@ error_cleanup:
 }
 
 static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl) {
+    CZ_Type func_type_query;
+    CZ_Type** func_param_types = NULL;
+    CZ_Symbol* func_symbol = NULL;
     NULL_POINTER_TO_GOTO(env, error_cleanup);
     NULL_POINTER_TO_GOTO(decl, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_FunctionDeclarationNodeType, error_cleanup);
 
     // func addone :: (x :: int32, y :: int32) -> int
+
     // 1. Check if symbol exists. (If yes, bad: duplicate symbol)
+    const CZ_Symbol* func_symbol_lookup = cz_environment_lookup(env, decl->function_declaration.function_identifier->identifier.name, true);
+    if (func_symbol_lookup != NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+                                 "Symbol \"%s\" previously defined.", func_symbol_lookup->name);
+        goto error_cleanup;
+    }
+
     // 2. Build type for function.
+    // 2.1 Build return type
+
+    // 2.1.1 Check void return type
+
+
+    // 2.1.2
+    const CZ_Type* func_ret_type = cz_type_from_type_node(decl->function_declaration.function.return_type, sa->gtt);
+    // 2.2 Build param types
+
+    // 2.2.1 Create parameter types list.
+    const CZ_AST_Node* func_param_list = decl->function_declaration.function.parameter_list;
+    unsigned int func_param_count = func_param_list->parameter_list.param_count;
+    func_param_types = (CZ_Type**) calloc(func_param_count, sizeof(CZ_Type*));
+    NULL_POINTER_TO_GOTO(func_param_types, error_cleanup);
+
+    // 2.2.2 Populate the parameter types list.
+    for (unsigned int i = 0; i < func_param_count; i++) {
+        const CZ_Type* func_param_type = cz_type_from_type_node(func_param_list->parameter_list.params[i]->variable_declaration.type, sa->gtt);
+        NULL_POINTER_TO_GOTO(func_param_type, error_cleanup);
+        func_param_types[i] = func_param_type;
+    }
+
+    // 2.2.3 Build type for function.
+    func_type_query = (CZ_Type) {
+        .kind = CZ_TYPE_KIND_FUNCTION,
+        .function = {
+            .return_type = func_ret_type,
+            .param_types = func_param_types,
+            .param_count = func_param_count,
+        }
+    };
+    func_param_types = NULL;
+
     // 3. Check if GTT contains it. If not add it. Otherwise get the function type from GTT, and free the query type.
+    const CZ_Type* func_type_lookup = cz_global_type_table_find_type(sa->gtt, &func_type_query);
+    CZ_Type* func_type = NULL;
+    if (func_type_lookup == NULL) {
+        // 3.1 Add to GTT. Need to create type to add.
+        func_type = cz_type_create(CZ_TYPE_KIND_FUNCTION);
+        *func_type = func_type_query;
+        if (cz_global_type_table_push_type(sa->gtt, NULL, func_type) != 1) {
+            cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+                                    "Function type for \"%s\" cannot be added to global type table", decl->function_declaration.function_identifier->identifier.name);
+            goto error_cleanup;
+        }
+    } else {
+        // 3.2 GTT already contains the function signature. Use the lookup and free the param_types
+        free(func_param_types);
+        func_type = func_type_lookup;
+    }
+    
     // 4. Add symbol.
+    func_symbol = cz_symbol_create(CZ_SYMBOL_KIND_VALUE, decl->function_declaration.function_identifier->identifier.name);
+    func_symbol->data.value.type = func_type;
+    if (cz_environment_push_symbol(env, func_symbol) != 1) {
+        goto error_cleanup;
+    }
 
     return 1;
 
 error_cleanup:
+    free(func_param_types);
+    cz_symbol_free(func_symbol);
     return 0;
 }
 

@@ -28,18 +28,8 @@ void cz_symbol_free(CZ_Symbol* symbol) {
         //free((void*)symbol->name);
 
         switch (symbol->kind) {
-            case CZ_SYMBOL_KIND_VARIABLE:
+            case CZ_SYMBOL_KIND_VALUE:
                 // Do nothing
-                break;
-            case CZ_SYMBOL_KIND_FUNCTION:
-                if (symbol->data.function.params != NULL) {
-                    for (unsigned int i = 0; i < symbol->data.function.param_count; i++) {
-                        //free((void*)symbol->data.function.params[i].name);
-                        symbol->data.function.params[i].name = NULL;
-                    }
-                    free((void*)symbol->data.function.params);
-                    symbol->data.function.params = NULL;
-                }
                 break;
             case CZ_SYMBOL_KIND_TYPE:
                 // Do nothing
@@ -82,6 +72,24 @@ void cz_environment_free(CZ_Environment* env) {
         free(env->symbols);
     }
     free(env);
+}
+
+const CZ_Symbol* cz_environment_lookup(CZ_Environment* env, const char* name, bool cascade) {
+    if (env == NULL || name == NULL) return NULL;
+
+    for (unsigned i = 0; i < env->symbol_count; i++) {
+        if (env->symbols[i] == name && strcmp(env->symbols[i]->name, name) == 0) {
+            return env->symbols[i];
+        }
+    }
+
+    // Since could not find in current environment, look up parent.
+    if (env->parent != NULL && cascade) {
+        return cz_environment_lookup(env->parent, name, cascade);
+    }
+
+    // Global scope could not find symbol.
+    return NULL;
 }
 
 int cz_environment_push_symbol(CZ_Environment* env, const CZ_Symbol* symbol) {

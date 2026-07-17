@@ -12,8 +12,7 @@ extern "C" {
 typedef struct CZ_Environment CZ_Environment;
 
 typedef enum {
-    CZ_SYMBOL_KIND_VARIABLE,
-    CZ_SYMBOL_KIND_FUNCTION,
+    CZ_SYMBOL_KIND_VALUE,           // Variables, Function
     CZ_SYMBOL_KIND_TYPE             // Struct, Typedef, Newtype
 } CZ_SymbolKind;
 
@@ -29,13 +28,7 @@ typedef struct {
     union {
         struct {
             const CZ_Type* type;
-        } variable;
-
-        struct {
-            const CZ_Type* return_type;
-            CZ_ParamSymbol* params;
-            unsigned int param_count;
-        } function;
+        } value;
 
         struct {
             const CZ_Type* type;
@@ -68,6 +61,16 @@ CZ_Symbol* cz_symbol_create(CZ_SymbolKind kind, const char* name);
  * @param symbol Pointer to CZ_Symbol
  */
 void cz_symbol_free(CZ_Symbol* symbol);
+
+/**
+ * @brief Look up CZ_Symbol from environment
+ * 
+ * @param env Pointer to CZ_Environment
+ * @param name Name of the symbol to look up.
+ * @param cascade Set to true to look up parent chain.
+ * @return const CZ_Symbol* Pointer to symbol table entry on success, NULL on failure.
+ */
+const CZ_Symbol* cz_environment_lookup(CZ_Environment* env, const char* name, bool cascade);
 
 /**
  * @brief Create CZ_Environment
