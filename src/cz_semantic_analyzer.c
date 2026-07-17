@@ -716,7 +716,7 @@ static int cz_semantic_analyzer_full_analyze(CZ_SemanticAnalyzer* sa) {
                 //cz_semantic_analyzer_check_function_body(sa, statement);
                 break;
             case CZ_AST_StructDeclarationNodeType:
-                //cz_semantic_analyzer_check_struct_fields(sa, statement);
+                cz_semantic_analyzer_check_struct_fields(sa, statement);
                 break;
             case CZ_AST_VariableDeclarationNodeType:
                 cz_semantic_analyzer_check_global_var_init(sa, statement);
@@ -733,6 +733,23 @@ static int cz_semantic_analyzer_full_analyze(CZ_SemanticAnalyzer* sa) {
 
     return 1;
 
+error_cleanup:
+    return 0;
+}
+
+static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl) {
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(decl, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_StructDeclarationNodeType, error_cleanup);
+
+    // global_y :: int32 = 3;
+    //struct Vector {
+    //    x :: int32 = 1,
+    //    y :: int32& = global_y,
+    //    z :: int32
+    //};
+
+    return 1;
 error_cleanup:
     return 0;
 }
@@ -774,11 +791,26 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
     const CZ_AST_Decoration* rhs_decoration = decl->variable_declaration.expression->decoration;
     NULL_POINTER_TO_GOTO(rhs_decoration, error_cleanup);
 
-    // 4. If variable is reference, RHS must be l-value.
-    if (var_decl_type->kind == CZ_TYPE_KIND_REFERENCE && rhs_decoration->value_category != CZ_VALUE_CATEGORY_LVALUE) {
-        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
-            "Variable  \"%s\" is declared as reference, but RHS is not l-value.", var_name);
-        goto error_cleanup;
+    // 4. If variable is reference
+    if (var_decl_type->kind == CZ_TYPE_KIND_REFERENCE) {
+
+        // 4.1 RHS must be l-value.
+        if (rhs_decoration->value_category != CZ_VALUE_CATEGORY_LVALUE) {
+            cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+                "Variable  \"%s\" is declared as reference, but RHS is not l-value.", var_name);
+            goto error_cleanup;
+        }
+
+        // 4.2 If RHS is const, then LHS cannot be const.
+        const CZ_Type* referenced_type = var_decl_type->reference_to;
+    
+        // Check if the underlying referenced type is non-const, but the RHS is const
+        if (referenced_type->kind != CZ_TYPE_KIND_CONST && rhs_decoration->resolved_type->kind == CZ_TYPE_KIND_CONST) {
+            cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+                "Cannot bind non-const reference \"%s\" to a const value.", var_name);
+            goto error_cleanup;
+        }
+
     }
 
     // 5. If explicit type, do types match after decaying.
