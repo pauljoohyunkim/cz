@@ -737,10 +737,80 @@ error_cleanup:
     return 0;
 }
 
+typedef enum {
+    CZ_STRUCT_RECURSIVE_CYCLE_STATE_UNVISITED = 0,
+    CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVING,
+    CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVED
+} CZ_StructRecursiveCycleState;
+
+/**
+ * @brief A helper to determine struct cycle.
+ * 
+ * @param sa Pointer to CZ_SemanticAnalyzer
+ * @param type Pointer to CZ_Type
+ * @param states Allocated list of CZ_StructRecursiveCycleState. Length must be at least gtt->all_entry_count.
+ * @return int 1 if no cycle (safe), or 0 if error or there is cycle.
+ */
+static int cz_semantic_analyzer_struct_cycle_detect(CZ_SemanticAnalyzer* sa, const CZ_Type* type, CZ_StructRecursiveCycleState* states) {
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(type, error_cleanup);
+    NULL_POINTER_TO_GOTO(states, error_cleanup);
+
+    if (type->kind != CZ_TYPE_KIND_STRUCT) {
+        // Not a struct. Primitive, references, etc. cannot form a struct cycle.
+        return 1;
+    }
+
+    // Determine a unique ID (or index) for this struct.
+    int struct_idx = -1;
+    for (unsigned int i = 0; i < sa->gtt->all_entry_count; i++) {
+        if (sa->gtt->all_allocations[i] == type) {
+            struct_idx = (int) i;
+            break;
+        }
+    }
+    if (struct_idx < 0) {
+        // Error: could not find struct in GTT
+        return 0;
+    }
+
+    if (states[struct_idx] == CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVING) {
+        // This was visited previously before.
+        return 0;
+    }
+
+    if (states[struct_idx] == CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVED) {
+        return 1;   // Verified safe before.
+    }
+
+    // Mark it as being visited.
+    states[struct_idx] = CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVING;
+
+    // Loop through each member
+    for (unsigned int i = 0; i < type->structure.layout->field_count; i++) {
+        const CZ_Type* field_type = type->structure.layout->fields[i].type;
+
+        if (field_type == CZ_TYPE_KIND_STRUCT) {
+            if (cz_semantic_analyzer_struct_cycle_detect(sa, field_type, states) != 1) {
+                // Recursive dependency.
+                return 0;
+            }
+        }
+    }
+
+    return 1;
+
+error_cleanup:
+    return 0;
+}
+
 static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl) {
+    CZ_StructRecursiveCycleState* states = NULL;
     NULL_POINTER_TO_GOTO(sa, error_cleanup);
     NULL_POINTER_TO_GOTO(decl, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_StructDeclarationNodeType, error_cleanup);
+
+    const char* struct_name = decl->struct_declaration.identifier->identifier.name;
 
     // global_y :: int32 = 3;
     //struct Vector {
@@ -749,8 +819,36 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
     //    z :: int32
     //};
 
+    // 1. Resolve Struct Symbol
+    const CZ_Type* struct_type = cz_global_type_table_find_type_by_name(sa->gtt, struct_name);
+    if (struct_type == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Struct name \"%s\" is not recognized", struct_name);
+        goto error_cleanup;
+    }
+    if (struct_type->kind != CZ_TYPE_KIND_STRUCT) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "\"%s\" is not a struct", struct_name);
+        goto error_cleanup;
+    }
+
+    // 2. Check recursive cycle
+    // No containing itself
+    states = (CZ_StructRecursiveCycleState*) calloc(sa->gtt->all_entry_count, sizeof(CZ_StructRecursiveCycleState));
+    if (cz_semantic_analyzer_struct_cycle_detect(sa, struct_type, states) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "\"%s\" has circular dependency", struct_name);
+        goto error_cleanup;
+    }
+    free(states);
+    states = NULL;
+
+    // 3. For each member
+    // 3.1 Member type well-definedness
+    // 3.2 Member type default initializer exists -> constexpr (required), type match after decay, and if reference, is lvalue and const correct?
+
+
+
     return 1;
 error_cleanup:
+    free(states);
     return 0;
 }
 

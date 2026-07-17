@@ -1,4 +1,5 @@
-newtype int32 int;
-
-x :: const int32 = 1 + 2;
-y :: int32& = x;
+struct Vector {
+    x :: int32;
+    y :: int32;
+    v :: Vector;
+}
