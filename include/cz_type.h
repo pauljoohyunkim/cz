@@ -84,6 +84,21 @@ typedef struct {
 CZ_Type* cz_type_create(CZ_TypeKind typekind);
 
 /**
+ * @brief Create CZ_StructLayout and the fields inside.
+ * 
+ * @param field_count Number of fields
+ * @return CZ_StructLayout* Pointer to CZ_StructLayout on success, NULL on failure.
+ */
+CZ_StructLayout* cz_struct_layout_create(unsigned int field_count);
+
+/**
+ * @brief Free CZ_StructLayout
+ * 
+ * @param layout Pointer to CZ_StructLayout
+ */
+void cz_struct_layout_free(CZ_StructLayout* layout);
+
+/**
  * @brief Free CZ_Type
  * 
  * @param type Pointer to CZ_Type on success, NULL on failure.

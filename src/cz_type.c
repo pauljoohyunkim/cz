@@ -19,7 +19,29 @@ error_cleanup:
     return NULL;
 }
 
-static void cz_struct_layout_free(CZ_StructLayout* layout) {
+CZ_StructLayout* cz_struct_layout_create(unsigned int field_count) {
+    CZ_StructLayout* struct_layout = NULL;
+    CZ_StructField* fields = NULL;
+
+    struct_layout = (CZ_StructLayout*) calloc(1, sizeof(CZ_StructLayout));
+    NULL_POINTER_TO_GOTO(struct_layout, error_cleanup);
+
+    fields = (CZ_StructField*) calloc(field_count, sizeof(CZ_StructField));
+    NULL_POINTER_TO_GOTO(fields, error_cleanup);
+
+    struct_layout->fields = fields;
+    fields = NULL;
+    struct_layout->field_count = field_count;
+
+    return struct_layout;
+
+error_cleanup:
+    cz_struct_layout_free(struct_layout);
+    free(fields);
+    return NULL;
+}
+
+void cz_struct_layout_free(CZ_StructLayout* layout) {
     if (layout != NULL) {
         for (unsigned int i = 0; i < layout->field_count; i++) {
             //free((void*)layout->fields[i].name);

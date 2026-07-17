@@ -258,7 +258,7 @@ static int cz_semantic_analyzer_build_global_table(CZ_SemanticAnalyzer* sa) {
                 cz_semantic_analyzer_register_function_decl(sa, sa->global_env, statement);
                 break;
             case CZ_AST_StructDeclarationNodeType:
-                //cz_semantic_analyzer_register_struct_decl(sa->global_env, statement);
+                cz_semantic_analyzer_register_struct_decl(sa, sa->global_env, statement);
                 break;
             case CZ_AST_VariableDeclarationNodeType:
                 cz_semantic_analyzer_register_variable_decl(sa, sa->global_env, statement);
@@ -364,6 +364,76 @@ static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, 
 error_cleanup:
     free(func_param_types);
     cz_symbol_free(func_symbol);
+    return 0;
+}
+
+static int cz_semantic_analyzer_register_struct_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl) {
+    CZ_StructLayout* struct_layout = NULL;
+    CZ_Type* struct_type = NULL;
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(decl, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_StructDeclarationNodeType, error_cleanup);
+
+    //struct Vector {
+    //    x :: int32 = 1,
+    //    y :: int32 = 0,
+    //    z :: int32
+    //};
+
+    const char* struct_name = decl->struct_declaration.identifier->identifier.name;
+    NULL_POINTER_TO_GOTO(struct_name, error_cleanup);
+
+    // 1. Check if struct name exists in the global type table. If so, bad.
+    const CZ_Type* struct_type_lookup = cz_global_type_table_find_type_by_name(sa->gtt, struct_name);
+    if (struct_type_lookup != NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+                                 "Type \"%s\" already defined previously", struct_name);
+        goto error_cleanup;
+    }
+
+    // 2. Go through each of the members.
+
+    // 2.1 TODO: Check if there are members of duplicate names.
+    unsigned int member_count = decl->struct_declaration.member_count;
+    struct_layout = cz_struct_layout_create(member_count);
+    NULL_POINTER_TO_GOTO(struct_layout, error_cleanup);
+    for (unsigned int i = 0; i < member_count; i++) {
+        const CZ_AST_Node* member_node = decl->struct_declaration.members[i];
+        const CZ_Type* member_type = cz_type_from_type_node(member_node->struct_member.type, sa->gtt);
+        if (member_type == NULL) {
+            cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+                                    "Type for struct field \"%s\" cannot be deduced", member_node->struct_member.identifier->identifier.name);
+            goto error_cleanup;
+        }
+
+        struct_layout->fields[i] = (CZ_StructField) {
+            .idx = i,
+            .name = member_node->struct_member.identifier->identifier.name,
+            .type = member_type
+        };
+    }
+
+    struct_type = cz_type_create(CZ_TYPE_KIND_STRUCT);
+    NULL_POINTER_TO_GOTO(struct_type, error_cleanup);
+
+    // 3. Create struct type
+    struct_type->structure.name = struct_name;
+    struct_type->structure.layout = struct_layout;
+    struct_layout = NULL;
+
+    // 4. Add to GTT
+    if (cz_global_type_table_push_type(sa->gtt, struct_name, struct_type) != 1) {
+        cz_type_free(struct_type);
+        struct_type = NULL;
+        goto error_cleanup;
+    }
+
+    return 1;
+
+error_cleanup:
+    cz_struct_layout_free(struct_layout);
+    cz_type_free(struct_type);
     return 0;
 }
 
