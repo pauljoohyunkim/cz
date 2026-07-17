@@ -1,4 +1,4 @@
 newtype int32 int;
 
-x :: int = 1 + 2;
-y :: int& = x;
+x :: int32 = 1 + 2;
+y :: int32& = x;

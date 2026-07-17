@@ -231,7 +231,7 @@ error_cleanup:
     return 0;
 }
 
-static bool cz_type_equals(const CZ_Type* a, const CZ_Type* b) {
+bool cz_type_equals(const CZ_Type* a, const CZ_Type* b) {
     if (a == b) return true; // Fast-path: identical pointers
     if (!a || !b) return false;
     if (a->kind != b->kind) return false;
