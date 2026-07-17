@@ -638,6 +638,7 @@ error_cleanup:
 
 
 /* --- PASS 2 ---*/
+// Needs to check for constness, constexpr, and references.
 static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
 static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
 static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
@@ -802,6 +803,7 @@ static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;
     }
+    decor->is_constexpr = true;
 
     // Transfer ownership to node.
     expr->decoration = decor;

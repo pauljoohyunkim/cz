@@ -28,6 +28,7 @@ typedef struct {
     union {
         struct {
             const CZ_Type* type;
+            bool is_constexpr;
         } value;
 
         struct {

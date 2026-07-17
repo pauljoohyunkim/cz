@@ -20,6 +20,7 @@ typedef enum {
 typedef struct {
     const CZ_Type* resolved_type;
     CZ_ValueCategory value_category;
+    bool is_constexpr;
 } CZ_AST_Decoration;
 
 typedef enum {
