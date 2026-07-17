@@ -107,9 +107,9 @@ CZ_GlobalTypeTable* cz_global_type_table_create(void) {
     names = (const char**) calloc(gtt->named_entry_capacity, sizeof(const char*));
 
     // Link them
-    gtt->named_types = named_types;
+    gtt->named_types = (const CZ_Type**) named_types;
     named_types = NULL;
-    gtt->all_allocations = all_allocations;
+    gtt->all_allocations = (const CZ_Type**) all_allocations;
     all_allocations = NULL;
     gtt->names = names;
     names = NULL;
@@ -164,7 +164,7 @@ void cz_global_type_table_free(CZ_GlobalTypeTable* gtt) {
         free(gtt->names);
         free(gtt->named_types);
         for (unsigned int i = 0; i < gtt->all_entry_count; i++) {
-            cz_type_free(gtt->all_allocations[i]);
+            cz_type_free((CZ_Type*)gtt->all_allocations[i]);
             gtt->all_allocations[i] = NULL;
         }
         free(gtt->all_allocations);
@@ -175,8 +175,8 @@ void cz_global_type_table_free(CZ_GlobalTypeTable* gtt) {
 
 int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, const CZ_Type* type) {
     const char** new_names = NULL;
-    CZ_Type** new_named_types = NULL;
-    CZ_Type** new_all_allocations = NULL;
+    const CZ_Type** new_named_types = NULL;
+    const CZ_Type** new_all_allocations = NULL;
     NULL_POINTER_TO_GOTO(gtt, error_cleanup);
     NULL_POINTER_TO_GOTO(type, error_cleanup);
 
@@ -187,10 +187,10 @@ int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, co
     if (lookup_type == NULL) {
         // All allocation
         if (gtt->all_allocations_capacity == gtt->all_entry_count) {
-            new_all_allocations = (CZ_Type**) realloc(gtt->all_allocations, sizeof(CZ_Type*) * (gtt->all_allocations_capacity) * 2);
+            new_all_allocations = realloc(gtt->all_allocations, sizeof(const CZ_Type*) * (gtt->all_allocations_capacity) * 2);
             NULL_POINTER_TO_GOTO(new_all_allocations, error_cleanup);
 
-            gtt->all_allocations = new_all_allocations;
+            gtt->all_allocations = (const CZ_Type**) new_all_allocations;
             new_all_allocations = NULL;
             gtt->all_allocations_capacity *= 2;
         }
@@ -207,12 +207,12 @@ int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, co
             new_names = (const char**) realloc(gtt->names, sizeof(const char*) * (gtt->named_entry_capacity) * 2);
             NULL_POINTER_TO_GOTO(new_names, error_cleanup);
 
-            new_named_types = (CZ_Type**) realloc(gtt->named_types, sizeof(CZ_Type*) * (gtt->named_entry_capacity) * 2);
+            new_named_types = (const CZ_Type**) realloc(gtt->named_types, sizeof(const CZ_Type*) * (gtt->named_entry_capacity) * 2);
             NULL_POINTER_TO_GOTO(new_named_types, error_cleanup);
 
             gtt->names = new_names;
             new_names = NULL;
-            gtt->named_types = new_named_types;
+            gtt->named_types = (const CZ_Type**) new_named_types;
             new_named_types = NULL;
             gtt->named_entry_capacity *= 2;
         }
