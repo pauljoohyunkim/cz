@@ -759,107 +759,69 @@ static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, 
         goto error_cleanup;
     }
 
-    const CZ_AST_Node* operand_node = expr->unary_expression.operand;
+    // Pre-fetch basic types
+    const CZ_Type* int32_type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
+    const CZ_Type* float_type = cz_global_type_table_find_type_by_name(sa->gtt, "float");
+    const CZ_Type* bool_type = cz_global_type_table_find_type_by_name(sa->gtt, "bool");
+    NULL_POINTER_TO_GOTO(int32_type, error_cleanup);
+    NULL_POINTER_TO_GOTO(float_type, error_cleanup);
+    NULL_POINTER_TO_GOTO(bool_type, error_cleanup);
 
+    const CZ_AST_Node* operand_node = expr->unary_expression.operand;
+    const CZ_Type* operand_type = operand_node->decoration->resolved_type;
+
+    // Reference decay
+    if (operand_type->kind == CZ_TYPE_KIND_REFERENCE) {
+        operand_type = operand_type->reference_to;
+    }
+    // Const stripping
+    if (operand_type->kind == CZ_TYPE_KIND_CONST) {
+        operand_type = operand_type->const_of;
+    }
+
+    if (operand_type->kind != CZ_TYPE_KIND_PRIMITIVE) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Invalid type. (Even after stripping reference and const, not a primitive)");
+        goto error_cleanup;
+    }
+
+    // Now we have the primitive type in operand_type->primitive
+    const CZ_Type* result_type = NULL;
     switch (expr->unary_expression.op) {
         case CZ_TT_MINUS:
-            {
-                // Deal with numerical type.
-                const CZ_Type* operand_type = operand_node->decoration->resolved_type;
-                
-                // Reference Decay (In the case of reference)
-                if (operand_type->kind == CZ_TYPE_KIND_REFERENCE) {
-                    operand_type = operand_type->reference_to;
-                }
-
-                // Raw value type
-                const CZ_Type* value_type = operand_type;
-                if (value_type->kind == CZ_TYPE_KIND_CONST) {
-                    value_type = value_type->const_of;
-                }
-
-                if (value_type->kind != CZ_TYPE_KIND_PRIMITIVE) {
-                    cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Invalid type. (Even after stripping reference and const, not a primitive)");
+            switch (operand_type->primitive) {
+                case CZ_PRIMITIVE_INT32:
+                    result_type = int32_type;
+                    break;
+                case CZ_PRIMITIVE_FLOAT:
+                    result_type = float_type;
+                    break;
+                default:
+                    cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "- unary operator only operates on numerical data");
                     goto error_cleanup;
-                }
-
-                const CZ_Type* result_type = NULL;
-                switch (value_type->primitive) {
-                    case CZ_PRIMITIVE_INT32:
-                        result_type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
-                        break;
-                    case CZ_PRIMITIVE_FLOAT:
-                        result_type = cz_global_type_table_find_type_by_name(sa->gtt, "float");
-                        break;
-                    default:
-                        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
-                            "- unary operator only operates on numerical data");
-                        goto error_cleanup;
-
-                }
-
-                // Create decoration
-                decor = cz_ast_decoration_create(result_type, CZ_VALUE_CATEGORY_RVALUE, operand_node->decoration->is_constexpr);
-
-                // Transfer decoration
-                expr->decoration = decor;
-                decor = NULL;
             }
             break;
         case CZ_TT_EXCLAMATION:
-            {
-                // Deal with numerical type.
-                const CZ_Type* operand_type = operand_node->decoration->resolved_type;
-                
-                // Reference Decay (In the case of reference)
-                if (operand_type->kind == CZ_TYPE_KIND_REFERENCE) {
-                    operand_type = operand_type->reference_to;
-                }
-
-                // Raw value type
-                const CZ_Type* value_type = operand_type;
-                if (value_type->kind == CZ_TYPE_KIND_CONST) {
-                    value_type = value_type->const_of;
-                }
-
-                if (value_type->kind != CZ_TYPE_KIND_PRIMITIVE) {
-                    cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Invalid type. (Even after stripping reference and const, not a primitive)");
-                    goto error_cleanup;
-                }
-
-                const CZ_Type* result_type = NULL;
-                if (value_type->primitive != CZ_PRIMITIVE_BOOL) {
-                    cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
-                        "! unary operator only operates on boolean data");
-                    goto error_cleanup;
-                }
-                result_type = cz_global_type_table_find_type_by_name(sa->gtt, "bool");
-                switch (value_type->primitive) {
-                    case CZ_PRIMITIVE_INT32:
-                        result_type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
-                        break;
-                    case CZ_PRIMITIVE_FLOAT:
-                        result_type = cz_global_type_table_find_type_by_name(sa->gtt, "float");
-                        break;
-                    default:
-                        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
-                            "- unary operator only operates on numerical data");
-                        goto error_cleanup;
-
-                }
-
-                // Create decoration
-                decor = cz_ast_decoration_create(result_type, CZ_VALUE_CATEGORY_RVALUE, operand_node->decoration->is_constexpr);
-
-                // Transfer decoration
-                expr->decoration = decor;
-                decor = NULL;
+            if (operand_type->primitive != CZ_PRIMITIVE_BOOL) {
+                cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "! unary operator only operates on boolean data");
+                goto error_cleanup;
             }
+            result_type = bool_type;
             break;
         default:
-            cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
+            cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Unknown unary operator");
             goto error_cleanup;
     }
+
+    // Create decoration
+    decor = cz_ast_decoration_create(result_type, CZ_VALUE_CATEGORY_RVALUE, operand_node->decoration->is_constexpr);
+    if (decor == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
+        goto error_cleanup;
+    }
+
+    // Transfer decoration
+    expr->decoration = decor;
+    decor = NULL;
 
     return 1;
 
