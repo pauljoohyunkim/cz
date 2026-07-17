@@ -78,7 +78,7 @@ const CZ_Symbol* cz_environment_lookup(CZ_Environment* env, const char* name, bo
     if (env == NULL || name == NULL) return NULL;
 
     for (unsigned i = 0; i < env->symbol_count; i++) {
-        if (env->symbols[i] == name && strcmp(env->symbols[i]->name, name) == 0) {
+        if (env->symbols[i]->name == name || strcmp(env->symbols[i]->name, name) == 0) {
             return env->symbols[i];
         }
     }

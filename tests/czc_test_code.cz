@@ -1,9 +1,4 @@
 typedef int32 int;
 
-func addone :: (n :: int32) -> int32 {
-    return n + 1;
-}
-
-func addtwo :: (n :: int) -> n {
-    return n + 2;
-}
+x :: int32 = 1;
+x :: int32 = 1;

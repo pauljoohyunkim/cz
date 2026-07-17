@@ -261,7 +261,7 @@ static int cz_semantic_analyzer_build_global_table(CZ_SemanticAnalyzer* sa) {
                 //cz_semantic_analyzer_register_struct_decl(sa->global_env, statement);
                 break;
             case CZ_AST_VariableDeclarationNodeType:
-                //cz_semantic_analyzer_register_variable_decl(sa->global_env, statement);
+                cz_semantic_analyzer_register_variable_decl(sa, sa->global_env, statement);
                 break;
             case CZ_AST_TypedefDeclarationNodeType:
                 cz_semantic_analyzer_register_typedef(sa, sa->global_env, statement);
@@ -283,6 +283,7 @@ static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, 
     CZ_Type func_type_query;
     CZ_Type** func_param_types = NULL;
     CZ_Symbol* func_symbol = NULL;
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
     NULL_POINTER_TO_GOTO(env, error_cleanup);
     NULL_POINTER_TO_GOTO(decl, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_FunctionDeclarationNodeType, error_cleanup);
@@ -366,7 +367,56 @@ error_cleanup:
     return 0;
 }
 
+static int cz_semantic_analyzer_register_variable_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl) {
+    CZ_Symbol* variable_symbol = NULL;
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(decl, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_VariableDeclarationNodeType, error_cleanup);
+
+    // x :: variable_type [ = 3 ];
+    const CZ_AST_Node* variable_node = decl->variable_declaration.identifier;
+    const CZ_AST_Node* type_node = decl->variable_declaration.type;
+
+    // 1. Check symbol table. If variable exists, duplicate.
+    const CZ_Symbol* variable_symbol_lookup = cz_environment_lookup(env, variable_node->identifier.name, false);
+    if (variable_symbol_lookup != NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, variable_node->line, variable_node->col,
+                                 "Symbol \"%s\" already defined previously", variable_node->identifier.name);
+        goto error_cleanup;
+    }
+
+    // 2. Create type from type node.
+    const CZ_Type* variable_type = cz_type_from_type_node(type_node, sa->gtt);
+    if (variable_type == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, type_node->line, type_node->col,
+                                 "Type could not be deduced");
+        goto error_cleanup;
+    }
+
+    // 3. Create symbol and add it to symbol table.
+    variable_symbol = cz_symbol_create(CZ_SYMBOL_KIND_VALUE, variable_node->identifier.name);
+    if (variable_symbol == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, type_node->line, type_node->col,
+                                 "Symbol \"%s\" could not be created", variable_node->identifier.name);
+        goto error_cleanup;
+    }
+    if (cz_environment_push_symbol(env, variable_symbol) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, type_node->line, type_node->col,
+                                 "Symbol \"%s\" could not be added to symbol table", variable_node->identifier.name);
+        goto error_cleanup;
+    }
+    
+
+    return 1;
+
+error_cleanup:
+    cz_symbol_free(variable_symbol);
+    return 0;
+}
+
 static int cz_semantic_analyzer_register_typedef(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl) {
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
     NULL_POINTER_TO_GOTO(env, error_cleanup);
     NULL_POINTER_TO_GOTO(decl, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_TypedefDeclarationNodeType, error_cleanup);
@@ -452,6 +502,7 @@ error_cleanup:
 
 static int cz_semantic_analyzer_register_newtypedef(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl) {
     CZ_Type* new_type = NULL;
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
     NULL_POINTER_TO_GOTO(env, error_cleanup);
     NULL_POINTER_TO_GOTO(decl, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_NewtypeDeclarationNodeType, error_cleanup);
