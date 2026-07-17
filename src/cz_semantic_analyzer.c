@@ -833,6 +833,7 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
         };
     }
 
+    // ------------------------------ TODO: MOVE CYCLE CHECK TO PASS 3 --------------------------------------
     // 3. Check recursive cycle on the populated struct
     // No containing itself
     states = (CZ_StructRecursiveCycleState*) calloc(sa->gtt->all_entry_count, sizeof(CZ_StructRecursiveCycleState));
@@ -851,9 +852,11 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
     }
     free(states);
     states = NULL;
+    // ------------------------------ TODO: MOVE CYCLE CHECK TO PASS 3 --------------------------------------
 
     // 4. For each member type,
     for (unsigned int i = 0; i < member_count; i++) {
+        const CZ_AST_Node* member_node = decl->struct_declaration.members[i];
         // 4.1 Check if types are well-defined.
         const CZ_StructField* field = &struct_type->structure.layout->fields[i];
         const CZ_Type* field_type = field->type;
@@ -864,7 +867,47 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
         }
 
         // 4.2 Does it have initializer?
-        //if (decl->struct_declaration.members[i])
+        if (member_node->variable_declaration.expression != NULL) {
+            // Check RHS.
+            if (cz_semantic_analyzer_check_expression(sa, sa->global_env, member_node->variable_declaration.expression) != 1) {
+                cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Type of initializer for member idx %d cannot be deduced.", i+1);
+                goto error_cleanup;
+            }
+
+            // 4.2.1 Check if it is constexpr
+            const CZ_AST_Decoration* initializer_decor = member_node->decoration;
+            if (!initializer_decor->is_constexpr) {
+                cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Initializer for member idx %d is not constexpr.", i+1);
+                goto error_cleanup;
+            }
+
+            // 4.2.2 Decay type match
+            const CZ_Type* decay_member_type = cz_semantic_analyzer_decay_operand_type(field_type);
+            const CZ_Type* decay_expr_type = cz_semantic_analyzer_decay_operand_type(initializer_decor->resolved_type);
+            if (!cz_type_equals(decay_member_type, decay_expr_type)) {
+                cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Type for member and initializer for member idx %d does not match.", i+1);
+                goto error_cleanup;
+            }
+
+            // 4.2.3 If LHS is reference
+            if (field_type->kind == CZ_TYPE_KIND_REFERENCE) {
+                // 4.2.3.1 Expression must be l-value.
+                if (initializer_decor->value_category != CZ_VALUE_CATEGORY_LVALUE) {
+                    cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Initializer for member idx %d is not an l-value even though it is reference.", i+1);
+                    goto error_cleanup;
+                }
+
+                const CZ_Type* referenced_field_type = field_type->reference_to;
+
+                // 4.2.3.2 If expression is const, field should be const
+                if (referenced_field_type->kind != CZ_TYPE_KIND_CONST && initializer_decor->resolved_type->kind == CZ_TYPE_KIND_CONST) {
+                    cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+                        "Cannot bind non-const reference to a const value.");
+                    goto error_cleanup;
+                }
+            }
+
+        }
     }
 
 
