@@ -806,7 +806,7 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
 
     for (unsigned int i = 0; i < member_count; i++) {
         const CZ_AST_Node* member_node = decl->struct_declaration.members[i];
-        const char* member_name = member_node->struct_member.identifier->identifier.name;
+        const char* member_name = member_node->variable_declaration.identifier->identifier.name;
 
         // 2.1 Check for duplicate member names in the new layout
         for (unsigned int j = 0; j < i; j++) {
@@ -818,7 +818,7 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
         }
 
         // 2.2 Get the type of the member
-        const CZ_Type* member_type = cz_type_from_type_node(member_node->struct_member.type, sa->gtt);
+        const CZ_Type* member_type = cz_type_from_type_node(member_node->variable_declaration.type, sa->gtt);
         if (member_type == NULL) {
             cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
                                     "Type for struct field \"%s\" cannot be deduced", member_name);
@@ -828,7 +828,7 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
         // 2.3 Set the field in the new layout
         struct_layout->fields[i] = (CZ_StructField) {
             .idx = i,
-            .name = member_node->struct_member.identifier->identifier.name,
+            .name = member_node->variable_declaration.identifier->identifier.name,
             .type = member_type
         };
     }
@@ -851,6 +851,21 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
     }
     free(states);
     states = NULL;
+
+    // 4. For each member type,
+    for (unsigned int i = 0; i < member_count; i++) {
+        // 4.1 Check if types are well-defined.
+        const CZ_StructField* field = &struct_type->structure.layout->fields[i];
+        const CZ_Type* field_type = field->type;
+        const CZ_Type* gtt_field_type = cz_global_type_table_find_type(sa->gtt, field_type);
+        if (gtt_field_type == NULL) {
+            cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Type of member idx %d is ill-defined.", i+1);
+            goto error_cleanup;
+        }
+
+        // 4.2 Does it have initializer?
+        //if (decl->struct_declaration.members[i])
+    }
 
 
     return 1;
