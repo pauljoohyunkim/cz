@@ -394,16 +394,26 @@ static int cz_semantic_analyzer_register_struct_decl(CZ_SemanticAnalyzer* sa, CZ
 
     // 2. Go through each of the members.
 
-    // 2.1 TODO: Check if there are members of duplicate names.
     unsigned int member_count = decl->struct_declaration.member_count;
     struct_layout = cz_struct_layout_create(member_count);
     NULL_POINTER_TO_GOTO(struct_layout, error_cleanup);
     for (unsigned int i = 0; i < member_count; i++) {
         const CZ_AST_Node* member_node = decl->struct_declaration.members[i];
+        const char* member_name = member_node->struct_member.identifier->identifier.name;
+
+        // 2.1 Check if there are members of duplicate names.
+        for (unsigned int j = 0; j < i; j++) {
+            if (member_name == struct_layout->fields[j].name) {
+                cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+                                        "Duplicate member name \"%s\" detected", member_name);
+                goto error_cleanup;
+            }
+        }
+
         const CZ_Type* member_type = cz_type_from_type_node(member_node->struct_member.type, sa->gtt);
         if (member_type == NULL) {
             cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
-                                    "Type for struct field \"%s\" cannot be deduced", member_node->struct_member.identifier->identifier.name);
+                                    "Type for struct field \"%s\" cannot be deduced", member_name);
             goto error_cleanup;
         }
 
