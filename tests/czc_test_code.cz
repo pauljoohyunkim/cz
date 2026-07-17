@@ -1,10 +1,4 @@
-typedef int32 int;
+newtype int32 int;
 
-struct Vector {
-    x :: int;
-    y :: float;
-}
-
-func addone :: () -> int32& {
-    addone() = 2;
-}
+x :: int32 = 1 + 2;
+y :: int32& = x;

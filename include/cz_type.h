@@ -138,6 +138,16 @@ void cz_global_type_table_free(CZ_GlobalTypeTable* gtt);
 int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, const CZ_Type* type);
 
 /**
+ * @brief Checks if types match (structurally)
+ * 
+ * @param a Type 1
+ * @param b Type 2
+ * @return true Equal
+ * @return false Not equal
+ */
+bool cz_type_equals(const CZ_Type* a, const CZ_Type* b);
+
+/**
  * @brief Find an existing identical type in the global type table.
  * 
  * @param gtt Pointer to CZ_GlobalTypeTable
