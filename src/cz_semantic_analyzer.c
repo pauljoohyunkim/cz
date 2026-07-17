@@ -740,6 +740,8 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
     NULL_POINTER_TO_GOTO(expr, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_BinaryExpressionNodeType, error_cleanup);
 
+    return 1;
+
 error_cleanup:
     cz_ast_decoration_free(decor);
     return 0;
@@ -751,6 +753,67 @@ static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, 
     NULL_POINTER_TO_GOTO(env, error_cleanup);
     NULL_POINTER_TO_GOTO(expr, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_UnaryExpressionNodeType, error_cleanup);
+
+    if (cz_semantic_analyzer_check_expression(sa, env, expr->unary_expression.operand) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Could not check operand for unary operation.");
+        goto error_cleanup;
+    }
+
+    const CZ_AST_Node* operand_node = expr->unary_expression.operand;
+
+    switch (expr->unary_expression.op) {
+        case CZ_TT_MINUS:
+            {
+                // Deal with numerical type.
+                const CZ_Type* operand_type = operand_node->decoration->resolved_type;
+                
+                // Reference Decay (In the case of reference)
+                if (operand_type->kind == CZ_TYPE_KIND_REFERENCE) {
+                    operand_type = operand_type->reference_to;
+                }
+
+                // Raw value type
+                const CZ_Type* value_type = operand_type;
+                if (value_type->kind == CZ_TYPE_KIND_CONST) {
+                    value_type = value_type->const_of;
+                }
+
+                if (value_type->kind != CZ_TYPE_KIND_PRIMITIVE) {
+                    cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Invalid type. (Even after stripping reference and const, not a primitive)");
+                    goto error_cleanup;
+                }
+
+                const CZ_Type* result_type = NULL;
+                switch (value_type->primitive) {
+                    case CZ_PRIMITIVE_INT32:
+                        result_type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
+                        break;
+                    case CZ_PRIMITIVE_FLOAT:
+                        result_type = cz_global_type_table_find_type_by_name(sa->gtt, "float");
+                        break;
+                    default:
+                        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+                            "- unary operator only operates on numerical data");
+                        goto error_cleanup;
+
+                }
+
+                // Create decoration
+                decor = cz_ast_decoration_create(result_type, CZ_VALUE_CATEGORY_RVALUE, operand_node->decoration->is_constexpr);
+
+                // Transfer decoration
+                expr->decoration = decor;
+                decor = NULL;
+            }
+            break;
+        case CZ_TT_EXCLAMATION:
+            break;
+        default:
+            cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
+            goto error_cleanup;
+    }
+
+    return 1;
 
 error_cleanup:
     cz_ast_decoration_free(decor);
@@ -792,18 +855,16 @@ static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa
         default:
             cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Unknown literal type.");
             goto error_cleanup;
-            break;
     }
 
     NULL_POINTER_TO_GOTO(type, error_cleanup);
 
     // Create decoration
-    decor = cz_ast_decoration_create(type, CZ_VALUE_CATEGORY_RVALUE);
+    decor = cz_ast_decoration_create(type, CZ_VALUE_CATEGORY_RVALUE, true);
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;
     }
-    decor->is_constexpr = true;
 
     // Transfer ownership to node.
     expr->decoration = decor;

@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "cz_ast.h"
 
-CZ_AST_Decoration* cz_ast_decoration_create(const CZ_Type* type, CZ_ValueCategory val_category) {
+CZ_AST_Decoration* cz_ast_decoration_create(const CZ_Type* type, CZ_ValueCategory val_category, bool is_constexpr) {
     CZ_AST_Decoration* decor = NULL;
     if (type == NULL) return NULL;
 
@@ -11,6 +11,7 @@ CZ_AST_Decoration* cz_ast_decoration_create(const CZ_Type* type, CZ_ValueCategor
 
     decor->resolved_type = type;
     decor->value_category = val_category;
+    decor->is_constexpr = is_constexpr;
 
     return decor;
 }

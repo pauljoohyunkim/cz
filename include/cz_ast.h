@@ -266,9 +266,10 @@ struct CZ_AST_Node {
  * 
  * @param type CZ_Type from global type table.
  * @param val_category Whether or not expression is l-value or r-value.
+ * @param is_constexpr Whether or not expression is constexpr.
  * @return CZ_AST_Decoration* Pointer to CZ_AST_Decoration allocated on success, NULL on failure.
  */
-CZ_AST_Decoration* cz_ast_decoration_create(const CZ_Type* type, CZ_ValueCategory val_category);
+CZ_AST_Decoration* cz_ast_decoration_create(const CZ_Type* type, CZ_ValueCategory val_category, bool is_constexpr);
 
 /**
  * @brief Frees AST node decoration.
