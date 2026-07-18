@@ -5,6 +5,7 @@
 
 #define NULL_POINTER_TO_GOTO(ptr, label) do { if ((ptr) == NULL) goto label; } while (0)
 #define INVALID_NODE_TYPE_TO_GOTO(node, node_type_enum, label) do { if ((node)->node_type != (node_type_enum)) goto label; } while (0)
+#define MAX(x,y) ((x) > (y) ? (x) : (y))
 
 const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTypeTable* gtt) {
     const CZ_Type* base_type = NULL;
@@ -377,7 +378,7 @@ static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, 
     }
     
     // 4. Add symbol.
-    func_symbol = cz_symbol_create(CZ_SYMBOL_KIND_VALUE, decl->function_declaration.function_identifier->identifier.name);
+    func_symbol = cz_symbol_create(CZ_SYMBOL_KIND_VALUE, decl->function_declaration.function_identifier->identifier.name, 0);
     func_symbol->data.value.type = func_type;
     if (cz_environment_push_symbol(env, func_symbol) != 1) {
         goto error_cleanup;
@@ -466,7 +467,7 @@ static int cz_semantic_analyzer_register_variable_decl(CZ_SemanticAnalyzer* sa, 
     }
 
     // 3. Create symbol and add it to symbol table.
-    variable_symbol = cz_symbol_create(CZ_SYMBOL_KIND_VALUE, variable_node->identifier.name);
+    variable_symbol = cz_symbol_create(CZ_SYMBOL_KIND_VALUE, variable_node->identifier.name, 0);
     if (variable_symbol == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, type_node->line, type_node->col,
                                  "Symbol \"%s\" could not be created", variable_node->identifier.name);
@@ -740,7 +741,7 @@ static int cz_semantic_analyzer_full_analyze(CZ_SemanticAnalyzer* sa) {
     NULL_POINTER_TO_GOTO(sa->program->program.global_declaration_list, error_cleanup);
 
     for (unsigned int i = 0; i < sa->program->program.declaration_count; i++) {
-        const CZ_AST_Node* statement = sa->program->program.global_declaration_list[i];
+        CZ_AST_Node* statement = sa->program->program.global_declaration_list[i];
         if (statement == NULL) return 0;
 
         // TODO: Log errors.
@@ -835,6 +836,9 @@ static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_
         goto error_cleanup;
     }
 
+    // Current function.
+    sa->current_function_return = func_symbol->data.value.type->function.return_type;
+
     // 2. Create parameter environment (scope = 1)
     func_param_env = cz_environment_create();
     if (func_param_env == NULL) {
@@ -861,12 +865,11 @@ static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_
             goto error_cleanup;
         }
 
-        param_symbol = cz_symbol_create(CZ_SYMBOL_KIND_VALUE, param_name);
+        param_symbol = cz_symbol_create(CZ_SYMBOL_KIND_VALUE, param_name, 1);
         if (param_symbol == NULL) {
             cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Could not create symbol for function parameter \"%s\".", param_name);
             goto error_cleanup;
         }
-        param_symbol->scope_level = 1;
         param_symbol->data.value.type = func_symbol->data.value.type->function.param_types[i];
 
         if (cz_environment_push_symbol(func_param_env, param_symbol) != 1) {
@@ -888,6 +891,10 @@ static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_
     func_body_env->parent = func_param_env;
 
     // 4. Go through each statement.
+    if (cz_semantic_analyzer_check_statement_list(sa, func_body_env, decl->function_declaration.body) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Function body of \"%s\" has a problem.", func_name);
+        goto error_cleanup;
+    }
 
 
 
@@ -900,12 +907,14 @@ static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_
     
     
 
+    sa->current_function_return = NULL;
     return 1;
 
 error_cleanup:
     cz_environment_free(func_param_env);
     cz_environment_free(func_body_env);
     cz_symbol_free(param_symbol);
+    sa->current_function_return = NULL;
     return 0;
 }
 
@@ -1113,6 +1122,28 @@ error_cleanup:
     return 0;
 }
 
+static int cz_semantic_analyzer_check_statement_list(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* block) {
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(block, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(block, CZ_AST_BlockStatementNodeType, error_cleanup);
+
+    for (unsigned int i = 0; i < block->statement_list.statement_count; i++) {
+        CZ_AST_Node* stmt = block->statement_list.statements[i];
+        if (cz_semantic_analyzer_check_statement(sa, env, stmt) != 1) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col, "An error at statement.");
+        }
+    }
+
+    return 1;
+
+error_cleanup:
+    return 0;
+}
+
+//static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
+static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
+
 static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
     NULL_POINTER_TO_GOTO(sa, error_cleanup);
     NULL_POINTER_TO_GOTO(env, error_cleanup);
@@ -1120,10 +1151,16 @@ static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Envi
 
     switch (stmt->node_type) {
         case CZ_AST_VariableDeclarationNodeType:
+            //if (cz_semantic_analyzer_check_variable_declaration_statement(sa, env, stmt) != 1) {
+            //    goto error_cleanup;
+            //}
             break;
         case CZ_AST_AssignmentStatementNodeType:
             break;
         case CZ_AST_ReturnStatementNodeType:
+            if (cz_semantic_analyzer_check_return_statement(sa, env, stmt) != 1) {
+                goto error_cleanup;
+            }
             break;
         case CZ_AST_IfStatementNodeType:
             break;
@@ -1137,6 +1174,89 @@ static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Envi
             // Expression
             break;
     }
+
+    return 1;
+
+error_cleanup:
+    return 0;
+}
+
+static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_ReturnStatementNodeType, error_cleanup);
+    NULL_POINTER_TO_GOTO(sa->current_function_return, error_cleanup);
+
+    // 1. If void return, then expr must be empty. If not void return, then expression must not be empty.
+    if (sa->current_function_return->kind == CZ_TYPE_KIND_PRIMITIVE && sa->current_function_return->primitive == CZ_PRIMITIVE_VOID) {
+        if (stmt->return_statement.expression != NULL) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "Return type of function is void, but an expression is given");
+            goto error_cleanup;
+        }
+        // Done
+        return 1;
+    } else {
+        if (stmt->return_statement.expression == NULL) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "Return type of function is not void, but return expression is not given.");
+            goto error_cleanup;
+        }
+    }
+
+    // Check expression
+    if (cz_semantic_analyzer_check_expression(sa, env, stmt->return_statement.expression) != 1) {
+        goto error_cleanup;
+    }
+
+    // 2. Decay type match
+    const CZ_Type* decayed_return_type = cz_semantic_analyzer_decay_operand_type(sa->current_function_return);
+    NULL_POINTER_TO_GOTO(decayed_return_type, error_cleanup);
+    const CZ_Type* decayed_expr_type = cz_semantic_analyzer_decay_operand_type(stmt->return_statement.expression->decoration->resolved_type);
+    NULL_POINTER_TO_GOTO(decayed_expr_type, error_cleanup);
+    if (!cz_type_equals(decayed_return_type, decayed_expr_type)) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "Return type of function does not match the expression type of return statement.");
+        goto error_cleanup;
+    }
+
+    // 3. Reference handling
+    if (sa->current_function_return->kind == CZ_TYPE_KIND_REFERENCE) {
+        // 3.1 Returning expression must be L-value
+        if (stmt->return_statement.expression->decoration->value_category != CZ_VALUE_CATEGORY_LVALUE) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "Return type of reference returning function should be l-value.");
+            goto error_cleanup;
+        }
+
+
+        // 3.1 & 3.2 Unified Scope and Lifetime validation via Decoration
+        if (stmt->return_statement.expression->decoration->scope_level >= 2) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "Cannot return local scope expressions by reference.");
+            goto error_cleanup;
+        }
+
+        // If it's at level 1 (parameter space), it MUST stem from an actual reference
+        if (stmt->return_statement.expression->decoration->scope_level == 1 && 
+            !stmt->return_statement.expression->decoration->is_reference_source) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "Cannot return a reference to data owned by a non-reference parameter.");
+            goto error_cleanup;
+        }
+
+        // 3.4 Const dropping block: If non-const reference returning, expression must not be a const.
+        if (sa->current_function_return->reference_to->kind != CZ_TYPE_KIND_CONST &&
+            cz_type_is_const(stmt->return_statement.expression->decoration->resolved_type)
+        ) {
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                    "Cannot strip away constness when function return type is non-const.");
+                goto error_cleanup;
+        }
+    }
+
+    return 1;
 
 error_cleanup:
     return 0;
@@ -1349,7 +1469,10 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
 
     decor = cz_ast_decoration_create(result_type,
         CZ_VALUE_CATEGORY_RVALUE,
-        lhs_node->decoration->is_constexpr && rhs_node->decoration->is_constexpr);
+        lhs_node->decoration->is_constexpr && rhs_node->decoration->is_constexpr,
+        false,
+        MAX(lhs_node->decoration->scope_level, rhs_node->decoration->scope_level)
+    );
     
     // Transfer decoration
     expr->decoration = decor;
@@ -1422,7 +1545,7 @@ static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, 
     }
 
     // Create decoration
-    decor = cz_ast_decoration_create(result_type, CZ_VALUE_CATEGORY_RVALUE, operand_node->decoration->is_constexpr);
+    decor = cz_ast_decoration_create(result_type, CZ_VALUE_CATEGORY_RVALUE, operand_node->decoration->is_constexpr, false, expr->unary_expression.operand->decoration->scope_level);
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;
@@ -1479,7 +1602,7 @@ static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa
     NULL_POINTER_TO_GOTO(type, error_cleanup);
 
     // Create decoration
-    decor = cz_ast_decoration_create(type, CZ_VALUE_CATEGORY_RVALUE, true);
+    decor = cz_ast_decoration_create(type, CZ_VALUE_CATEGORY_RVALUE, true, false, 0);
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;
@@ -1524,7 +1647,7 @@ static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer*
         value_cat = CZ_VALUE_CATEGORY_RVALUE;
     }
 
-    decor = cz_ast_decoration_create(symbol->data.value.type, value_cat, symbol->data.value.is_constexpr);
+    decor = cz_ast_decoration_create(symbol->data.value.type, value_cat, symbol->data.value.is_constexpr, symbol->data.value.type->kind == CZ_TYPE_KIND_REFERENCE, symbol->scope_level);
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;

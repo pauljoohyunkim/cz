@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "cz_ast.h"
 
-CZ_AST_Decoration* cz_ast_decoration_create(const CZ_Type* type, CZ_ValueCategory val_category, bool is_constexpr) {
+CZ_AST_Decoration* cz_ast_decoration_create(const CZ_Type* type, CZ_ValueCategory val_category, bool is_constexpr, bool is_reference_source, unsigned int scope_level) {
     CZ_AST_Decoration* decor = NULL;
     if (type == NULL) return NULL;
 
@@ -12,6 +12,8 @@ CZ_AST_Decoration* cz_ast_decoration_create(const CZ_Type* type, CZ_ValueCategor
     decor->resolved_type = type;
     decor->value_category = val_category;
     decor->is_constexpr = is_constexpr;
+    decor->is_reference_source = is_reference_source;
+    decor->scope_level = scope_level;
 
     return decor;
 }
@@ -278,7 +280,7 @@ void cz_ast_root_print(const CZ_AST_Node* node, unsigned int depth) {
             cz_ast_root_print(node->binary_expression.right, depth+1);
             break;
         case CZ_AST_ReturnStatementNodeType:
-            printf("ReturnStatement%s\n", node->return_statement.is_ref ? " (ref)" : "");
+            printf("ReturnStatement\n");
             cz_ast_root_print(node->return_statement.expression, depth+1);
             break;
         case CZ_AST_IfStatementNodeType:

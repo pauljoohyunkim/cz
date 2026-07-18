@@ -309,3 +309,15 @@ void cz_global_type_table_print(const CZ_GlobalTypeTable* gtt) {
         printf("    [%u] Type: %p\n", i, (void*)gtt->all_allocations[i]);
     }
 }
+
+bool cz_type_is_const(const CZ_Type* type) {
+    if (type == NULL) return false;
+    if (type->kind == CZ_TYPE_KIND_CONST) return true;
+    
+    if (type->kind == CZ_TYPE_KIND_REFERENCE) {
+        return cz_type_is_const(type->reference_to);
+    }
+    // TODO: Const array type->array_of here too
+    
+    return false;
+}

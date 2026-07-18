@@ -6,7 +6,7 @@
 
 #define NULL_POINTER_TO_GOTO(ptr, label) do { if ((ptr) == NULL) goto label; } while (0)
 
-CZ_Symbol* cz_symbol_create(CZ_SymbolKind kind, const char* name) {
+CZ_Symbol* cz_symbol_create(CZ_SymbolKind kind, const char* name, unsigned int scope_level) {
     CZ_Symbol* symbol = NULL;
     NULL_POINTER_TO_GOTO(name, error_cleanup);
 
@@ -15,6 +15,7 @@ CZ_Symbol* cz_symbol_create(CZ_SymbolKind kind, const char* name) {
     
     symbol->kind = kind;
     symbol->name = name;
+    symbol->scope_level = scope_level;
 
     return symbol;
 
