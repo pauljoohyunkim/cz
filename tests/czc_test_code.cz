@@ -1,11 +1,5 @@
-x :: int32 = 1;
+n :: const int32 = 0;
 
-func addone :: (x :: int32) -> int32 {
-    res :: int32;
-    {
-        incr_x :: int32 = x + 1;
-
-        return incr_x;
-    }
-    return res;
+func increment :: () {
+    n += 1;
 }
