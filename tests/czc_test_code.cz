@@ -1,5 +1,5 @@
 
 func increment :: (n :: int32&) -> int32& {
-    n = n + 1;
+    //n = n + 1;
     return n;
 }

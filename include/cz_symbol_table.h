@@ -53,9 +53,10 @@ struct CZ_Environment {
  * 
  * @param kind Symbol kind
  * @param name Name of the symbol. Will internally copy.
+ * @param scope_level Scope level (0 for global, 1 for function parameters, 2 and onward are block variables.)
  * @return CZ_Symbol* Allocated CZ_Symbol on success, NULL on failure.
  */
-CZ_Symbol* cz_symbol_create(CZ_SymbolKind kind, const char* name);
+CZ_Symbol* cz_symbol_create(CZ_SymbolKind kind, const char* name, unsigned int scope_level);
 
 /**
  * @brief Frees allocated CZ_Symbol

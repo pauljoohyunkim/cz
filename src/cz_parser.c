@@ -1000,7 +1000,6 @@ error_free_node:
 static CZ_AST_Node* cz_parser_create_return_statement(CZ_Parser* parser) {
     CZ_AST_Node* node = NULL;
     CZ_AST_Node* expression = NULL;
-    bool is_ref = false;
 
     if (parser == NULL) return NULL;
 
@@ -1019,7 +1018,6 @@ static CZ_AST_Node* cz_parser_create_return_statement(CZ_Parser* parser) {
     node = cz_ast_node_create(CZ_AST_ReturnStatementNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
     NULL_POINTER_TO_GOTO(node, error_free_node);
 
-    node->return_statement.is_ref = is_ref;
     node->return_statement.expression = expression;
     expression = NULL;
 
