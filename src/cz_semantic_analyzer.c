@@ -1144,6 +1144,7 @@ error_cleanup:
 static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
+static int cz_semantic_analyzer_check_if_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 static int cz_semantic_analyzer_check_while_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 
 static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
@@ -1169,10 +1170,16 @@ static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Envi
             }
             break;
         case CZ_AST_IfStatementNodeType:
+            if (cz_semantic_analyzer_check_if_statement(sa, env, stmt) != 1) {
+                goto error_cleanup;
+            }
             break;
         case CZ_AST_ForStatementNodeType:
             break;
         case CZ_AST_WhileStatementNodeType:
+            if (cz_semantic_analyzer_check_while_statement(sa, env, stmt) != 1) {
+                goto error_cleanup;
+            }
             break;
         case CZ_AST_BlockStatementNodeType:
             inner_env = cz_environment_create();
@@ -1580,6 +1587,43 @@ static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, 
                 cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
                     "Cannot strip away constness when function return type is non-const.");
                 goto error_cleanup;
+        }
+    }
+
+    return 1;
+
+error_cleanup:
+    return 0;
+}
+
+static int cz_semantic_analyzer_check_if_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_IfStatementNodeType, error_cleanup);
+
+    // Check condition. See if it is boolean.
+    if (cz_semantic_analyzer_check_expression(sa, env, stmt->if_statement.condition) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "Could not check the type inside the if condition");
+        goto error_cleanup;
+    }
+    const CZ_Type* decayed_condition_type = cz_semantic_analyzer_decay_operand_type(stmt->if_statement.condition->decoration->resolved_type);
+    NULL_POINTER_TO_GOTO(decayed_condition_type, error_cleanup);
+    
+    // 2. Check then block.
+    if (cz_semantic_analyzer_check_statement(sa, env, stmt->if_statement.if_branch) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "If statement then body has a problem");
+        goto error_cleanup;
+    }
+
+    // 3. Check else block
+    if (stmt->if_statement.else_branch != NULL) {
+        if (cz_semantic_analyzer_check_statement(sa, env, stmt->if_statement.else_branch) != 1) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "If statement else body has a problem");
+            goto error_cleanup;
         }
     }
 
