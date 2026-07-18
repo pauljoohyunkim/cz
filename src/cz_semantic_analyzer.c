@@ -1116,7 +1116,7 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
     }
     
     // 6. Update symbol.
-    var_symbol->data.value.is_constexpr = rhs_decoration->is_constexpr;
+    var_symbol->data.value.is_constexpr = rhs_decoration->is_constexpr && cz_type_is_const(var_symbol->data.value.type);
 
 error_cleanup:
     return 0;
@@ -1158,6 +1158,9 @@ static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Envi
             }
             break;
         case CZ_AST_AssignmentStatementNodeType:
+            if (cz_semantic_analyzer_check_assignment_statement(sa, env, stmt) != 1) {
+                goto error_cleanup;
+            }
             break;
         case CZ_AST_ReturnStatementNodeType:
             if (cz_semantic_analyzer_check_return_statement(sa, env, stmt) != 1) {
@@ -1308,6 +1311,13 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
     NULL_POINTER_TO_GOTO(stmt, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_AssignmentStatementNodeType, error_cleanup);
 
+    // 0. Operation Type
+    if (!cz_token_type_is_assignment(stmt->binary_expression.op)) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "Assignment operation but assignment operator is not given.");
+        goto error_cleanup;
+    }
+
     // 1. Check LHS and RHS
     if (cz_semantic_analyzer_check_expression(sa, env, stmt->binary_expression.left) != 1) {
         cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
@@ -1319,6 +1329,22 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
             "Type of RHS cannot be deduced.");
         goto error_cleanup;
     }
+
+    // Check that LHS and RHS decorations are not NULL
+    if (stmt->binary_expression.left->decoration == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "LHS decoration is missing.");
+        goto error_cleanup;
+    }
+    if (stmt->binary_expression.right->decoration == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "RHS decoration is missing.");
+        goto error_cleanup;
+    }
+    const CZ_Type* lhs_type = stmt->binary_expression.left->decoration->resolved_type;
+    const CZ_Type* rhs_type = stmt->binary_expression.right->decoration->resolved_type;
+    NULL_POINTER_TO_GOTO(lhs_type, error_cleanup);
+    NULL_POINTER_TO_GOTO(rhs_type, error_cleanup);
 
     // 2. LHS must be l-value.
     if (stmt->binary_expression.left->decoration->value_category != CZ_VALUE_CATEGORY_LVALUE) {
@@ -1334,13 +1360,145 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
         goto error_cleanup;
     }
 
-    // 4. Decay type must match.
-    const CZ_Type* decayed_lhs_type = cz_semantic_analyzer_decay_operand_type(stmt->binary_expression.left->decoration->resolved_type);
-    const CZ_Type* decayed_rhs_type = cz_semantic_analyzer_decay_operand_type(stmt->binary_expression.right->decoration->resolved_type);
+    // 4. For assignment operators, check that the underlying operation is valid
+    // Pre-fetch basic types (same as in binary expression checker)
+    const CZ_Type* int32_type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
+    const CZ_Type* float_type = cz_global_type_table_find_type_by_name(sa->gtt, "float");
+    const CZ_Type* bool_type = cz_global_type_table_find_type_by_name(sa->gtt, "bool");
+    NULL_POINTER_TO_GOTO(int32_type, error_cleanup);
+    NULL_POINTER_TO_GOTO(float_type, error_cleanup);
+    NULL_POINTER_TO_GOTO(bool_type, error_cleanup);
+
+    // Decay and strip const for operation validation (same as binary expression checker)
+    const CZ_Type* decayed_lhs_type = cz_semantic_analyzer_decay_operand_type(lhs_type);
+    const CZ_Type* decayed_rhs_type = cz_semantic_analyzer_decay_operand_type(rhs_type);
+    NULL_POINTER_TO_GOTO(decayed_lhs_type, error_cleanup);
+    NULL_POINTER_TO_GOTO(decayed_rhs_type, error_cleanup);
+
+    // Check that after decaying, we have primitive types (same validation as binary expressions)
+    if (decayed_lhs_type->kind != CZ_TYPE_KIND_PRIMITIVE || decayed_rhs_type->kind != CZ_TYPE_KIND_PRIMITIVE) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "Invalid type for assignment operation. (After stripping reference and const, not a primitive)");
+        goto error_cleanup;
+    }
+
+    // 5. Decay type must match for simple assignment
     if (!cz_type_equals(decayed_lhs_type, decayed_rhs_type)) {
         cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
             "Assignment requires types of LHS and RHS to match.");
         goto error_cleanup;
+    }
+
+    // 6. Check validity of the underlying operation for compound assignment operators
+    switch (stmt->binary_expression.op) {
+        case CZ_TT_EQUAL:
+            // Simple assignment - already validated type match above
+            break;
+
+        case CZ_TT_PLUS_EQUAL:
+            // int32 + int32 -> int32
+            // float + float -> float
+            if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_FLOAT && decayed_rhs_type->primitive == CZ_PRIMITIVE_FLOAT) {
+                // Valid
+            } else {
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                    "+= only defined for int32 or float.");
+                goto error_cleanup;
+            }
+            break;
+
+        case CZ_TT_MINUS_EQUAL:
+            // int32 - int32 -> int32
+            // float - float -> float
+            if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_FLOAT && decayed_rhs_type->primitive == CZ_PRIMITIVE_FLOAT) {
+                // Valid
+            } else {
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                    "-= only defined for int32 or float.");
+                goto error_cleanup;
+            }
+            break;
+
+        case CZ_TT_STAR_EQUAL:
+            // int32 * int32 -> int32
+            // float * float -> float
+            if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_FLOAT && decayed_rhs_type->primitive == CZ_PRIMITIVE_FLOAT) {
+                // Valid
+            } else {
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                    "*= only defined for int32 or float.");
+                goto error_cleanup;
+            }
+            break;
+
+        case CZ_TT_SLASH_EQUAL:
+            // int32 / int32 -> int32
+            // float / float -> float
+            if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_FLOAT && decayed_rhs_type->primitive == CZ_PRIMITIVE_FLOAT) {
+                // Valid
+            } else {
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                    "/= only defined for int32 or float.");
+                goto error_cleanup;
+            }
+            break;
+
+        case CZ_TT_PERCENT_EQUAL:
+            // int32 % int32 -> int32
+            if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else {
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                    "%= only defined for int32");
+                goto error_cleanup;
+            }
+            break;
+
+        case CZ_TT_AMPERSAND_EQUAL:
+            // int32 & int32 -> int32
+            if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else {
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                    "&= only defined for int32");
+                goto error_cleanup;
+            }
+            break;
+
+        case CZ_TT_BAR_EQUAL:
+            // int32 | int32 -> int32
+            if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else {
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                    "|= only defined for int32");
+                goto error_cleanup;
+            }
+            break;
+
+        case CZ_TT_CAROT_EQUAL:
+            // int32 ^ int32 -> int32
+            if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else {
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                    "^= only defined for int32");
+                goto error_cleanup;
+            }
+            break;
+
+        default:
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "Unknown assignment operator.");
+            goto error_cleanup;
     }
 
     return 1;
