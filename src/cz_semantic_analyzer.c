@@ -392,7 +392,6 @@ error_cleanup:
 }
 
 static int cz_semantic_analyzer_register_struct_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl) {
-    CZ_StructLayout* struct_layout = NULL;
     CZ_Type* struct_type = NULL;
     NULL_POINTER_TO_GOTO(sa, error_cleanup);
     NULL_POINTER_TO_GOTO(env, error_cleanup);
@@ -416,47 +415,14 @@ static int cz_semantic_analyzer_register_struct_decl(CZ_SemanticAnalyzer* sa, CZ
         goto error_cleanup;
     }
 
-    // 2. Go through each of the members.
-
-    unsigned int member_count = decl->struct_declaration.member_count;
-    struct_layout = cz_struct_layout_create(member_count);
-    NULL_POINTER_TO_GOTO(struct_layout, error_cleanup);
-    for (unsigned int i = 0; i < member_count; i++) {
-        const CZ_AST_Node* member_node = decl->struct_declaration.members[i];
-        const char* member_name = member_node->struct_member.identifier->identifier.name;
-
-        // 2.1 Check if there are members of duplicate names.
-        for (unsigned int j = 0; j < i; j++) {
-            if (member_name == struct_layout->fields[j].name) {
-                cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
-                                        "Duplicate member name \"%s\" detected", member_name);
-                goto error_cleanup;
-            }
-        }
-
-        const CZ_Type* member_type = cz_type_from_type_node(member_node->struct_member.type, sa->gtt);
-        if (member_type == NULL) {
-            cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
-                                    "Type for struct field \"%s\" cannot be deduced", member_name);
-            goto error_cleanup;
-        }
-
-        struct_layout->fields[i] = (CZ_StructField) {
-            .idx = i,
-            .name = member_node->struct_member.identifier->identifier.name,
-            .type = member_type
-        };
-    }
-
+    // 2. Create struct type with NULL layout (to be populated in pass 2)
     struct_type = cz_type_create(CZ_TYPE_KIND_STRUCT);
     NULL_POINTER_TO_GOTO(struct_type, error_cleanup);
 
-    // 3. Create struct type
     struct_type->structure.name = struct_name;
-    struct_type->structure.layout = struct_layout;
-    struct_layout = NULL;
+    struct_type->structure.layout = NULL;   // Layout will be created in pass 2
 
-    // 4. Add to GTT
+    // 3. Add to GTT
     if (cz_global_type_table_push_type(sa->gtt, struct_name, struct_type) != 1) {
         cz_type_free(struct_type);
         struct_type = NULL;
@@ -468,7 +434,6 @@ static int cz_semantic_analyzer_register_struct_decl(CZ_SemanticAnalyzer* sa, CZ
     return 1;
 
 error_cleanup:
-    cz_struct_layout_free(struct_layout);
     cz_type_free(struct_type);
     return 0;
 }
@@ -700,7 +665,74 @@ static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Env
  * @param sa Pointer to CZ_SemanticAnalyzer
  * @return int 1 on success, 0 on failure
  */
+typedef enum {
+    CZ_STRUCT_RECURSIVE_CYCLE_STATE_UNVISITED = 0,
+    CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVING,
+    CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVED
+} CZ_StructRecursiveCycleState;
+
+/**
+ * @brief A helper to determine struct cycle.
+ *
+ * @param sa Pointer to CZ_SemanticAnalyzer
+ * @param type Pointer to CZ_Type
+ * @param states Allocated list of CZ_StructRecursiveCycleState. Length must be at least gtt->all_entry_count.
+ * @return int 1 if no cycle (safe), or 0 if error or there is cycle.
+ */
+static int cz_semantic_analyzer_struct_cycle_detect(CZ_SemanticAnalyzer* sa, const CZ_Type* type, CZ_StructRecursiveCycleState* states) {
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(type, error_cleanup);
+    NULL_POINTER_TO_GOTO(states, error_cleanup);
+
+    if (type->kind != CZ_TYPE_KIND_STRUCT) {
+        // Not a struct. Primitive, references, etc. cannot form a struct cycle.
+        return 1;
+    }
+
+    // Determine a unique ID (or index) for this struct.
+    int struct_idx = -1;
+    for (unsigned int i = 0; i < sa->gtt->all_entry_count; i++) {
+        if (sa->gtt->all_allocations[i] == type) {
+            struct_idx = (int) i;
+            break;
+        }
+    }
+    if (struct_idx < 0) {
+        // Error: could not find struct in GTT
+        return 0;
+    }
+
+    if (states[struct_idx] == CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVING) {
+        // This was visited previously before.
+        return 0;
+    }
+
+    if (states[struct_idx] == CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVED) {
+        return 1;   // Verified safe before.
+    }
+
+    // Mark it as being visited.
+    states[struct_idx] = CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVING;
+
+    // Loop through each member
+    for (unsigned int i = 0; i < type->structure.layout->field_count; i++) {
+        const CZ_Type* field_type = type->structure.layout->fields[i].type;
+
+        if (field_type->kind == CZ_TYPE_KIND_STRUCT) {
+            if (cz_semantic_analyzer_struct_cycle_detect(sa, field_type, states) != 1) {
+                // Recursive dependency.
+                return 0;
+            }
+        }
+    }
+
+    return 1;
+
+error_cleanup:
+    return 0;
+}
 static int cz_semantic_analyzer_full_analyze(CZ_SemanticAnalyzer* sa) {
+    CZ_StructRecursiveCycleState* states = NULL;
     NULL_POINTER_TO_GOTO(sa, error_cleanup);
     NULL_POINTER_TO_GOTO(sa->program, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(sa->program, CZ_AST_ProgramNodeType, error_cleanup);
@@ -731,16 +763,63 @@ static int cz_semantic_analyzer_full_analyze(CZ_SemanticAnalyzer* sa) {
         }
     }
 
+    // Cycle check for structs (moved from pass 2 to pass 3)
+    for (unsigned int i = 0; i < sa->program->program.declaration_count; i++) {
+        const CZ_AST_Node* statement = sa->program->program.global_declaration_list[i];
+        if (statement == NULL) return 0;
+
+        if (statement->node_type == CZ_AST_StructDeclarationNodeType) {
+            const char* struct_name = statement->struct_declaration.identifier->identifier.name;
+
+            // Look up the struct type
+            CZ_Type* struct_type = (CZ_Type*) cz_global_type_table_find_type_by_name(sa->gtt, struct_name);
+            if (struct_type == NULL) {
+                cz_error_list_push_error(sa->error_list, sa->filename, statement->line, statement->col, "Struct name \"%s\" is not recognized", struct_name);
+                goto error_cleanup;
+            }
+            if (struct_type->kind != CZ_TYPE_KIND_STRUCT) {
+                cz_error_list_push_error(sa->error_list, sa->filename, statement->line, statement->col, "\"%s\" is not a struct", struct_name);
+                goto error_cleanup;
+            }
+
+            // Check if struct layout exists (should have been populated by cz_semantic_analyzer_check_struct_fields)
+            if (struct_type->structure.layout == NULL) {
+                cz_error_list_push_error(sa->error_list, sa->filename, statement->line, statement->col, "Struct layout not populated for \"%s\"", struct_name);
+                goto error_cleanup;
+            }
+
+            // Allocate states array for cycle detection
+            states = (CZ_StructRecursiveCycleState*) calloc(sa->gtt->all_entry_count, sizeof(CZ_StructRecursiveCycleState));
+            if (states == NULL) {
+                cz_error_list_push_error(sa->error_list, sa->filename, statement->line, statement->col, "Out of memory");
+                goto error_cleanup;
+            }
+
+            // Perform cycle detection
+            if (cz_semantic_analyzer_struct_cycle_detect(sa, struct_type, states) != 1) {
+                cz_error_list_push_error(sa->error_list, sa->filename, statement->line, statement->col, "\"%s\" has circular dependency", struct_name);
+                goto error_cleanup;
+            }
+            free(states);
+            states = NULL;
+        }
+    }
+
     return 1;
 
 error_cleanup:
+    free(states);
     return 0;
 }
 
+
 static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl) {
+    CZ_StructLayout* struct_layout = NULL;
     NULL_POINTER_TO_GOTO(sa, error_cleanup);
     NULL_POINTER_TO_GOTO(decl, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_StructDeclarationNodeType, error_cleanup);
+
+    const char* struct_name = decl->struct_declaration.identifier->identifier.name;
 
     // global_y :: int32 = 3;
     //struct Vector {
@@ -749,8 +828,117 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
     //    z :: int32
     //};
 
+    // 1. Resolve Struct Symbol
+    CZ_Type* struct_type = (CZ_Type*) cz_global_type_table_find_type_by_name(sa->gtt, struct_name);
+    if (struct_type == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Struct name \"%s\" is not recognized", struct_name);
+        goto error_cleanup;
+    }
+    if (struct_type->kind != CZ_TYPE_KIND_STRUCT) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "\"%s\" is not a struct", struct_name);
+        goto error_cleanup;
+    }
+
+    // 2. Populate the struct layout with the actual members
+    unsigned int member_count = decl->struct_declaration.member_count;
+    struct_layout = cz_struct_layout_create(member_count);
+    if (struct_layout == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Out of memory");
+        goto error_cleanup;
+    }
+
+    for (unsigned int i = 0; i < member_count; i++) {
+        const CZ_AST_Node* member_node = decl->struct_declaration.members[i];
+        const char* member_name = member_node->variable_declaration.identifier->identifier.name;
+
+        // 2.1 Check for duplicate member names in the new layout
+        for (unsigned int j = 0; j < i; j++) {
+            if (member_name == struct_layout->fields[j].name) {
+                cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+                                        "Duplicate member name \"%s\" detected", member_name);
+                goto error_cleanup;
+            }
+        }
+
+        // 2.2 Get the type of the member
+        const CZ_Type* member_type = cz_type_from_type_node(member_node->variable_declaration.type, sa->gtt);
+        if (member_type == NULL) {
+            cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+                                    "Type for struct field \"%s\" cannot be deduced", member_name);
+            goto error_cleanup;
+        }
+
+        // 2.3 Set the field in the new layout
+        struct_layout->fields[i] = (CZ_StructField) {
+            .idx = i,
+            .name = member_node->variable_declaration.identifier->identifier.name,
+            .type = member_type
+        };
+    }
+    struct_type->structure.layout = struct_layout;
+    struct_layout = NULL;
+
+    // 3. For each member type,
+    for (unsigned int i = 0; i < member_count; i++) {
+        const CZ_AST_Node* member_node = decl->struct_declaration.members[i];
+        // 3.1 Check if types are well-defined.
+        const CZ_StructField* field = &struct_type->structure.layout->fields[i];
+        const CZ_Type* field_type = field->type;
+        const CZ_Type* gtt_field_type = cz_global_type_table_find_type(sa->gtt, field_type);
+        if (gtt_field_type == NULL) {
+            cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Type of member idx %d is ill-defined.", i+1);
+            goto error_cleanup;
+        }
+
+        // 3.2 Does it have initializer?
+        if (member_node->variable_declaration.expression != NULL) {
+            // Check RHS.
+            if (cz_semantic_analyzer_check_expression(sa, sa->global_env, member_node->variable_declaration.expression) != 1) {
+                cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Type of initializer for member idx %d cannot be deduced.", i+1);
+                goto error_cleanup;
+            }
+
+            // 3.2.1 Check if it is constexpr
+            const CZ_AST_Decoration* initializer_decor = member_node->decoration;
+            if (!initializer_decor->is_constexpr) {
+                cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Initializer for member idx %d is not constexpr.", i+1);
+                goto error_cleanup;
+            }
+
+            // 3.2.2 Decay type match
+            const CZ_Type* decay_member_type = cz_semantic_analyzer_decay_operand_type(field_type);
+            const CZ_Type* decay_expr_type = cz_semantic_analyzer_decay_operand_type(initializer_decor->resolved_type);
+            if (!cz_type_equals(decay_member_type, decay_expr_type)) {
+                cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Type for member and initializer for member idx %d does not match.", i+1);
+                goto error_cleanup;
+            }
+
+            // 3.2.3 If LHS is reference
+            if (field_type->kind == CZ_TYPE_KIND_REFERENCE) {
+                // 3.2.3.1 Expression must be l-value.
+                if (initializer_decor->value_category != CZ_VALUE_CATEGORY_LVALUE) {
+                    cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Initializer for member idx %d is not an l-value even though it is reference.", i+1);
+                    goto error_cleanup;
+                }
+
+                const CZ_Type* referenced_field_type = field_type->reference_to;
+
+                // 3.2.3.2 If expression is const, field should be const
+                if (referenced_field_type->kind != CZ_TYPE_KIND_CONST && initializer_decor->resolved_type->kind == CZ_TYPE_KIND_CONST) {
+                    cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+                        "Cannot bind non-const reference to a const value.");
+                    goto error_cleanup;
+                }
+            }
+
+        }
+    }
+
+
     return 1;
+
 error_cleanup:
+    cz_struct_layout_free(struct_layout);
     return 0;
 }
 

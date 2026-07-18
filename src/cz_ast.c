@@ -42,15 +42,16 @@ void cz_ast_root_free(CZ_AST_Node* node) {
                 free(node->program.global_declaration_list);
                 break;
             case CZ_AST_StructDeclarationNodeType:
+            case CZ_AST_StructInitNodeType:
                 cz_ast_root_free(node->struct_declaration.identifier);
                 for (unsigned int i = 0; i < node->struct_declaration.member_count; i++) {
                     cz_ast_root_free(node->struct_declaration.members[i]);
                 }
                 free(node->struct_declaration.members);
                 break;
-            case CZ_AST_StructMemberNodeType:
-                cz_ast_root_free(node->struct_member.identifier);
-                cz_ast_root_free(node->struct_member.type);
+            case CZ_AST_StructInitMemberNodeType:
+                cz_ast_root_free(node->struct_init_member.identifier);
+                cz_ast_root_free(node->struct_init_member.expression);
                 break;
             case CZ_AST_FunctionDeclarationNodeType:
                 cz_ast_root_free(node->function_declaration.function_identifier);
@@ -161,10 +162,17 @@ void cz_ast_root_print(const CZ_AST_Node* node, unsigned int depth) {
                 cz_ast_root_print(node->struct_declaration.members[i], depth+1);
             }
             break;
-        case CZ_AST_StructMemberNodeType:
-            printf("StructMember\n");
-            cz_ast_root_print(node->struct_member.identifier, depth+1);
-            cz_ast_root_print(node->struct_member.type, depth+1);
+        case CZ_AST_StructInitNodeType:
+            printf("StructInit\n");
+            cz_ast_root_print(node->struct_declaration.identifier, depth+1);
+            for (unsigned int i = 0; i < node->struct_declaration.member_count; i++) {
+                cz_ast_root_print(node->struct_declaration.members[i], depth+1);
+            }
+            break;
+        case CZ_AST_StructInitMemberNodeType:
+            printf("StructInit\n");
+            cz_ast_root_print(node->struct_init_member.identifier, depth+1);
+            cz_ast_root_print(node->struct_init_member.expression, depth+1);
             break;
         case CZ_AST_FunctionDeclarationNodeType:
             printf("FunctionDeclaration\n");

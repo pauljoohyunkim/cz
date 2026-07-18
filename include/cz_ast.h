@@ -26,7 +26,8 @@ typedef struct {
 typedef enum {
     CZ_AST_ProgramNodeType,
     CZ_AST_StructDeclarationNodeType,
-    CZ_AST_StructMemberNodeType,
+    CZ_AST_StructInitNodeType,
+    CZ_AST_StructInitMemberNodeType,
     CZ_AST_FunctionDeclarationNodeType,
     CZ_AST_ParameterListNodeType,
 
@@ -73,22 +74,21 @@ struct CZ_AST_Node {
             unsigned int capacity;
         } program;
 
-        /** Used for node_type == CZ_AST_StructDeclarationNodeType */
+        /** Used for node_type == CZ_AST_StructDeclarationNodeType or CZ_AST_StructInitNodeType */
         struct {
             /** Identifier node (CZ_AST_IdentifierNodeType) */
             CZ_AST_Node* identifier;
-            /** Array of CZ_AST_Node* (each being a struct member, CZ_AST_StructMemberNodeType) */
+            /** [StructDeclaration] Array of CZ_AST_Node* (each being a variable_declaration) */
+            /** [StructInit] Array of CZ_AST_Node* (each being a struct_init_member) */
             CZ_AST_Node** members;
             unsigned int member_count;
         } struct_declaration;
 
-        /** Used for node_type == CZ_AST_StructMemberNodeType */
         struct {
-            /** Identifier node (CZ_AST_IdentifierNodeType) */
             CZ_AST_Node* identifier;
-            /** Type node (CZ_AST_TypeNodeType) */
-            CZ_AST_Node* type;
-        } struct_member;
+
+            CZ_AST_Node* expression;
+        } struct_init_member;
 
         /** Used for node_type == CZ_AST_FunctionDeclarationNodeType */
         struct {

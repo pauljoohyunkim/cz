@@ -1,4 +1,10 @@
-newtype int32 int;
+struct Vector {
+    x :: int32;
+    y :: int32;
+    M :: Matrix;
+}
 
-x :: const int32 = 1 + 2;
-y :: int32& = x;
+struct Matrix {
+    v1 :: Vector;
+    v2 :: Vector;
+}
