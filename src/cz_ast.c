@@ -98,6 +98,7 @@ void cz_ast_root_free(CZ_AST_Node* node) {
                 cz_ast_root_free(node->for_statement.condition);
                 cz_ast_root_free(node->for_statement.iteration_step);
                 cz_ast_root_free(node->for_statement.body);
+                cz_environment_free(node->for_statement.scope);
                 break;
             case CZ_AST_WhileStatementNodeType:
                 cz_ast_root_free(node->while_statement.condition);

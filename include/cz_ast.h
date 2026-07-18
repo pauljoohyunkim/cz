@@ -163,6 +163,8 @@ struct CZ_AST_Node {
             CZ_AST_Node* iteration_step;
             /** Body statement node */
             CZ_AST_Node* body;
+
+            CZ_Environment* scope;
         } for_statement;
 
         /** Used for node_type == CZ_AST_WhileStatementNodeType */

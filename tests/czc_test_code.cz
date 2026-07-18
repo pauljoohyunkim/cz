@@ -1,5 +1,7 @@
-func relu :: (x :: float) -> float {
-    while (x > 0.0) {
-        return 1.0;
+func sum :: (n :: int32) -> int32 {
+    s :: int32 = 0;
+    for (i :: int32 = 0; i <= n; i += 1) {
+        s += i;
     }
+    return s;
 }

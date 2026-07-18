@@ -1145,6 +1145,7 @@ static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_Semantic
 static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 static int cz_semantic_analyzer_check_if_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
+static int cz_semantic_analyzer_check_for_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 static int cz_semantic_analyzer_check_while_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 
 static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
@@ -1175,6 +1176,9 @@ static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Envi
             }
             break;
         case CZ_AST_ForStatementNodeType:
+            if (cz_semantic_analyzer_check_for_statement(sa, env, stmt) != 1) {
+                goto error_cleanup;
+            }
             break;
         case CZ_AST_WhileStatementNodeType:
             if (cz_semantic_analyzer_check_while_statement(sa, env, stmt) != 1) {
@@ -1635,6 +1639,76 @@ static int cz_semantic_analyzer_check_if_statement(CZ_SemanticAnalyzer* sa, CZ_E
     return 1;
 
 error_cleanup:
+    return 0;
+}
+
+static int cz_semantic_analyzer_check_for_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
+    CZ_Environment* sub_env = NULL;
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_ForStatementNodeType, error_cleanup);
+
+    // 1. Create a sub-environment as there could be a declaration.
+    sub_env = cz_environment_create();
+    if (sub_env == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "Subenvironment for for-loop could not be created");
+        goto error_cleanup;
+    }
+    sub_env->parent = env;
+    sub_env->scope_level = env->scope_level + 1;
+
+    // 2. Check initializer.
+    if (stmt->for_statement.initialization != NULL) {
+        CZ_AST_Node* initializer_node = stmt->for_statement.initialization;
+
+        // 2.1 If initializer is declaration, add to the sub-environment just created.
+        if (initializer_node->node_type == CZ_AST_VariableDeclarationNodeType || initializer_node->node_type == CZ_AST_AssignmentStatementNodeType) {
+            if (cz_semantic_analyzer_check_statement(sa, sub_env, stmt->for_statement.initialization) != 1) {
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                    "Initializer statement must be either a variable declaration or assignment (for now, maybe?).");
+                goto error_cleanup;
+            }
+        }
+    }
+    // 3. Check condition if it exists and see if it resolves to boolean.
+    if (stmt->for_statement.condition != NULL) {
+        if (cz_semantic_analyzer_check_expression(sa, sub_env, stmt->for_statement.condition) != 1) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "Could not check the type inside the for condition");
+            goto error_cleanup;
+        }
+        const CZ_Type* decayed_condition_type = cz_semantic_analyzer_decay_operand_type(stmt->for_statement.condition->decoration->resolved_type);
+        NULL_POINTER_TO_GOTO(decayed_condition_type, error_cleanup);
+        if (decayed_condition_type->kind != CZ_TYPE_KIND_PRIMITIVE || decayed_condition_type->primitive != CZ_PRIMITIVE_BOOL) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "Condition for for is not a boolean.");
+            goto error_cleanup;
+        }
+    }
+    // 4. Check assignment or expression.
+    if (stmt->for_statement.iteration_step != NULL) {
+        if (cz_semantic_analyzer_check_statement(sa, sub_env, stmt->for_statement.iteration_step) != 1) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "Invalid condition for iteration step.");
+            goto error_cleanup;
+        }
+    }
+    // 5. Check block statement.
+    if (cz_semantic_analyzer_check_statement(sa, sub_env, stmt->for_statement.body) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "For statement body has a problem.");
+        goto error_cleanup;
+    }
+
+    stmt->for_statement.scope = sub_env;
+    sub_env = NULL;
+
+    return 1;
+
+error_cleanup:
+    cz_environment_free(sub_env);
     return 0;
 }
 
