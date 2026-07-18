@@ -1145,6 +1145,7 @@ static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_Semantic
 static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 
 static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
+    CZ_Environment* inner_env = NULL;
     NULL_POINTER_TO_GOTO(sa, error_cleanup);
     NULL_POINTER_TO_GOTO(env, error_cleanup);
     NULL_POINTER_TO_GOTO(stmt, error_cleanup);
@@ -1169,6 +1170,21 @@ static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Envi
         case CZ_AST_WhileStatementNodeType:
             break;
         case CZ_AST_BlockStatementNodeType:
+            inner_env = cz_environment_create();
+            if (inner_env == NULL) {
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col, "Could not allocate environment for block statement.");
+                goto error_cleanup;
+            }
+            inner_env->parent = env;
+            inner_env->scope_level = env->scope_level + 1;
+
+            if (cz_semantic_analyzer_check_statement_list(sa, inner_env, stmt) != 1) {
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col, "Block statement has an error.");
+                goto error_cleanup;
+            }
+
+            stmt->statement_list.scope = inner_env;
+            inner_env = NULL;
             break;
         default:
             // Expression
@@ -1178,6 +1194,7 @@ static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Envi
     return 1;
 
 error_cleanup:
+    cz_environment_free(inner_env);
     return 0;
 }
 

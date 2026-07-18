@@ -1,6 +1,11 @@
 x :: int32 = 1;
 
 func addone :: (x :: int32) -> int32 {
-    incr_x :: int32 = x + 1;
-    return incr_x;
+    res :: int32;
+    {
+        incr_x :: int32 = x + 1;
+
+        return incr_x;
+    }
+    return res;
 }
