@@ -1144,6 +1144,7 @@ error_cleanup:
 static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
+static int cz_semantic_analyzer_check_while_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 
 static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
     CZ_Environment* inner_env = NULL;
@@ -1580,6 +1581,39 @@ static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, 
                     "Cannot strip away constness when function return type is non-const.");
                 goto error_cleanup;
         }
+    }
+
+    return 1;
+
+error_cleanup:
+    return 0;
+}
+
+static int cz_semantic_analyzer_check_while_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_WhileStatementNodeType, error_cleanup);
+
+    // 1. Check condition. See if it is boolean.
+    if (cz_semantic_analyzer_check_expression(sa, env, stmt->while_statement.condition) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "Could not check the type inside the while condition");
+        goto error_cleanup;
+    }
+    const CZ_Type* decayed_condition_type = cz_semantic_analyzer_decay_operand_type(stmt->while_statement.condition->decoration->resolved_type);
+    NULL_POINTER_TO_GOTO(decayed_condition_type, error_cleanup);
+    if (decayed_condition_type->kind != CZ_TYPE_KIND_PRIMITIVE || decayed_condition_type->primitive != CZ_PRIMITIVE_BOOL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "Condition for while is not a boolean.");
+        goto error_cleanup;
+    }
+
+    // 2. Check block.
+    if (cz_semantic_analyzer_check_statement(sa, env, stmt->while_statement.body) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "While statement body has a problem");
+        goto error_cleanup;
     }
 
     return 1;
