@@ -1,5 +1,5 @@
-n :: const int32 = 0;
-
-func increment :: () {
-    n += 1;
+func relu :: (x :: float) -> float {
+    while (x > 0.0) {
+        return 1.0;
+    }
 }
