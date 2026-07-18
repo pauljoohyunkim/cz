@@ -3,6 +3,10 @@
 #include "cz_type.h"
 #include "cz_semantic_analyzer.h"
 
+#define SCOPE_LEVEL_GLOBAL (0)
+#define SCOPE_LEVEL_FUNCTION_PARAMETER (1)
+#define SCOPE_LEVEL_FUNCTION_BODY (2)
+
 #define NULL_POINTER_TO_GOTO(ptr, label) do { if ((ptr) == NULL) goto label; } while (0)
 #define INVALID_NODE_TYPE_TO_GOTO(node, node_type_enum, label) do { if ((node)->node_type != (node_type_enum)) goto label; } while (0)
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
@@ -897,10 +901,6 @@ static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_
     }
 
 
-
-
-
-
     // Wire everything up.
     param_list_node->parameter_list.scope = func_param_env;
     func_param_env = NULL;
@@ -1141,7 +1141,7 @@ error_cleanup:
     return 0;
 }
 
-//static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
+static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 
 static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
@@ -1151,9 +1151,9 @@ static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Envi
 
     switch (stmt->node_type) {
         case CZ_AST_VariableDeclarationNodeType:
-            //if (cz_semantic_analyzer_check_variable_declaration_statement(sa, env, stmt) != 1) {
-            //    goto error_cleanup;
-            //}
+            if (cz_semantic_analyzer_check_variable_declaration_statement(sa, env, stmt) != 1) {
+                goto error_cleanup;
+            }
             break;
         case CZ_AST_AssignmentStatementNodeType:
             break;
@@ -1180,6 +1180,110 @@ static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Envi
 error_cleanup:
     return 0;
 }
+
+static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
+    CZ_Symbol* symbol = NULL;
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_VariableDeclarationNodeType, error_cleanup);
+
+    const char* var_name = stmt->variable_declaration.identifier->identifier.name;
+
+    // 1. Look up variable name. If var name exists, and it happens to be parameter, disallow it.
+    const CZ_Symbol* var_name_symbol = cz_environment_lookup(env, var_name, true);
+    if (var_name_symbol != NULL) {
+        if (var_name_symbol->scope_level == SCOPE_LEVEL_FUNCTION_PARAMETER) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col, "%s is a function parameter, and it cannot be shadowed by variable declaration", var_name);
+            goto error_cleanup;
+        }
+        if (var_name_symbol->scope_level == env->scope_level) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col, "Redeclaration of %s in the same scope not allowed.", var_name);
+            goto error_cleanup;
+        }
+    }
+
+    // Getting the variable type.
+    const CZ_Type* var_type = cz_type_from_type_node(stmt->variable_declaration.type, sa->gtt);
+    if (var_type == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col, "Type for \"%s\" cannot be deduced.", var_name);
+        goto error_cleanup;
+    }
+
+    // 2. If variable is reference or const, RHS must exist. If not, fail.
+    if (var_type->kind == CZ_TYPE_KIND_REFERENCE || cz_type_is_const(var_type)) {
+        if (stmt->variable_declaration.expression == NULL) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col, "\"%s\" is declared either reference or const, but is not given an initializer.", var_name);
+            goto error_cleanup;
+        }
+    }
+
+    // 3. Check RHS and decorate.
+    if (stmt->variable_declaration.expression != NULL) {
+        if (cz_semantic_analyzer_check_expression(sa, env, stmt->variable_declaration.expression) != 1) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col, "Type for initializer of \"%s\" cannot be deduced.", var_name);
+            goto error_cleanup;
+        }
+    }
+
+    // 4. If reference variable, RHS must be l-value.
+    if (var_type->kind == CZ_TYPE_KIND_REFERENCE) {
+        if (stmt->variable_declaration.expression == NULL || 
+            stmt->variable_declaration.expression->decoration->value_category != CZ_VALUE_CATEGORY_LVALUE) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "\"%s\" declared as reference but initializer is not l-value.", var_name);
+            goto error_cleanup;
+        }
+    }
+
+    // 5. Const-correctness
+    if (var_type->kind == CZ_TYPE_KIND_REFERENCE && !cz_type_is_const(var_type)) {
+        if (stmt->variable_declaration.expression != NULL && 
+            cz_type_is_const(stmt->variable_declaration.expression->decoration->resolved_type)) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "\"%s\" declared as mutable reference but initializer is const.", var_name);
+            goto error_cleanup;
+        }
+    }
+
+    // 6. Decay type match
+    if (stmt->variable_declaration.expression != NULL) {
+        const CZ_Type* decayed_var_type = cz_semantic_analyzer_decay_operand_type(var_type);
+        const CZ_Type* decayed_expr_type = cz_semantic_analyzer_decay_operand_type(stmt->variable_declaration.expression->decoration->resolved_type);
+        if (!cz_type_equals(decayed_var_type, decayed_expr_type)) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "Declared type for \"%s\" does not match the decayed type of initializer.", var_name);
+            goto error_cleanup;
+        }
+    }
+
+    symbol = cz_symbol_create(CZ_SYMBOL_KIND_VALUE, var_name, env->scope_level);
+    if (symbol == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "Symbol for \"%s\" could not be created.", var_name);
+        goto error_cleanup;
+    }
+    symbol->data.value.type = var_type;
+    symbol->data.value.is_constexpr = cz_type_is_const(var_type) &&
+                                      stmt->variable_declaration.expression != NULL &&
+                                      stmt->variable_declaration.expression->decoration->is_constexpr;
+
+    if (cz_environment_push_symbol(env, symbol) != 1) {
+        cz_symbol_free(symbol);
+        symbol = NULL;
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "Symbol for \"%s\" could not be added to symbol table.", var_name);
+        goto error_cleanup;
+    }
+    symbol = NULL;
+
+    return 1;
+
+error_cleanup:
+    cz_symbol_free(symbol);
+    return 0;
+}
+
 
 static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
     NULL_POINTER_TO_GOTO(sa, error_cleanup);
