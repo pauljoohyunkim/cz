@@ -891,7 +891,10 @@ static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_
     func_body_env->parent = func_param_env;
 
     // 4. Go through each statement.
-    cz_semantic_analyzer_check_statement_list(sa, func_body_env, decl->function_declaration.body);
+    if (cz_semantic_analyzer_check_statement_list(sa, func_body_env, decl->function_declaration.body) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Function body of \"%s\" has a problem.", func_name);
+        goto error_cleanup;
+    }
 
 
 
@@ -1172,6 +1175,8 @@ static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Envi
             break;
     }
 
+    return 1;
+
 error_cleanup:
     return 0;
 }
@@ -1218,9 +1223,38 @@ static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, 
 
     // 3. Reference handling
     if (sa->current_function_return->kind == CZ_TYPE_KIND_REFERENCE) {
+        // 3.1 Cannot return local scope.
+        if (stmt->return_statement.expression->decoration->scope_level >= 2) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "Return type of function is reference, so cannot return local scope expressions.");
+            goto error_cleanup;
+        }
+        // 3.2 Parameter can be returned only if it is reference.
+        if (stmt->return_statement.expression->node_type == CZ_AST_IdentifierNodeType) {
+            const CZ_Symbol* identifier = cz_environment_lookup(env, stmt->return_statement.expression->identifier.name, true);
+            // Check if it is actually parameter.
+            if (identifier->scope_level == 1 && identifier->data.value.type->kind != CZ_TYPE_KIND_REFERENCE) {
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                    "Return type of function is reference and you are trying to return a non-reference parameter.");
+                goto error_cleanup;
+            }
+        }
+        // 3.3 Returning expression must be L-value
+        if (stmt->return_statement.expression->decoration->value_category != CZ_VALUE_CATEGORY_LVALUE) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "Return type of reference returning function is should be l-value.");
+            goto error_cleanup;
+        }
 
+        // 3.4 Const dropping block: If non-const reference returning, expression must not be a const.
+        if (sa->current_function_return->reference_to->kind != CZ_TYPE_KIND_CONST &&
+            cz_type_is_const(stmt->return_statement.expression->decoration->resolved_type)
+        ) {
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                    "Cannot strip away constness when function return type is non-const.");
+                goto error_cleanup;
+            }
     }
-
 
     return 1;
 

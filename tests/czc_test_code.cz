@@ -3,3 +3,7 @@ func increment :: (n :: int32&) -> int32& {
     //n = n + 1;
     return n;
 }
+
+func not_allowed :: (n :: const int32&) -> int32& {
+    return n;
+}

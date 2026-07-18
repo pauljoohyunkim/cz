@@ -172,6 +172,15 @@ const CZ_Type* cz_global_type_table_find_type_by_name(const CZ_GlobalTypeTable* 
  */
 void cz_global_type_table_print(const CZ_GlobalTypeTable* gtt);
 
+/**
+ * @brief Check if type is const, regardless of if it is reference or not
+ * 
+ * @param type Pointer to CZ_Type
+ * @return true Type is const (or reference to a const.)
+ * @return false Type is not const.
+ */
+bool cz_type_is_const(const CZ_Type* type);
+
 #ifdef __cplusplus
 }
 #endif
