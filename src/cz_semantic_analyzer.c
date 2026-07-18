@@ -904,7 +904,8 @@ static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_
     // Wire everything up.
     param_list_node->parameter_list.scope = func_param_env;
     func_param_env = NULL;
-    
+    decl->function_declaration.body->statement_list.scope = func_body_env;
+    func_body_env = NULL;
     
 
     sa->current_function_return = NULL;
