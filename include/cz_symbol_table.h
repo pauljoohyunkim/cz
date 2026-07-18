@@ -24,6 +24,7 @@ typedef struct {
 typedef struct {
     CZ_SymbolKind kind;
     const char* name;
+    unsigned int scope_level;
 
     union {
         struct {

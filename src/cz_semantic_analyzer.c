@@ -731,6 +731,7 @@ static int cz_semantic_analyzer_struct_cycle_detect(CZ_SemanticAnalyzer* sa, con
 error_cleanup:
     return 0;
 }
+
 static int cz_semantic_analyzer_full_analyze(CZ_SemanticAnalyzer* sa) {
     CZ_StructRecursiveCycleState* states = NULL;
     NULL_POINTER_TO_GOTO(sa, error_cleanup);
@@ -745,7 +746,7 @@ static int cz_semantic_analyzer_full_analyze(CZ_SemanticAnalyzer* sa) {
         // TODO: Log errors.
         switch (statement->node_type) {
             case CZ_AST_FunctionDeclarationNodeType:
-                //cz_semantic_analyzer_check_function_body(sa, statement);
+                cz_semantic_analyzer_check_function_body(sa, statement);
                 break;
             case CZ_AST_StructDeclarationNodeType:
                 cz_semantic_analyzer_check_struct_fields(sa, statement);
@@ -812,6 +813,101 @@ error_cleanup:
     return 0;
 }
 
+static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl) {
+    CZ_Environment* func_param_env = NULL;
+    CZ_Environment* func_body_env = NULL;
+    CZ_Symbol* param_symbol = NULL;
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(decl, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_FunctionDeclarationNodeType, error_cleanup);
+
+    const char* func_name = decl->function_declaration.function_identifier->identifier.name;
+    CZ_AST_Node* param_list_node = decl->function_declaration.function.parameter_list;
+
+    // 1. Look up function from symbol table.
+    const CZ_Symbol* func_symbol = cz_environment_lookup(sa->global_env, func_name, true);
+    if (func_symbol == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Could not find function symbol \"%s\".", func_name);
+        goto error_cleanup;
+    }
+    if (func_symbol->kind != CZ_SYMBOL_KIND_VALUE || func_symbol->data.value.type->kind != CZ_TYPE_KIND_FUNCTION) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Symbol \"%s\" might be declared as something that is not a function.", func_name);
+        goto error_cleanup;
+    }
+
+    // 2. Create parameter environment (scope = 1)
+    func_param_env = cz_environment_create();
+    if (func_param_env == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Could not create environment for function parameters of \"%s\".", func_name);
+        goto error_cleanup;
+    }
+    func_param_env->parent = sa->global_env;
+    func_param_env->scope_level = 1;
+    // 2.1 Add symbol for each parameter
+    // 2.1.1 Check that the number of parameters is equal.
+    if (param_list_node->parameter_list.param_count != func_symbol->data.value.type->function.param_count) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+        "Parameter count in definition of function \"%s\" doesn't match its declaration.", func_name);
+        goto error_cleanup;
+    }
+
+    for (unsigned int i = 0; i < param_list_node->parameter_list.param_count; i++) {
+        const char* param_name = param_list_node->parameter_list.params[i]->variable_declaration.identifier->identifier.name;
+
+        // 2.1.2 Check duplicate parameter names.
+        if (cz_environment_lookup(func_param_env, param_name, false) != NULL) {
+            cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, 
+                "Redefinition of parameter \"%s\" in function \"%s\".", param_name, func_name);
+            goto error_cleanup;
+        }
+
+        param_symbol = cz_symbol_create(CZ_SYMBOL_KIND_VALUE, param_name);
+        if (param_symbol == NULL) {
+            cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Could not create symbol for function parameter \"%s\".", param_name);
+            goto error_cleanup;
+        }
+        param_symbol->scope_level = 1;
+        param_symbol->data.value.type = func_symbol->data.value.type->function.param_types[i];
+
+        if (cz_environment_push_symbol(func_param_env, param_symbol) != 1) {
+            cz_symbol_free(param_symbol);
+            param_symbol = NULL;
+            cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Could not push symbol for function parameter \"%s\".", param_name);
+            goto error_cleanup;
+        }
+        param_symbol = NULL;
+    }
+
+    // 3. Create body environment.
+    func_body_env = cz_environment_create();
+    if (func_body_env == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Could not create environment for function body of \"%s\".", func_name);
+        goto error_cleanup;
+    }
+    func_body_env->scope_level = 2;
+    func_body_env->parent = func_param_env;
+
+    // 4. Go through each statement.
+
+
+
+
+
+
+    // Wire everything up.
+    param_list_node->parameter_list.scope = func_param_env;
+    func_param_env = NULL;
+    
+    
+
+    return 1;
+
+error_cleanup:
+    cz_environment_free(func_param_env);
+    cz_environment_free(func_body_env);
+    cz_symbol_free(param_symbol);
+    return 0;
+}
 
 static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl) {
     CZ_StructLayout* struct_layout = NULL;
@@ -1012,6 +1108,35 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
     
     // 6. Update symbol.
     var_symbol->data.value.is_constexpr = rhs_decoration->is_constexpr;
+
+error_cleanup:
+    return 0;
+}
+
+static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
+
+    switch (stmt->node_type) {
+        case CZ_AST_VariableDeclarationNodeType:
+            break;
+        case CZ_AST_AssignmentStatementNodeType:
+            break;
+        case CZ_AST_ReturnStatementNodeType:
+            break;
+        case CZ_AST_IfStatementNodeType:
+            break;
+        case CZ_AST_ForStatementNodeType:
+            break;
+        case CZ_AST_WhileStatementNodeType:
+            break;
+        case CZ_AST_BlockStatementNodeType:
+            break;
+        default:
+            // Expression
+            break;
+    }
 
 error_cleanup:
     return 0;
@@ -1392,7 +1517,14 @@ static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer*
     }
 
     // 2. Decoration
-    decor = cz_ast_decoration_create(symbol->data.value.type, CZ_VALUE_CATEGORY_LVALUE, symbol->data.value.is_constexpr);
+    CZ_ValueCategory value_cat = CZ_VALUE_CATEGORY_LVALUE;
+
+    // A function symbol or a compile-time constant cannot be an L-value (assignable)
+    if (symbol->data.value.type->kind == CZ_TYPE_KIND_FUNCTION || symbol->data.value.is_constexpr) {
+        value_cat = CZ_VALUE_CATEGORY_RVALUE;
+    }
+
+    decor = cz_ast_decoration_create(symbol->data.value.type, value_cat, symbol->data.value.is_constexpr);
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;

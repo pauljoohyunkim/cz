@@ -105,6 +105,7 @@ struct CZ_AST_Node {
             /** Array of CZ_AST_Node* (each being a parameter, likely VariableDeclaration node) */
             CZ_AST_Node** params;
             unsigned int param_count;
+            CZ_Environment* scope;
         } parameter_list;
 
         /** Used for node_type == CZ_AST_BlockStatementNodeType */

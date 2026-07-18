@@ -1,10 +1,5 @@
-struct Vector {
-    x :: int32;
-    y :: int32;
-    M :: Matrix;
-}
 
-struct Matrix {
-    v1 :: Vector;
-    v2 :: Vector;
+func increment :: (n :: int32&) -> int32& {
+    n = n + 1;
+    return n;
 }

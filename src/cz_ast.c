@@ -64,6 +64,7 @@ void cz_ast_root_free(CZ_AST_Node* node) {
                     cz_ast_root_free(node->parameter_list.params[i]);
                 }
                 free(node->parameter_list.params);
+                cz_environment_free(node->parameter_list.scope);
                 break;
             case CZ_AST_BlockStatementNodeType:
                 for (unsigned int i = 0; i < node->statement_list.statement_count; i++) {
