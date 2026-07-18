@@ -641,13 +641,13 @@ error_free_node:
 
 static CZ_AST_Node* cz_parser_create_assignment(CZ_Parser* parser) {
     CZ_AST_Node* node = NULL;
-    CZ_AST_Node* identifier = NULL;
-    CZ_AST_Node* expression = NULL;
+    CZ_AST_Node* l_expression = NULL;
+    CZ_AST_Node* r_expression = NULL;
 
     NULL_POINTER_TO_GOTO(parser, error_free_node);
 
-    identifier = cz_parser_create_identifier(parser);
-    NULL_POINTER_TO_GOTO(identifier, error_free_node);
+    l_expression = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
+    NULL_POINTER_TO_GOTO(l_expression, error_free_node);
 
 
     CZ_TokenType op_token_type = cz_parser_peek_token_type(parser, 0);
@@ -658,24 +658,24 @@ static CZ_AST_Node* cz_parser_create_assignment(CZ_Parser* parser) {
         goto error_free_node;
     }
         
-    expression = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
-    NULL_POINTER_TO_GOTO(expression, error_free_node);
+    r_expression = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
+    NULL_POINTER_TO_GOTO(r_expression, error_free_node);
 
     node = cz_ast_node_create(CZ_AST_AssignmentStatementNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
     NULL_POINTER_TO_GOTO(node, error_free_node);
 
     node->binary_expression.op = op_token_type;
-    node->binary_expression.left = identifier;
-    identifier = NULL;
-    node->binary_expression.right = expression;
-    expression = NULL;
+    node->binary_expression.left = l_expression;
+    l_expression = NULL;
+    node->binary_expression.right = r_expression;
+    r_expression = NULL;
 
     return node;
 
 error_free_node:
     cz_ast_root_free(node);
-    cz_ast_root_free(identifier);
-    cz_ast_root_free(expression);
+    cz_ast_root_free(l_expression);
+    cz_ast_root_free(r_expression);
     return NULL;
 }
 

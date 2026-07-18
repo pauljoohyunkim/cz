@@ -36,7 +36,7 @@
 ;; --- Declarations & Assignments ---
 <variable_decl>    ::= <param_decl> [ "=" <expression> ]
 
-<assignment_stmt>  ::= <identifier> <assignment_op> <expression>
+<assignment_stmt>  ::= <expression> <assignment_op> <expression>
 <assignment_op>    ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^="
 
 <return_stmt>      ::= "return" [ <expression> ]
