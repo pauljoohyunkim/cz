@@ -1203,7 +1203,10 @@ static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Envi
             inner_env = NULL;
             break;
         default:
-            // Expression
+            if (cz_semantic_analyzer_check_expression(sa, env, stmt) != 1) {
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col, "Expression checking failure.");
+                goto error_cleanup;
+            }
             break;
     }
 
