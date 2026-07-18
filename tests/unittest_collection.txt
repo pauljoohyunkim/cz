@@ -23,7 +23,7 @@ Expected Result: PASS (lexer analyzes successfully with 3 tokens: =, ==, EOF)
 
 Test Case 4: Lexer.Keywords
 Source Code:
-"return func int"
+"return func int32"
 Expected Result: PASS (lexer analyzes successfully with 4 tokens: RETURN, FUNC, INT, EOF)
 
 Test Case 5: Lexer.Identifiers
@@ -39,7 +39,8 @@ Expected Result: PASS (lexer analyzes successfully with 4 tokens: 3 numerical li
 Test Case 7: Lexer.Unknown
 Source Code:
 "a bd ~ `
-+"
++
+"
 Expected Result: FAIL (lexer analyzes successfully but produces 1 error for unknown character '~')
 
 PARSER TESTS
@@ -47,12 +48,12 @@ PARSER TESTS
 
 Test Case 8: ParserTest.GoodExample10_FunctionPostfixChains
 Source Code:
-func test_postfix_chains :: () -> int {
+func test_postfix_chains :: () -> int32 {
     // 1. Chained member access
-    current_zip :: int = company.subsidiary.address.zip;
+    current_zip :: int32 = company.subsidiary.address.zip;
 
     // 2. High-order call: a function returning a function being invoked immediately
-    result :: int = get_calculator()(10, 20);
+    result :: int32 = get_calculator()(10, 20);
 
     // 3. Mixed chain: accessing a method pointer on a struct field and calling it
     status :: bool = cluster.nodes[0].get_status();
@@ -63,11 +64,11 @@ Expected Result: PASS (parser analyzes successfully with 0 errors)
 
 Test Case 9: ParserTest.GoodExample11_FunctionLoops
 Source Code:
-func test_loops :: () -> int {
-    sum :: int = 0;
+func test_loops :: () -> int32 {
+    sum :: int32 = 0;
 
     // Standard 3-component loop
-    for (i :: int = 0; i < 10; i = i + 1) {
+    for (i :: int32 = 0; i < 10; i = i + 1) {
         sum = sum + i;
     }
 
@@ -85,7 +86,7 @@ Expected Result: PASS (parser analyzes successfully with 0 errors)
 
 Test Case 10: ParserTest.GoodExample12_FunctionProcessMatrix
 Source Code:
-func process_matrix :: (threshold :: int) -> void {
+func process_matrix :: (threshold :: int32) -> void {
     if (system_is_ready()) {
         while (count < threshold) {
             count = count + 1;
@@ -101,7 +102,7 @@ Expected Result: PASS (parser analyzes successfully with 0 errors)
 
 Test Case 11: ParserTest.GoodExample13_TypedefStructFunction
 Source Code:
-typedef int Handle;
+typedef int32 Handle;
 
 struct Vector3 {
     x :: float;
@@ -122,7 +123,7 @@ Test Case 12: ParserTest.BadExample13_ErrorA_MalformedForLoop
 Source Code:
 // Error A: Malformed for-loop header (missing second semicolon)
 func bad_for :: () -> void {
-    for (i :: int = 0; i < 10) {
+    for (i :: int32 = 0; i < 10) {
         sum = sum + 1;
     }
 }
@@ -132,7 +133,7 @@ Test Case 13: ParserTest.BadExample14_ErrorB_NakedExpressionInStruct
 Source Code:
 // Error B: Naked expression inside struct declaration block
 struct BadStruct {
-    x :: int;
+    x :: int32;
     5 + 3; // Should trigger error and sync to next declaration boundary
     y :: float;
 }
@@ -142,16 +143,16 @@ Test Case 14: ParserTest.GoodExample14_VerificationAnchor
 Source Code:
 // Verification Anchor: The parser MUST recover from the errors above
 // and cleanly parse this final function node!
-func recovery_anchor :: () -> int {
+func recovery_anchor :: () -> int32 {
     return 1;
 }
 Expected Result: PASS (parser analyzes successfully with 0 errors)
 
 Test Case 15: ParserTest.GoodExample1_FunctionMain
 Source Code:
-func main :: () -> int {
-    x :: const int = 10;
-    y :: int = 5;
+func main :: () -> int32 {
+    x :: const int32 = 10;
+    y :: int32 = 5;
 
     // Pratt check: should parse as (y parse as (y * 2) + (x /  y * 2) + (x / 5) / 2, left-to-right division
     y = y * 2 + x / 5 / 2;
@@ -162,17 +163,17 @@ Expected Result: PASS (parser analyzes successfully with 0 errors)
 
 Test Case 16: ParserTest.GoodExample2_FunctionGetPtr
 Source Code:
-func get_ptr :: (val :: const int&) -> int& {
-    backup :: const int = val;
+func get_ptr :: (val :: const int32&) -> int32& {
+    backup :: const int32 = val;
     return val;
 }
 Expected Result: PASS (parser analyzes successfully with 0 errors)
 
 Test Case 17: ParserTest.GoodExample3_GlobalConstant
 Source Code:
-GLOBALMASK :: const int = 255;
+GLOBALMASK :: const int32 = 255;
 
-func apply_mask :: (val :: int) -> int {
+func apply_mask :: (val :: int32) -> int32 {
     return val & GLOBAL_MASK;
 }
 Expected Result: PASS (parser analyzes successfully with 0 errors)
@@ -180,13 +181,13 @@ Expected Result: PASS (parser analyzes successfully with 0 errors)
 Test Case 18: ParserTest.BadExample4_MissingSemicolonGlobal
 Source Code:
 // Error A: Missing semicolon in global scope
-wrong :: const int = 5
+wrong :: const int32 = 5
 Expected Result: FAIL (parser analyzes successfully but produces >0 errors)
 
 Test Case 19: ParserTest.BadExample5_ExpressionInParameter
 Source Code:
 // Error B: Expression in parameter declaration
-func bad_param :: (x :: int = 12) -> int {
+func bad_param :: (x :: int32 = 12) -> int32 {
     return x;
 }
 Expected Result: FAIL (parser analyzes successfully but produces >0 errors)
@@ -194,16 +195,16 @@ Expected Result: FAIL (parser analyzes successfully but produces >0 errors)
 Test Case 20: ParserTest.BadExample6_MalformedExpression
 Source Code:
 // Error C: Operator precedence lockup / malformed statement
-func bad_math :: () -> int {
-    x :: int = + * 5;
+func bad_math :: () -> int32 {
+    x :: int32 = + * 5;
     return x;
 }
 Expected Result: FAIL (parser analyzes successfully but produces >0 errors)
 
 Test Case 21: ParserTest.GoodExample7_FunctionCheckValue
 Source Code:
-func check_value :: (val :: int) -> int {
-    result :: int = 0;
+func check_value :: (val :: int32) -> int32 {
+    result :: int32 = 0;
 
     if (val > 100) {
         result = 1;
@@ -219,20 +220,20 @@ Expected Result: PASS (parser analyzes successfully with 0 errors)
 
 Test Case 22: ParserTest.GoodExample8_FunctionComputeRatio
 Source Code:
-func compute_ratio :: (alpha :: int, beta :: bool) -> int {
+func compute_ratio :: (alpha :: int32, beta :: bool) -> int32 {
     // Verifies your Pratt parse loop handles complex parenthesis-wrapped casting flows
     intermediate :: const float = ((alpha as float) + (4.5 as float));
 
     // Verifies sequential left-associative casting: bool -> int -> float
-    complex_cast :: const float = beta as int as float;
+    complex_cast :: const float = beta as int32 as float;
 
-    return intermediate as int;
+    return intermediate as int32;
 }
 Expected Result: PASS (parser analyzes successfully with 0 errors)
 
 Test Case 23: ParserTest.GoodExample9_FunctionProcessSystem
 Source Code:
-typedef int custom_status;
+typedef int32 custom_status;
 typedef bool toggle_flag;
 
 func process_system :: (status :: custom_status) -> toggle_flag {
@@ -249,7 +250,7 @@ Expected Result: PASS (parser analyzes successfully with 0 errors)
 Test Case 24: ParserTest.BadExample10_ErrorA_NakedConditional
 Source Code:
 // Error A: Naked conditional statement (Missing mandatory curly braces)
-func bad_if :: (x :: int) -> int {
+func bad_if :: (x :: int32) -> int32 {
     if (x == 5) return 10;
     return 0;
 }
@@ -258,8 +259,8 @@ Expected Result: FAIL (parser analyzes successfully but produces >0 errors)
 Test Case 25: ParserTest.BadExample11_ErrorB_CastingExpression
 Source Code:
 // Error B: Casting a type into an expression (Right side of 'as' must be a TypeNode)
-func bad_cast_target :: (x :: int) -> int {
-    y :: const int = x as (5 + 3);
+func bad_cast_target :: (x :: int32) -> int32 {
+    y :: const int32 = x as (5 + 3);
     return y;
 }
 Expected Result: FAIL (parser analyzes successfully but produces >0 errors)
@@ -273,7 +274,7 @@ Expected Result: FAIL (parser analyzes successfully but produces >0 errors)
 Test Case 27: ParserTest.BadExample13_ErrorD_StatementSeparator
 Source Code:
 // Error D: Statement separator leakage inside conditional check block headers
-func bad_header :: () -> int {
+func bad_header :: () -> int32 {
     if (true;) {
         return 1;
     }
@@ -286,55 +287,55 @@ SEMANTIC ANALYZER TESTS
 
 Test Case 28: SemanticAnalyzerTest.GoodCase1_GlobalCounter
 Source Code:
-global_counter :: int = 42;
+global_counter :: int32 = 42;
 
-func get_counter :: () -> int& {
+func get_counter :: () -> int32& {
     return global_counter;
 }
 Expected Result: PASS (semantic analysis completes with 0 errors)
 
 Test Case 29: SemanticAnalyzerTest.GoodCase2_ChooseLeft
 Source Code:
-func choose_left :: (left :: int&, right :: int&) -> int& {
+func choose_left :: (left :: int32&, right :: int32&) -> int32& {
     return left;
 }
 Expected Result: PASS (semantic analysis completes with 0 errors)
 
 Test Case 30: SemanticAnalyzerTest.BadCase3_InvalidLocalReferenceReturn
 Source Code:
-func bad_leak :: () -> int& {
-    local_val :: int = 100;
+func bad_leak :: () -> int32& {
+    local_val :: int32 = 100;
     return local_val;
 }
 Expected Result: FAIL (semantic analysis completes with >0 errors - cannot return reference to local variable)
 
 Test Case 31: SemanticAnalyzerTest.BadCase4_InvalidDeeplyNestedLocalReferenceReturn
 Source Code:
-func complex_leak :: (condition :: bool) -> int& {
+func complex_leak :: (condition :: bool) -> int32& {
     if (condition) {
-        nested_val :: int = 5;
+        nested_val :: int32 = 5;
         return nested_val;
     }
-    global_backup :: int = 0;
+    global_backup :: int32 = 0;
     return global_backup;
 }
 Expected Result: FAIL (semantic analysis completes with >0 errors - cannot return reference to local variable)
 
 Test Case 32: SemanticAnalyzerTest.TestCase1_GetMagicNumber_ReturnConstInt
 Source Code:
-func get_magic_number :: () -> const int {
+func get_magic_number :: () -> const int32 {
     return 42;
 }
 
 func main :: () {
     // Should compile perfectly
-    val :: int = get_magic_number();
+    val :: int32 = get_magic_number();
 }
 Expected Result: PASS (semantic analysis completes with 0 errors)
 
 Test Case 33: SemanticAnalyzerTest.TestCase2_AssignToConstFunctionReturn
 Source Code:
-func get_magic_number :: () -> const int {
+func get_magic_number :: () -> const int32 {
     return 42;
 }
 
@@ -345,9 +346,9 @@ Expected Result: FAIL (semantic analysis completes with >0 errors - cannot assig
 
 Test Case 34: SemanticAnalyzerTest.TestCase3_AssignToConstRefFunctionReturn
 Source Code:
-global_weight :: int = 80;
+global_weight :: int32 = 80;
 
-func get_weight_limit :: () -> const int& {
+func get_weight_limit :: () -> const int32& {
     return global_weight;
 }
 
@@ -361,36 +362,36 @@ Expected Result: FAIL (semantic analysis completes with >0 errors - cannot assig
 Test Case 35: SemanticAnalyzerTest.TestCase4_BindMutableRefToConstLocation
 Source Code:
 func main :: () {
-    static_score :: const int = 100;
+    static_score :: const int32 = 100;
 
     // Should FAIL semantic analysis:
-    // Cannot bind a mutable reference (int&) to a constant location (const int)
-    alias :: int& = static_score;
+    // Cannot bind a mutable reference (int32&) to a constant location (const int32)
+    alias :: int32& = static_score;
 
     alias = 200; // This would illegally mutate static_score if allowed!
 }
-Expected Result: FAIL (semantic analysis completes with >0 errors - cannot bind int& to const int)
+Expected Result: FAIL (semantic analysis completes with >0 errors - cannot bind int32& to const int32)
 
 Test Case 36: SemanticAnalyzerTest.TestCase5_PassConstRefToConstRefParam
 Source Code:
-func print_val :: (val :: const int&) {
+func print_val :: (val :: const int32&) {
     // Read-only is fine
-    x :: int = val;
+    x :: int32 = val;
 }
 
 func main :: () {
-    data :: const int = 999;
+    data :: int32 = 999;
 
     // Should PASS seamlessly:
-    // Parameter expects const int&, and data is const int (L-value). Safe.
+    // Parameter expects const int32&, and data is int32 (L-value). Safe.
     print_val(data);
 }
 Expected Result: PASS (semantic analysis completes with 0 errors)
 
 Test Case 37: SemanticAnalyzerTest.TestCase6_ReturnLocalConstRef
 Source Code:
-func leaky_constant :: () -> const int& {
-    temporary :: const int = 7;
+func leaky_constant :: () -> const int32& {
+    temporary :: const int32 = 7;
 
     // Should FAIL semantic analysis:
     // Even though it's const, 'temporary' is local and will decay on the stack!
@@ -429,31 +430,31 @@ Expected Result: PASS (semantic analysis completes with 0 errors)
 
 Test Case 41: SemanticAnalyzerTest.GoodCase_Handle_UserHandle_UID_BootstrapId
 Source Code:
-typedef int Handle;
+typedef int32 Handle;
 typedef Handle UserHandle;
-newtype int UID;
+newtype int32 UID;
 
 func bootstrap_id :: () {
     raw_id :: UserHandle = 1024;
 
     // 1. LHS is UID. RHS is explicit cast to UID.
-    // 2. Cast unboxes UserHandle -> Handle -> int.
-    // 3. Cast unboxes UID -> int.
-    // 4. Memory layouts match (int == int). Valid!
+    // 2. Cast unboxes UserHandle -> Handle -> int32.
+    // 3. Cast unboxes UID -> int32.
+    // 4. Memory layouts match (int32 == int32). Valid!
     user_id :: UID = raw_id as UID;
 }
 Expected Result: PASS (semantic analysis completes with 0 errors)
 
 Test Case 42: SemanticAnalyzerTest.BadCase_USD_GBP_TypeMismatch
 Source Code:
-newtype int USD;
-newtype int GBP;
+newtype int32 USD;
+newtype int32 GBP;
 
 func trade :: () {
     wallet_a :: USD = 100 as USD;
 
     // ERROR: Type mismatch!
-    // Both unbox to 'int' at a machine level, but they are nominally distinct.
+    // Both unbox to 'int32' at a machine level, but they are nominally distinct.
     // Pass 2 must fail here because no explicit cast was provided.
     wallet_b :: GBP = wallet_a;
 }
@@ -461,7 +462,7 @@ Expected Result: FAIL (semantic analysis completes with >0 errors - type mismatc
 
 Test Case 43: SemanticAnalyzerTest.BadCase_Age_TemporaryReference
 Source Code:
-newtype int Age;
+newtype int32 Age;
 
 func update_age :: (target :: Age&) {
     // ...
@@ -481,9 +482,9 @@ SEMANTIC ANALYZER TESTS (continued)
 
 Test Case 44: SemanticAnalyzerTest.GoodCase_Handle_TypeTransparency
 Source Code:
-typedef int Handle;
+typedef int32 Handle;
 
-func increment_raw :: (value :: int&) {
+func increment_raw :: (value :: int32&) {
     // ...
 }
 
@@ -491,18 +492,18 @@ func test :: () {
     active_handle :: Handle = 42;
 
     // 1. active_handle is an L-value of type Handle.
-    // 2. resolve_core unwraps Handle directly to 'int'.
-    // 3. The function expects an 'int&'.
+    // 2. resolve_core unwraps Handle directly to 'int32'.
+    // 3. The function expects an 'int32&'.
     // 4. Since Handle is a transparent alias, names match structurally. Valid!
     increment_raw(active_handle);
 }
-Expected Result: PASS (semantic analysis completes with 0 errors - Handle is transparent alias to int conversion works)
+Expected Result: PASS (semantic analysis completes with 0 errors - Handle is transparent alias to int32 conversion works)
 
 Test Case 45: SemanticAnalyzerTest.BadCase_ItemCount_TypeMismatch
 Source Code:
-newtype int ItemCount;
+newtype int32 ItemCount;
 
-func corrupt_count :: (raw_ptr :: int&) {
+func corrupt_count :: (raw_ptr :: int32&) {
     // If allowed, this would bypass the nominal constraints of ItemCount!
     raw_ptr = -500;
 }
@@ -512,8 +513,8 @@ func test :: () {
 
     // ERROR: Type mismatch!
     // resolve_core on 'stock' leaves it as 'ItemCount&' -> 'ItemCount'.
-    // resolve_core on the parameter is 'int&' -> 'int'.
-    // cz_type_is_equal_nominal flags that ItemCount != int.
+    // resolve_core on the parameter is 'int32&' -> 'int32'.
+    // cz_type_is_equal_nominal flags that ItemCount != int32.
     // You cannot implicitly pass a strong type reference to a raw reference.
     corrupt_count(stock);
 }
@@ -522,9 +523,9 @@ Expected Result: FAIL (semantic analysis completes with >0 errors - cannot pass 
 
 Test Case 46: SemanticAnalyzerTest.CzcTestCode_ConstReferenceAssignment
 Source Code:
-newtype int SecureID;
+newtype int32 SecureID;
 
-func test :: (a :: const SecureID&, b :: SecureID) {
+func test :: (a :: const int32&, b :: int32) {
     // ERROR: 'a' points to a read-only location.
     // If your assignment checker only checks if 'a' is a reference
     // but forgets to check if its inner_type is marked 'is_const',

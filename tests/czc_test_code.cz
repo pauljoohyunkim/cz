@@ -1,7 +1,4 @@
-func sum :: (n :: int32) -> int32 {
-    s :: int32 = 0;
-    for (i :: int32 = 0; i <= n; i += 1) {
-        s += i;
-    }
-    return s;
+func bad_leak :: () -> int32 & {
+    local_val :: int32 = 100;
+    return local_val;
 }
