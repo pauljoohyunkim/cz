@@ -1610,6 +1610,11 @@ static int cz_semantic_analyzer_check_if_statement(CZ_SemanticAnalyzer* sa, CZ_E
     }
     const CZ_Type* decayed_condition_type = cz_semantic_analyzer_decay_operand_type(stmt->if_statement.condition->decoration->resolved_type);
     NULL_POINTER_TO_GOTO(decayed_condition_type, error_cleanup);
+    if (decayed_condition_type->kind != CZ_TYPE_KIND_PRIMITIVE || decayed_condition_type->primitive != CZ_PRIMITIVE_BOOL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "Condition for while is not a boolean.");
+        goto error_cleanup;
+    }
     
     // 2. Check then block.
     if (cz_semantic_analyzer_check_statement(sa, env, stmt->if_statement.if_branch) != 1) {
