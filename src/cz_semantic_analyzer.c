@@ -741,7 +741,7 @@ static int cz_semantic_analyzer_full_analyze(CZ_SemanticAnalyzer* sa) {
     NULL_POINTER_TO_GOTO(sa->program->program.global_declaration_list, error_cleanup);
 
     for (unsigned int i = 0; i < sa->program->program.declaration_count; i++) {
-        const CZ_AST_Node* statement = sa->program->program.global_declaration_list[i];
+        CZ_AST_Node* statement = sa->program->program.global_declaration_list[i];
         if (statement == NULL) return 0;
 
         // TODO: Log errors.
@@ -1223,26 +1223,26 @@ static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, 
 
     // 3. Reference handling
     if (sa->current_function_return->kind == CZ_TYPE_KIND_REFERENCE) {
-        // 3.1 Cannot return local scope.
-        if (stmt->return_statement.expression->decoration->scope_level >= 2) {
-            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
-                "Return type of function is reference, so cannot return local scope expressions.");
-            goto error_cleanup;
-        }
-        // 3.2 Parameter can be returned only if it is reference.
-        if (stmt->return_statement.expression->node_type == CZ_AST_IdentifierNodeType) {
-            const CZ_Symbol* identifier = cz_environment_lookup(env, stmt->return_statement.expression->identifier.name, true);
-            // Check if it is actually parameter.
-            if (identifier->scope_level == 1 && identifier->data.value.type->kind != CZ_TYPE_KIND_REFERENCE) {
-                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
-                    "Return type of function is reference and you are trying to return a non-reference parameter.");
-                goto error_cleanup;
-            }
-        }
-        // 3.3 Returning expression must be L-value
+        // 3.1 Returning expression must be L-value
         if (stmt->return_statement.expression->decoration->value_category != CZ_VALUE_CATEGORY_LVALUE) {
             cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
-                "Return type of reference returning function is should be l-value.");
+                "Return type of reference returning function should be l-value.");
+            goto error_cleanup;
+        }
+
+
+        // 3.1 & 3.2 Unified Scope and Lifetime validation via Decoration
+        if (stmt->return_statement.expression->decoration->scope_level >= 2) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "Cannot return local scope expressions by reference.");
+            goto error_cleanup;
+        }
+
+        // If it's at level 1 (parameter space), it MUST stem from an actual reference
+        if (stmt->return_statement.expression->decoration->scope_level == 1 && 
+            !stmt->return_statement.expression->decoration->is_reference_source) {
+            cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                "Cannot return a reference to data owned by a non-reference parameter.");
             goto error_cleanup;
         }
 
@@ -1253,7 +1253,7 @@ static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, 
                 cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
                     "Cannot strip away constness when function return type is non-const.");
                 goto error_cleanup;
-            }
+        }
     }
 
     return 1;
@@ -1470,6 +1470,7 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
     decor = cz_ast_decoration_create(result_type,
         CZ_VALUE_CATEGORY_RVALUE,
         lhs_node->decoration->is_constexpr && rhs_node->decoration->is_constexpr,
+        false,
         MAX(lhs_node->decoration->scope_level, rhs_node->decoration->scope_level)
     );
     
@@ -1544,7 +1545,7 @@ static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, 
     }
 
     // Create decoration
-    decor = cz_ast_decoration_create(result_type, CZ_VALUE_CATEGORY_RVALUE, operand_node->decoration->is_constexpr, expr->unary_expression.operand->decoration->scope_level);
+    decor = cz_ast_decoration_create(result_type, CZ_VALUE_CATEGORY_RVALUE, operand_node->decoration->is_constexpr, false, expr->unary_expression.operand->decoration->scope_level);
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;
@@ -1601,7 +1602,7 @@ static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa
     NULL_POINTER_TO_GOTO(type, error_cleanup);
 
     // Create decoration
-    decor = cz_ast_decoration_create(type, CZ_VALUE_CATEGORY_RVALUE, true, 0);
+    decor = cz_ast_decoration_create(type, CZ_VALUE_CATEGORY_RVALUE, true, false, 0);
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;
@@ -1646,7 +1647,7 @@ static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer*
         value_cat = CZ_VALUE_CATEGORY_RVALUE;
     }
 
-    decor = cz_ast_decoration_create(symbol->data.value.type, value_cat, symbol->data.value.is_constexpr, symbol->scope_level);
+    decor = cz_ast_decoration_create(symbol->data.value.type, value_cat, symbol->data.value.is_constexpr, symbol->data.value.type->kind == CZ_TYPE_KIND_REFERENCE, symbol->scope_level);
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;

@@ -21,6 +21,7 @@ typedef struct {
     const CZ_Type* resolved_type;
     CZ_ValueCategory value_category;
     bool is_constexpr;
+    bool is_reference_source;
     unsigned int scope_level;
 } CZ_AST_Decoration;
 
@@ -267,10 +268,11 @@ struct CZ_AST_Node {
  * @param type CZ_Type from global type table.
  * @param val_category Whether or not expression is l-value or r-value.
  * @param is_constexpr Whether or not expression is constexpr.
+ * @param is_reference_source Whether or not expression is source of reference.
  * @param scope_level 0 means global, 1 means function parameter, 2 for local variables and subsequent levels mean inner blocks.
  * @return CZ_AST_Decoration* Pointer to CZ_AST_Decoration allocated on success, NULL on failure.
  */
-CZ_AST_Decoration* cz_ast_decoration_create(const CZ_Type* type, CZ_ValueCategory val_category, bool is_constexpr, unsigned int scope_level);
+CZ_AST_Decoration* cz_ast_decoration_create(const CZ_Type* type, CZ_ValueCategory val_category, bool is_constexpr, bool is_reference_source, unsigned int scope_level);
 
 /**
  * @brief Frees AST node decoration.
