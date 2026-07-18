@@ -1308,11 +1308,40 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
     NULL_POINTER_TO_GOTO(stmt, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_AssignmentStatementNodeType, error_cleanup);
 
-    // 1. Check LHS.
+    // 1. Check LHS and RHS
+    if (cz_semantic_analyzer_check_expression(sa, env, stmt->binary_expression.left) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "Type of LHS cannot be deduced.");
+        goto error_cleanup;
+    }
+    if (cz_semantic_analyzer_check_expression(sa, env, stmt->binary_expression.right) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "Type of RHS cannot be deduced.");
+        goto error_cleanup;
+    }
 
-    // 2. If type is const, failure. (Cannot do any assignment on a const variable or const reference variable.)
+    // 2. LHS must be l-value.
+    if (stmt->binary_expression.left->decoration->value_category != CZ_VALUE_CATEGORY_LVALUE) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "Assignment requires LHS to be l-value.");
+        goto error_cleanup;
+    }
 
-    // 3. Decay type must match.
+    // 3. LHS must be non-const
+    if (cz_type_is_const(stmt->binary_expression.left->decoration->resolved_type)) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "Assignment requires LHS to be mutable.");
+        goto error_cleanup;
+    }
+
+    // 4. Decay type must match.
+    const CZ_Type* decayed_lhs_type = cz_semantic_analyzer_decay_operand_type(stmt->binary_expression.left->decoration->resolved_type);
+    const CZ_Type* decayed_rhs_type = cz_semantic_analyzer_decay_operand_type(stmt->binary_expression.right->decoration->resolved_type);
+    if (!cz_type_equals(decayed_lhs_type, decayed_rhs_type)) {
+        cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+            "Assignment requires types of LHS and RHS to match.");
+        goto error_cleanup;
+    }
 
     return 1;
 
