@@ -1142,6 +1142,7 @@ error_cleanup:
 }
 
 static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
+static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 
 static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
@@ -1301,6 +1302,23 @@ error_cleanup:
     return 0;
 }
 
+static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_AssignmentStatementNodeType, error_cleanup);
+
+    // 1. Check LHS.
+
+    // 2. If type is const, failure. (Cannot do any assignment on a const variable or const reference variable.)
+
+    // 3. Decay type must match.
+
+    return 1;
+
+error_cleanup:
+    return 0;
+}
 
 static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
     NULL_POINTER_TO_GOTO(sa, error_cleanup);
