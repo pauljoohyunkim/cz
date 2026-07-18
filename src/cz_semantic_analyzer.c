@@ -875,7 +875,8 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
             .type = member_type
         };
     }
-
+    struct_type->structure.layout = struct_layout;
+    struct_layout = NULL;
 
     // 3. For each member type,
     for (unsigned int i = 0; i < member_count; i++) {

@@ -1,4 +1,10 @@
 struct Vector {
     x :: int32;
     y :: int32;
+    M :: Matrix;
+}
+
+struct Matrix {
+    v1 :: Vector;
+    v2 :: Vector;
 }
