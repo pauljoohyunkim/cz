@@ -1,4 +1,8 @@
-func bad_leak :: () -> int32 & {
-    local_val :: int32 = 100;
-    return local_val;
+func fibo :: (n :: int32) -> int32 {
+    if (n == 1) {
+        return 1;
+    } else if (n == 2) {
+        return 1;
+    }
+    return fibo(n-1) + fibo(n-2);
 }
