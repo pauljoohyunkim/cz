@@ -172,6 +172,41 @@ error_cleanup:
     return NULL;
 }
 
+const CZ_Type* cz_type_table_get_or_create_const(CZ_GlobalTypeTable* gtt, const CZ_Type* base_type) {
+    CZ_Type* const_type = NULL;
+    if (gtt == NULL || base_type == NULL) return NULL;
+
+    // 1. Already const
+    if (cz_type_is_const(base_type)) {
+        return base_type;
+    }
+
+    // 2. See if we already have a const version
+    for (unsigned int i = 0; i < gtt->all_entry_count; i++) {
+        const CZ_Type* type = gtt->all_allocations[i];
+        if (type->kind == CZ_TYPE_KIND_CONST && type->const_of == base_type) {
+            return type;
+        }
+    }
+
+    // 3. Allocate a new const.
+    const_type = cz_type_create(CZ_TYPE_KIND_CONST);
+    NULL_POINTER_TO_GOTO(const_type, error_cleanup);
+
+    const_type->const_of = base_type;
+
+    // 4. Register with GTT
+    if (cz_global_type_table_push_type(gtt, NULL, const_type) != 1) {
+        goto error_cleanup;
+    }
+
+    return const_type;
+
+error_cleanup:
+    cz_type_free(const_type);
+    return NULL;
+}
+
 CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser) {
     CZ_SemanticAnalyzer* sa = NULL;
     CZ_Environment* global_env = NULL;
@@ -1754,6 +1789,7 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
 static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 
 static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
     NULL_POINTER_TO_GOTO(sa, error_cleanup);
@@ -1786,9 +1822,14 @@ static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Env
                 goto error_cleanup;
             }
             break;
+        case CZ_AST_StructMemberAccessNodeType:
+            if (cz_semantic_analyzer_check_struct_access(sa, env, expr) != 1) {
+                goto error_cleanup;
+            }
+            break;
         default:
             cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Not yet supported.");
-            break;
+            goto error_cleanup;
             
     }
 
@@ -2247,5 +2288,86 @@ static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer*
     return 1;
 error_cleanup:
     cz_ast_decoration_free(decor);
+    return 0;
+}
+
+static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
+    CZ_AST_Decoration* decor = NULL;
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(expr, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_StructMemberAccessNodeType, error_cleanup);
+
+    // 1. Check base expression
+    if (cz_semantic_analyzer_check_expression(sa, env, expr->struct_member_access.object) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, 
+            "Could not deduce type of the base object for struct access.");
+        goto error_cleanup;
+    }
+
+    // 2. Decay check base expression to strip references safely
+    const CZ_Type* struct_type = expr->struct_member_access.object->decoration->resolved_type;
+    const CZ_Type* decayed_struct_type = cz_semantic_analyzer_decay_operand_type(struct_type);
+    NULL_POINTER_TO_GOTO(decayed_struct_type, error_cleanup);
+    
+    if (decayed_struct_type->kind != CZ_TYPE_KIND_STRUCT) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, 
+            "Struct access requires base to be a struct");
+        goto error_cleanup;
+    }
+
+    // 3. Check if struct member exists (Reading field count off the DECAYED type)
+    const char* member_name = expr->struct_member_access.member->identifier.name;
+    int member_idx = -1;
+    for (unsigned int i = 0; i < decayed_struct_type->structure.layout->field_count; i++) {
+        if (decayed_struct_type->structure.layout->fields[i].name == member_name ||
+            strcmp(member_name, decayed_struct_type->structure.layout->fields[i].name) == 0) {
+                member_idx = (int) i;
+                break;
+        }
+    }
+    if (member_idx < 0) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, 
+            "Member name %s does not exist", member_name);
+        goto error_cleanup; // Protect against out of bounds index checks below
+    }
+
+    // 4. Inherit L-value and propagate constness
+    const CZ_Type* member_type = decayed_struct_type->structure.layout->fields[member_idx].type;
+    CZ_ValueCategory value_cat = expr->struct_member_access.object->decoration->value_category;
+    
+    if (cz_type_is_const(struct_type) && !cz_type_is_const(member_type)) {
+        // Safe lookups off your Global Type Table manager
+        member_type = cz_type_table_get_or_create_const(sa->gtt, member_type);
+        if (member_type == NULL) {
+            cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, 
+                "Failed to resolve internal const variant type mapping.");
+            goto error_cleanup;
+        }
+    }
+
+    // 5. Decorate the AST node safely
+    decor = cz_ast_decoration_create(
+        member_type,
+        value_cat,
+        expr->struct_member_access.object->decoration->is_constexpr,
+        member_type->kind == CZ_TYPE_KIND_REFERENCE,
+        env->scope_level
+    );
+    if (decor == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, 
+            "Allocating AST decorator failure.");
+        goto error_cleanup;
+    }
+
+    expr->decoration = decor;
+    decor = NULL;
+
+    return 1;
+
+error_cleanup:
+    if (decor != NULL) {
+        cz_ast_decoration_free(decor);
+    }
     return 0;
 }
