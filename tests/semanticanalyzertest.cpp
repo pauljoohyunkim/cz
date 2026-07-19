@@ -780,3 +780,144 @@ TEST(SemanticAnalyzerTest, CzcTestCode_ConstReferenceAssignment) {
     EXPECT_EQ(analyze_result, 1);
     EXPECT_GT(error_count, 0);
 }
+
+// Test Case 47: SemanticAnalyzerTest.NewType_SecondsFrames_Success
+TEST(SemanticAnalyzerTest, NewType_SecondsFrames_Success) {
+    const char* source =
+        "newtype int32 Seconds;\n"
+        "newtype int32 Frames;\n\n"
+        "func main :: () {\n"
+        "    s :: Seconds = 60 as Seconds;\n"
+        "    f :: Frames = s as Frames;\n"
+        "}";
+
+    auto lexer_ptr = create_lexer(source);
+    ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
+
+    auto parser_ptr = create_parser(lexer_ptr);
+    ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
+
+    auto sa_ptr = create_semantic_analyzer(parser_ptr);
+    ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
+
+    int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
+    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+
+    if (error_count > 0) {
+        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
+        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+            CZ_Error err = sa_ptr->error_list->errors[i];
+            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
+                    i, err.message, err.line, err.column);
+        }
+    }
+
+    EXPECT_EQ(analyze_result, 1);
+    EXPECT_EQ(error_count, 0);
+}
+
+
+// Test Case 48: SemanticAnalyzerTest.StructVector_GetDefaultX_Success
+TEST(SemanticAnalyzerTest, StructVector_GetDefaultX_Success) {
+    const char* source =
+        "struct Vector {\n"
+        "    x :: int32;\n"
+        "    y :: int32;\n"
+        "}\n\n"
+        "func get_default_x :: () -> int32 {\n"
+        "    val :: int32 = Vector{1, 2}.x;\n"
+        "}";
+
+    auto lexer_ptr = create_lexer(source);
+    ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
+
+    auto parser_ptr = create_parser(lexer_ptr);
+    ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
+
+    auto sa_ptr = create_semantic_analyzer(parser_ptr);
+    ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
+
+    int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
+    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+
+    if (error_count > 0) {
+        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
+        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+            CZ_Error err = sa_ptr->error_list->errors[i];
+            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
+                    i, err.message, err.line, err.column);
+        }
+    }
+
+    EXPECT_EQ(analyze_result, 1);
+    EXPECT_EQ(error_count, 0);
+}
+
+
+// Test Case 49: SemanticAnalyzerTest.RefHolder_UninitializedReference_Failure
+TEST(SemanticAnalyzerTest, RefHolder_UninitializedReference_Failure) {
+    const char* source =
+        "struct RefHolder {\n"
+        "    data :: int32&;\n"
+        "}\n\n"
+        "func break_references :: () {\n"
+        "    rh :: RefHolder;\n"
+        "}";
+
+    auto lexer_ptr = create_lexer(source);
+    ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
+
+    auto parser_ptr = create_parser(lexer_ptr);
+    ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
+
+    auto sa_ptr = create_semantic_analyzer(parser_ptr);
+    ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
+
+    int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
+    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+
+    if (error_count > 0) {
+        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
+        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+            CZ_Error err = sa_ptr->error_list->errors[i];
+            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
+                    i, err.message, err.line, err.column);
+        }
+    }
+
+    EXPECT_EQ(analyze_result, 1);
+    EXPECT_GT(error_count, 0);
+}
+
+
+// Test Case 50: SemanticAnalyzerTest.ConstReference_AssignmentFailure
+TEST(SemanticAnalyzerTest, ConstReference_AssignmentFailure) {
+    const char* source =
+        "func process :: (x :: const int32&) {\n"
+        "    y :: int32& = x;\n"
+        "}";
+
+    auto lexer_ptr = create_lexer(source);
+    ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
+
+    auto parser_ptr = create_parser(lexer_ptr);
+    ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
+
+    auto sa_ptr = create_semantic_analyzer(parser_ptr);
+    ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
+
+    int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
+    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+
+    if (error_count > 0) {
+        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
+        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+            CZ_Error err = sa_ptr->error_list->errors[i];
+            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
+                    i, err.message, err.line, err.column);
+        }
+    }
+
+    EXPECT_EQ(analyze_result, 1);
+    EXPECT_GT(error_count, 0);
+}

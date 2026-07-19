@@ -533,3 +533,47 @@ func test :: (a :: const int32&, b :: int32) {
     a = b;
 }
 Expected Result: FAIL (semantic analysis completes with >0 errors - cannot assign to const reference parameter)
+
+Test Case 47: SemanticAnalyzerTest.NewType_SecondsFrames_Success
+Source Code:
+newtype int32 Seconds;
+newtype int32 Frames;
+
+func main :: () {
+    s :: Seconds = 60 as Seconds;
+    f :: Frames = s as Frames;
+}
+Expected Result: PASS (semantic analysis completes with 0 errors)
+
+
+Test Case 48: SemanticAnalyzerTest.StructVector_GetDefaultX_Success
+Source Code:
+struct Vector {
+    x :: int32;
+    y :: int32;
+}
+
+func get_default_x :: () -> int32 {
+    val :: int32 = Vector{1, 2}.x;
+}
+Expected Result: PASS (semantic analysis completes with 0 errors)
+
+
+Test Case 49: SemanticAnalyzerTest.RefHolder_UninitializedReference_Failure
+Source Code:
+struct RefHolder {
+    data :: int32&;
+}
+
+func break_references :: () {
+    rh :: RefHolder;
+}
+Expected Result: FAIL (semantic analysis completes with >0 errors - cannot bind reference without initializer)
+
+
+Test Case 50: SemanticAnalyzerTest.ConstReference_AssignmentFailure
+Source Code:
+func process :: (x :: const int32&) {
+    y :: int32& = x;
+}
+Expected Result: FAIL (semantic analysis completes with >0 errors - cannot bind mutable reference to const reference)
