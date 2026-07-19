@@ -172,7 +172,7 @@ error_cleanup:
     return NULL;
 }
 
-const CZ_Type* cz_type_table_get_or_create_const(CZ_GlobalTypeTable* gtt, const CZ_Type* base_type) {
+static const CZ_Type* cz_type_table_get_or_create_const(CZ_GlobalTypeTable* gtt, const CZ_Type* base_type) {
     CZ_Type* const_type = NULL;
     if (gtt == NULL || base_type == NULL) return NULL;
 
@@ -1790,6 +1790,7 @@ static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, 
 static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 
 static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
     NULL_POINTER_TO_GOTO(sa, error_cleanup);
@@ -1827,6 +1828,8 @@ static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Env
                 goto error_cleanup;
             }
             break;
+        case CZ_AST_StructInitNodeType:
+
         default:
             cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Not yet supported.");
             goto error_cleanup;
@@ -2362,6 +2365,43 @@ static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_
 
     expr->decoration = decor;
     decor = NULL;
+
+    return 1;
+
+error_cleanup:
+    if (decor != NULL) {
+        cz_ast_decoration_free(decor);
+    }
+    return 0;
+}
+
+static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
+    CZ_AST_Decoration* decor = NULL;
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(expr, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_StructInitNodeType, error_cleanup);
+
+    const char* struct_name = expr->struct_declaration.identifier->identifier.name;
+    // 1. Look up struct and check if it is a valid struct.
+    const CZ_Type* struct_lookup = cz_global_type_table_find_type_by_name(sa->gtt, struct_name);
+    if (struct_lookup == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+        "Symbol %s is not defined.", struct_name);
+        goto error_cleanup;
+    }
+    if (struct_lookup->kind != CZ_TYPE_KIND_STRUCT) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+        "\"%s\" is not a struct.", struct_name);
+        goto error_cleanup;
+    }
+
+    // 2. For each initializer check with the struct definition
+    // 2.1 Check for any duplicate members in struct initializer.
+    // 2.2 Check and match type with the struct member definitions
+    // 2.3 All parameters are optional except for reference.
+
+
 
     return 1;
 
