@@ -1,0 +1,16 @@
+Reference of (const to int)" is exactly what you want. It means: "This is a reference. If you follow it, the value you find on the other side is const and cannot be modified."
+"Const to (reference of int)" is semantically meaningless. A reference in C-style languages is already inherently const (re-binding a reference is impossible; you can only assign to the value it points to).
+
+
+const is only for l-value
+1. Should the output of a Unary Operation be const if the operand is const?
+
+No. The output of a unary operation (like -x or +x) should not be a const type.
+
+    Why? Unary operations produce an RVALUE (a temporary, transient value like the -5 resulting from -x).
+
+    In type systems, const is a qualifier used to restrict write access to memory locations (LVALUEs like variables or reference targets).
+
+    Since an RVALUE has no persistent memory location and is inherently immutable (you can't assign a value to -x), adding const to its type is redundant.
+
+    Therefore, if x is const int32, the expression -x should be decorated simply as int32 (RVALUE).

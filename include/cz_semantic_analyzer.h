@@ -16,6 +16,7 @@ typedef struct {
     CZ_Token* tokens;
     size_t n_tokens;
     CZ_AST_Node* program;
+    CZ_StringPool* sp;
 
     CZ_Environment* global_env;
     CZ_GlobalTypeTable* gtt;
@@ -25,6 +26,15 @@ typedef struct {
 
     CZ_ErrorList* error_list;
 } CZ_SemanticAnalyzer;
+
+/**
+ * @brief Return read-only CZ_Type from Type Expression Node. Will add to GTT if it does not exist.
+ * 
+ * @param type_node Type expression node
+ * @param gtt Global Type Table
+ * @return CZ_Type* Read-only pointer to CZ_Type on success, NULL on failure
+ */
+const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTypeTable* gtt);
 
 /**
  * @brief Creates semantic analyzer from parser

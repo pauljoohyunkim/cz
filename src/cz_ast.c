@@ -2,6 +2,27 @@
 #include <stdlib.h>
 #include "cz_ast.h"
 
+CZ_AST_Decoration* cz_ast_decoration_create(const CZ_Type* type, CZ_ValueCategory val_category, bool is_constexpr, bool is_reference_source, unsigned int scope_level) {
+    CZ_AST_Decoration* decor = NULL;
+    if (type == NULL) return NULL;
+
+    decor = (CZ_AST_Decoration*) calloc(1, sizeof(CZ_AST_Decoration));
+    if (decor == NULL) return NULL;
+
+    decor->resolved_type = type;
+    decor->value_category = val_category;
+    decor->is_constexpr = is_constexpr;
+    decor->is_reference_source = is_reference_source;
+    decor->scope_level = scope_level;
+
+    return decor;
+}
+
+void cz_ast_decoration_free(CZ_AST_Decoration* decor) {
+    // Note that internal CZ_Type* should not be freed.
+    free(decor);
+}
+
 CZ_AST_Node* cz_ast_node_create(CZ_AST_NodeType node_type, unsigned int line, unsigned int col) {
     CZ_AST_Node* node = (CZ_AST_Node*) calloc(1, sizeof(CZ_AST_Node));
     if (node == NULL) return NULL;
@@ -23,15 +44,16 @@ void cz_ast_root_free(CZ_AST_Node* node) {
                 free(node->program.global_declaration_list);
                 break;
             case CZ_AST_StructDeclarationNodeType:
+            case CZ_AST_StructInitNodeType:
                 cz_ast_root_free(node->struct_declaration.identifier);
                 for (unsigned int i = 0; i < node->struct_declaration.member_count; i++) {
                     cz_ast_root_free(node->struct_declaration.members[i]);
                 }
                 free(node->struct_declaration.members);
                 break;
-            case CZ_AST_StructMemberNodeType:
-                cz_ast_root_free(node->struct_member.identifier);
-                cz_ast_root_free(node->struct_member.type);
+            case CZ_AST_StructInitMemberNodeType:
+                cz_ast_root_free(node->struct_init_member.identifier);
+                cz_ast_root_free(node->struct_init_member.expression);
                 break;
             case CZ_AST_FunctionDeclarationNodeType:
                 cz_ast_root_free(node->function_declaration.function_identifier);
@@ -44,6 +66,7 @@ void cz_ast_root_free(CZ_AST_Node* node) {
                     cz_ast_root_free(node->parameter_list.params[i]);
                 }
                 free(node->parameter_list.params);
+                cz_environment_free(node->parameter_list.scope);
                 break;
             case CZ_AST_BlockStatementNodeType:
                 for (unsigned int i = 0; i < node->statement_list.statement_count; i++) {
@@ -75,6 +98,7 @@ void cz_ast_root_free(CZ_AST_Node* node) {
                 cz_ast_root_free(node->for_statement.condition);
                 cz_ast_root_free(node->for_statement.iteration_step);
                 cz_ast_root_free(node->for_statement.body);
+                cz_environment_free(node->for_statement.scope);
                 break;
             case CZ_AST_WhileStatementNodeType:
                 cz_ast_root_free(node->while_statement.condition);
@@ -115,6 +139,7 @@ void cz_ast_root_free(CZ_AST_Node* node) {
                 cz_ast_root_free(node->struct_member_access.member);
                 break;
         }
+        cz_ast_decoration_free(node->decoration);
     }
     free(node);
 }
@@ -141,10 +166,17 @@ void cz_ast_root_print(const CZ_AST_Node* node, unsigned int depth) {
                 cz_ast_root_print(node->struct_declaration.members[i], depth+1);
             }
             break;
-        case CZ_AST_StructMemberNodeType:
-            printf("StructMember\n");
-            cz_ast_root_print(node->struct_member.identifier, depth+1);
-            cz_ast_root_print(node->struct_member.type, depth+1);
+        case CZ_AST_StructInitNodeType:
+            printf("StructInit\n");
+            cz_ast_root_print(node->struct_declaration.identifier, depth+1);
+            for (unsigned int i = 0; i < node->struct_declaration.member_count; i++) {
+                cz_ast_root_print(node->struct_declaration.members[i], depth+1);
+            }
+            break;
+        case CZ_AST_StructInitMemberNodeType:
+            printf("StructInit\n");
+            cz_ast_root_print(node->struct_init_member.identifier, depth+1);
+            cz_ast_root_print(node->struct_init_member.expression, depth+1);
             break;
         case CZ_AST_FunctionDeclarationNodeType:
             printf("FunctionDeclaration\n");
@@ -249,7 +281,7 @@ void cz_ast_root_print(const CZ_AST_Node* node, unsigned int depth) {
             cz_ast_root_print(node->binary_expression.right, depth+1);
             break;
         case CZ_AST_ReturnStatementNodeType:
-            printf("ReturnStatement%s\n", node->return_statement.is_ref ? " (ref)" : "");
+            printf("ReturnStatement\n");
             cz_ast_root_print(node->return_statement.expression, depth+1);
             break;
         case CZ_AST_IfStatementNodeType:
@@ -294,7 +326,7 @@ void cz_ast_root_print(const CZ_AST_Node* node, unsigned int depth) {
                 cz_ast_root_print(node->type_expression.function_signature.parameter_list, depth+1);
                 cz_ast_root_print(node->type_expression.function_signature.return_type, depth+1);
             } else {
-                printf("TypeNode: %s %.*s\n", node->type_expression.is_const ? "(const)" : "", (int)node->type_expression.primitive.name_len, node->type_expression.primitive.name);
+                printf("TypeNode: %s %s\n", node->type_expression.is_const ? "(const)" : "", node->type_expression.primitive.name);
             }
             break;
         case CZ_AST_BinaryExpressionNodeType:
@@ -372,10 +404,10 @@ void cz_ast_root_print(const CZ_AST_Node* node, unsigned int depth) {
             }
             break;
         case CZ_AST_LiteralNodeType:
-            printf("Literal: %.*s\n", (unsigned int) node->literal.lexeme_length, node->literal.lexeme);
+            printf("Literal: %s\n", node->literal.lexeme);
             break;
         case CZ_AST_IdentifierNodeType:
-            printf("Identifier: %.*s\n", (unsigned int) node->identifier.name_len, node->identifier.name);
+            printf("Identifier: %s\n", node->identifier.name);
             break;
         case CZ_AST_CastExpressionNodeType:
             printf("CastExpression\n");

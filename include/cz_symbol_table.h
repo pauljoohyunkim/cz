@@ -12,8 +12,7 @@ extern "C" {
 typedef struct CZ_Environment CZ_Environment;
 
 typedef enum {
-    CZ_SYMBOL_KIND_VARIABLE,
-    CZ_SYMBOL_KIND_FUNCTION,
+    CZ_SYMBOL_KIND_VALUE,           // Variables, Function
     CZ_SYMBOL_KIND_TYPE             // Struct, Typedef, Newtype
 } CZ_SymbolKind;
 
@@ -25,17 +24,13 @@ typedef struct {
 typedef struct {
     CZ_SymbolKind kind;
     const char* name;
+    unsigned int scope_level;
 
     union {
         struct {
             const CZ_Type* type;
-        } variable;
-
-        struct {
-            const CZ_Type* return_type;
-            CZ_ParamSymbol* params;
-            unsigned int param_count;
-        } function;
+            bool is_constexpr;
+        } value;
 
         struct {
             const CZ_Type* type;
@@ -58,9 +53,10 @@ struct CZ_Environment {
  * 
  * @param kind Symbol kind
  * @param name Name of the symbol. Will internally copy.
+ * @param scope_level Scope level (0 for global, 1 for function parameters, 2 and onward are block variables.)
  * @return CZ_Symbol* Allocated CZ_Symbol on success, NULL on failure.
  */
-CZ_Symbol* cz_symbol_create(CZ_SymbolKind kind, const char* name);
+CZ_Symbol* cz_symbol_create(CZ_SymbolKind kind, const char* name, unsigned int scope_level);
 
 /**
  * @brief Frees allocated CZ_Symbol
@@ -68,6 +64,16 @@ CZ_Symbol* cz_symbol_create(CZ_SymbolKind kind, const char* name);
  * @param symbol Pointer to CZ_Symbol
  */
 void cz_symbol_free(CZ_Symbol* symbol);
+
+/**
+ * @brief Look up CZ_Symbol from environment
+ * 
+ * @param env Pointer to CZ_Environment
+ * @param name Name of the symbol to look up.
+ * @param cascade Set to true to look up parent chain.
+ * @return const CZ_Symbol* Pointer to symbol table entry on success, NULL on failure.
+ */
+const CZ_Symbol* cz_environment_lookup(CZ_Environment* env, const char* name, bool cascade);
 
 /**
  * @brief Create CZ_Environment
@@ -97,3 +103,20 @@ int cz_environment_push_symbol(CZ_Environment* env, const CZ_Symbol* symbol);
 #endif
 
 #endif  /* CZ_SYMBOL_TABLE_H */
+
+/**
+ * @brief Print CZ_Symbol information with indentation
+ *
+ * @param symbol Pointer to CZ_Symbol to print
+ * @param depth Indentation level (number of tabs)
+ */
+void cz_symbol_print(const CZ_Symbol* symbol, unsigned int depth);
+
+/**
+ * @brief Print CZ_Environment information with indentation
+ *
+ * @param env Pointer to CZ_Environment to print
+ * @param depth Indentation level (number of tabs)
+ * @param cascade Set to true to print parent chain
+ */
+void cz_environment_print(const CZ_Environment* env, unsigned int depth, bool cascade);

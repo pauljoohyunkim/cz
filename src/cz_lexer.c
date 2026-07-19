@@ -4,6 +4,103 @@
 #include <ctype.h>
 #include "cz_lexer.h"
 
+#define NULL_POINTER_TO_GOTO(ptr, label) do { if ((ptr) == NULL) goto label; } while (0)
+
+static inline char* create_null_terminated_string(const char* text, size_t length) {
+    char* nt_str = NULL;
+    if (text == NULL || length == 0) goto error_cleanup;
+
+    nt_str = (char*) malloc(sizeof(char) * (length + 1));
+    NULL_POINTER_TO_GOTO(nt_str, error_cleanup);
+
+    memcpy(nt_str, text, length);
+    nt_str[length] = '\0';
+
+    return nt_str;
+
+error_cleanup:
+    return NULL;
+}
+
+
+CZ_StringPool* cz_string_pool_create(void) {
+    const char** strings = NULL;
+    CZ_StringPool* sp = NULL;
+
+    sp = (CZ_StringPool*) calloc(1, sizeof(CZ_StringPool));
+    NULL_POINTER_TO_GOTO(sp, error_cleanup);
+
+    sp->capacity = 8;
+    strings = (const char**) calloc(sp->capacity, sizeof(const char*));
+    NULL_POINTER_TO_GOTO(strings, error_cleanup);
+
+    sp->strings = strings;
+    strings = NULL;
+
+    return sp;
+error_cleanup:
+    free(strings);
+    cz_string_pool_free(sp);
+    return NULL;
+}
+
+void cz_string_pool_free(CZ_StringPool* sp) {
+    if (sp != NULL) {
+        for (unsigned int i = 0; i < sp->count; i++) {
+            free((void*)sp->strings[i]);
+            sp->strings[i] = NULL;
+        }
+        free(sp->strings);
+    }
+    free(sp);
+}
+
+const char* cz_string_pool_push(CZ_StringPool* sp, const char* text, size_t length) {
+    const char* nt_str = NULL;
+    const char** new_strings = NULL;
+    NULL_POINTER_TO_GOTO(sp, error_cleanup);
+    NULL_POINTER_TO_GOTO(text, error_cleanup);
+    if (length == 0) goto error_cleanup;
+
+    // Search pool
+    for (unsigned int i = 0; i < sp->count; i++) {
+        if (length == strlen(sp->strings[i]) && strncmp(sp->strings[i], text, length) == 0) {
+            nt_str = sp->strings[i];
+            break;
+        }
+    }
+
+    if (nt_str == NULL) {
+        // Create and push.
+        if (sp->capacity == sp->count) {
+            // Increase capacity.
+            new_strings = (const char**) realloc(sp->strings, sizeof(const char*) * sp->capacity * 2);
+            NULL_POINTER_TO_GOTO(new_strings, error_cleanup);
+
+            // Move ownership of newly allocated strings.
+            sp->strings = new_strings;
+            new_strings = NULL;
+            sp->capacity *= 2;
+        }
+
+        // Create string
+        nt_str = create_null_terminated_string(text, length);
+        NULL_POINTER_TO_GOTO(nt_str, error_cleanup);
+
+        // Transfer string (but keep the shallow copy)
+        sp->strings[sp->count] = nt_str;
+
+        sp->count++;
+    }
+
+    // Return the pointer to inside string pool
+    return nt_str;
+error_cleanup:
+    free((void*)nt_str);
+    free(new_strings);
+    return NULL;
+}
+
 CZ_Lexer* cz_lexer_create(const char* code, const char* filename) {
     if (code == NULL) {
         return NULL;
@@ -33,6 +130,12 @@ CZ_Lexer* cz_lexer_create(const char* code, const char* filename) {
     // Add error list
     lexer->error_list = cz_error_list_create();
     if (lexer->error_list == NULL) {
+        cz_lexer_free(lexer);
+        return NULL;
+    }
+
+    lexer->sp = cz_string_pool_create();
+    if (lexer->sp == NULL) {
         cz_lexer_free(lexer);
         return NULL;
     }
@@ -130,10 +233,12 @@ static inline char peek(CZ_Lexer* lexer, unsigned int n) { return lexer->idx + n
  * @return int 1 if successful, 0 if failure.
  */
 static inline int cz_lexer_push_token_helper(CZ_Lexer* lexer, CZ_TokenType token_type, size_t length) {
+    const char* lexeme = cz_string_pool_push(lexer->sp, lexer->code + lexer->idx, length);
+    if (lexeme == NULL) return 0;
+
     return cz_lexer_push_token(lexer, (CZ_Token){
                                         .token_type = token_type,
-                                        .lexeme = lexer->code + lexer->idx,
-                                        .length = length,
+                                        .lexeme = lexeme,
                                         .line = lexer->row,
                                         .column = lexer->col
                                     });
@@ -604,7 +709,12 @@ int cz_lexer_analyze(CZ_Lexer* lexer) {
         }
     }
 
-    if (cz_lexer_push_token_helper(lexer, CZ_TT_EOF, 0) != 1) {
+    if (cz_lexer_push_token(lexer, (CZ_Token){
+            .token_type = CZ_TT_EOF,
+            .lexeme = NULL,
+            .line = lexer->row,
+            .column = lexer->col
+        }) != 1) {
         return 0;
     }
 
@@ -616,6 +726,7 @@ void cz_lexer_free(CZ_Lexer* lexer) {
         free(lexer->tokens);
         free(lexer->code);
         cz_error_list_free(lexer->error_list);
+        cz_string_pool_free(lexer->sp);
         free(lexer);
     }
 }
