@@ -2371,9 +2371,7 @@ static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_
     return 1;
 
 error_cleanup:
-    if (decor != NULL) {
-        cz_ast_decoration_free(decor);
-    }
+    cz_ast_decoration_free(decor);
     return 0;
 }
 
@@ -2420,9 +2418,9 @@ static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_En
             // Check if it is part of the initializers.
             const char* field_name = field->name;
             bool found = false;
-            for (unsigned int j = 0; j < expr->struct_declaration.member_count; i++) {
+            for (unsigned int j = 0; j < expr->struct_declaration.member_count; j++) {
                 const char* member_name = expr->struct_declaration.members[j]->struct_init_member.identifier->identifier.name;
-                if (member_name == field_name || strcmp(member_name, field_name)) {
+                if (member_name == field_name || strcmp(member_name, field_name) == 0) {
                     found = true;
                     break;
                 }
@@ -2436,13 +2434,14 @@ static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_En
 
     }
 
+    bool initializer_is_constexpr = true;
     // 3. For each initializer check with the struct definition
     for (unsigned int i = 0; i < expr->struct_declaration.member_count; i++) {
         // 3.1 Check duplicate member in initializer
         const char* member_name = expr->struct_declaration.members[i]->struct_init_member.identifier->identifier.name;
         for (unsigned int j = 0; j < i; j++) {
             const char* prev_member_name = expr->struct_declaration.members[j]->struct_init_member.identifier->identifier.name;
-            if (member_name == prev_member_name) {
+            if (member_name == prev_member_name || strcmp(member_name, prev_member_name) == 0) {
                 cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
                 "Initializer member %s is given duplicate.", struct_name);
                 goto error_cleanup;
@@ -2477,17 +2476,45 @@ static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_En
             "Type for initializer of member \"%s\" does not match the declared type.", member_name);
             goto error_cleanup;
         }
-        // 3.3.2 If field type is reference, initializer must be an non-const l-value
+        if (struct_lookup->structure.layout->fields[member_field_idx].type->kind == CZ_TYPE_KIND_REFERENCE) {
+            // 3.3.2 If field type is reference, initializer must be an l-value
+            if (member_init_decor->value_category != CZ_VALUE_CATEGORY_LVALUE) {
+                cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+                "Initializer of member \"%s\" is declared as reference, and l-value initializer is required", member_name);
+                goto error_cleanup;
+            }
+
+            // 3.3.3 If field type is not const, then initializer must not be const.
+            if (!cz_type_is_const(struct_lookup->structure.layout->fields[member_field_idx].type) &&
+                cz_type_is_const(member_init_decor->resolved_type)) {
+                cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+                "Initializer of member \"%s\" is declared as reference, and initializer is const", member_name);
+                goto error_cleanup;
+                
+            }
+        }
+        if (!member_init_decor->is_constexpr) {
+            initializer_is_constexpr = false;
+        }
     }
     
+    decor = cz_ast_decoration_create(struct_lookup,
+        CZ_VALUE_CATEGORY_RVALUE,
+        initializer_is_constexpr,
+        false,
+        env->scope_level);
+    if (decor == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, 
+            "Allocating AST decorator failure.");
+        goto error_cleanup;
+    }
 
-
+    expr->decoration = decor;
+    decor = NULL;
 
     return 1;
 
 error_cleanup:
-    if (decor != NULL) {
-        cz_ast_decoration_free(decor);
-    }
+    cz_ast_decoration_free(decor);
     return 0;
 }
