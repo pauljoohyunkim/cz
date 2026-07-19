@@ -4,39 +4,56 @@
 #include "cz_error.h"
 #include "cz_ast.h"
 
-// Helper function to create a parser from source code
-static CZ_Parser* create_parser_from_source(const char* source) {
+// Helper function to create a parser from source code and get lexer error count
+static CZ_Parser* create_parser_from_source(const char* source, int& lexer_error_count) {
     CZ_Lexer* lexer = cz_lexer_create(source, nullptr);
-    if (!lexer) return nullptr;
+    if (!lexer) {
+        lexer_error_count = 0;
+        return nullptr;
+    }
 
+    lexer_error_count = 0;  // Initialize
     if (cz_lexer_analyze(lexer) != 1) {
+        // Get lexer errors before freeing
+        lexer_error_count = lexer->error_list ? lexer->error_list->n_errors : 0;
         cz_lexer_free(lexer);
         return nullptr;
     }
 
     CZ_Parser* parser = cz_parser_create(lexer);
-    cz_lexer_free(lexer); // Parser takes ownership of lexer's resources
+    // Don't free lexer here - parser now owns it
     return parser;
 }
 
 // Helper function to run parser and get error count and parse result
-static void parse_and_get_error_count(CZ_Parser* parser, int& error_count, int& parse_result) {
+static void parse_and_get_error_count(CZ_Parser* parser, int lexer_error_count, int& error_count, int& parse_result) {
     if (!parser) {
-        error_count = 0;
+        error_count = lexer_error_count;  // Only lexer errors if parser creation failed
         parse_result = 0;
         return;
     }
 
     parse_result = cz_parser_parse(parser);
-    error_count = parser->error_list ? parser->error_list->n_errors : 0;
+    int parser_error_count = parser->error_list ? parser->error_list->n_errors : 0;
+    error_count = lexer_error_count + parser_error_count;
 
     // Print errors for debugging if any
-    if (error_count > 0 && parser->error_list) {
-        fprintf(stderr, "Parse failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < parser->error_list->n_errors; i++) {
-            CZ_Error err = parser->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+    if (error_count > 0) {
+        fprintf(stderr, "Parse failed with %d errors (%d lexer, %d parser):\n",
+                error_count, lexer_error_count, parser_error_count);
+        // Print lexer errors if any
+        if (lexer_error_count > 0) {
+            // We don't have access to the lexer anymore to print its errors
+            // This is a limitation of our approach
+            fprintf(stderr, "  [Lexer errors not displayed - lexer resources owned by parser]\n");
+        }
+        // Print parser errors if any
+        if (parser_error_count > 0 && parser->error_list) {
+            for (size_t i = 0; i < parser->error_list->n_errors; i++) {
+                CZ_Error err = parser->error_list->errors[i];
+                fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -57,10 +74,11 @@ TEST(ParserTest, GoodExample10_FunctionPostfixChains) {
         "    return current_zip;\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_EQ(error_count, 0);
 }
@@ -85,10 +103,11 @@ TEST(ParserTest, GoodExample11_FunctionLoops) {
         "    return sum;\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_EQ(error_count, 0);
 }
@@ -110,10 +129,11 @@ TEST(ParserTest, GoodExample12_FunctionProcessMatrix) {
         "    }\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_EQ(error_count, 0);
 }
@@ -135,10 +155,11 @@ TEST(ParserTest, GoodExample13_TypedefStructFunction) {
         "    }\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_EQ(error_count, 0);
 }
@@ -154,10 +175,11 @@ TEST(ParserTest, BadExample13_ErrorA_MalformedForLoop) {
         "    }\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_GT(error_count, 0);
 }
@@ -173,10 +195,11 @@ TEST(ParserTest, BadExample14_ErrorB_NakedExpressionInStruct) {
         "    y :: float;\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_GT(error_count, 0);
 }
@@ -191,10 +214,11 @@ TEST(ParserTest, GoodExample14_VerificationAnchor) {
         "    return 1;\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_EQ(error_count, 0);
 }
@@ -213,10 +237,11 @@ TEST(ParserTest, GoodExample1_FunctionMain) {
         "    return y;\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_EQ(error_count, 0);
 }
@@ -229,10 +254,11 @@ TEST(ParserTest, GoodExample2_FunctionGetPtr) {
         "    return val;\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_EQ(error_count, 0);
 }
@@ -246,10 +272,11 @@ TEST(ParserTest, GoodExample3_GlobalConstant) {
         "    return val & GLOBAL_MASK;\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_EQ(error_count, 0);
 }
@@ -260,10 +287,11 @@ TEST(ParserTest, BadExample4_MissingSemicolonGlobal) {
         "// Error A: Missing semicolon in global scope\n"
         "wrong :: const int32 = 5";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_GT(error_count, 0);
 }
@@ -276,10 +304,11 @@ TEST(ParserTest, BadExample5_ExpressionInParameter) {
         "    return x;\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_GT(error_count, 0);
 }
@@ -293,10 +322,11 @@ TEST(ParserTest, BadExample6_MalformedExpression) {
         "    return x;\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_GT(error_count, 0);
 }
@@ -318,10 +348,11 @@ TEST(ParserTest, GoodExample7_FunctionCheckValue) {
         "    return result;\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_EQ(error_count, 0);
 }
@@ -339,10 +370,11 @@ TEST(ParserTest, GoodExample8_FunctionComputeRatio) {
         "    return intermediate as int32;\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_EQ(error_count, 0);
 }
@@ -363,10 +395,11 @@ TEST(ParserTest, GoodExample9_FunctionProcessSystem) {
         "    return is_active;\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_EQ(error_count, 0);
 }
@@ -380,10 +413,11 @@ TEST(ParserTest, BadExample10_ErrorA_NakedConditional) {
         "    return 0;\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_GT(error_count, 0);
 }
@@ -397,10 +431,11 @@ TEST(ParserTest, BadExample11_ErrorB_CastingExpression) {
         "    return y;\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_GT(error_count, 0);
 }
@@ -411,10 +446,11 @@ TEST(ParserTest, BadExample12_ErrorC_MalformedTypedef) {
         "// Error C: Malformed typedef formatting\n"
         "typedef my_bad_alias; \n";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_GT(error_count, 0);
 }
@@ -430,10 +466,11 @@ TEST(ParserTest, BadExample13_ErrorD_StatementSeparator) {
         "    return 0;\n"
         "}";
 
+    int lexer_error_count = 0;
     int error_count = 0;
     int parse_result = 0;
-    CZ_Parser* parser = create_parser_from_source(source);
-    parse_and_get_error_count(parser, error_count, parse_result);
+    CZ_Parser* parser = create_parser_from_source(source, lexer_error_count);
+    parse_and_get_error_count(parser, lexer_error_count, error_count, parse_result);
     EXPECT_EQ(parse_result, 1);
     EXPECT_GT(error_count, 0);
 }

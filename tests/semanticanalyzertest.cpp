@@ -7,20 +7,23 @@
 #include "cz_semantic_analyzer.h"
 
 // Helper function to create a lexer from source code and analyze it.
-static std::unique_ptr<CZ_Lexer, decltype(&cz_lexer_free)> create_lexer(const char* source) {
+static std::unique_ptr<CZ_Lexer, decltype(&cz_lexer_free)> create_lexer(const char* source, int& lexer_error_count) {
     CZ_Lexer* lexer = cz_lexer_create(source, nullptr);
     if (!lexer) {
+        lexer_error_count = 0;
         return std::unique_ptr<CZ_Lexer, decltype(&cz_lexer_free)>(nullptr, cz_lexer_free);
     }
     if (cz_lexer_analyze(lexer) != 1) {
+        lexer_error_count = lexer->error_list ? lexer->error_list->n_errors : 0;
         cz_lexer_free(lexer);
         return std::unique_ptr<CZ_Lexer, decltype(&cz_lexer_free)>(nullptr, cz_lexer_free);
     }
+    lexer_error_count = 0;  // No lexer errors if analysis succeeded
     return std::unique_ptr<CZ_Lexer, decltype(&cz_lexer_free)>(lexer, cz_lexer_free);
 }
 
 // Helper function to create a parser from a lexer (parser takes ownership of lexer resources).
-static std::unique_ptr<CZ_Parser, decltype(&cz_parser_free)> create_parser(std::unique_ptr<CZ_Lexer, decltype(&cz_lexer_free)>& lexer_ptr) {
+static std::unique_ptr<CZ_Parser, decltype(&cz_parser_free)> create_parser(std::unique_ptr<CZ_Lexer, decltype(&cz_lexer_free)>& lexer_ptr, int& parser_error_count) {
     CZ_Lexer* lexer = lexer_ptr.release();  // Transfer ownership to parser
     CZ_Parser* parser = cz_parser_create(lexer);
     if (!parser) {
@@ -28,10 +31,12 @@ static std::unique_ptr<CZ_Parser, decltype(&cz_parser_free)> create_parser(std::
         return std::unique_ptr<CZ_Parser, decltype(&cz_parser_free)>(nullptr, cz_parser_free);
     }
     if (cz_parser_parse(parser) != 1) {
+        parser_error_count = parser->error_list ? parser->error_list->n_errors : 0;
         cz_parser_free(parser);
         return std::unique_ptr<CZ_Parser, decltype(&cz_parser_free)>(nullptr, cz_parser_free);
     }
     // Parser now owns lexer's resources, so we don't free lexer separately
+    parser_error_count = 0;  // No parser errors if parsing succeeded
     return std::unique_ptr<CZ_Parser, decltype(&cz_parser_free)>(parser, cz_parser_free);
 }
 
@@ -55,24 +60,32 @@ TEST(SemanticAnalyzerTest, GoodCase1_GlobalCounter) {
         "    return global_counter;\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        // Note: We don't easily have access to lexer/parser errors anymore due to ownership transfer
+        // But we can still print semantic errors if needed
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -87,24 +100,30 @@ TEST(SemanticAnalyzerTest, GoodCase2_ChooseLeft) {
         "    return left;\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -120,24 +139,30 @@ TEST(SemanticAnalyzerTest, BadCase3_InvalidLocalReferenceReturn) {
         "    return local_val;\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -157,24 +182,30 @@ TEST(SemanticAnalyzerTest, BadCase4_InvalidDeeplyNestedLocalReferenceReturn) {
         "    return global_backup;\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -195,24 +226,30 @@ TEST(SemanticAnalyzerTest, TestCase1_GetMagicNumber_ReturnConstInt) {
         "    val :: int32 = get_magic_number();\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -232,24 +269,30 @@ TEST(SemanticAnalyzerTest, TestCase2_AssignToConstFunctionReturn) {
         "    get_magic_number() = 100;\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -273,24 +316,30 @@ TEST(SemanticAnalyzerTest, TestCase3_AssignToConstRefFunctionReturn) {
         "    get_weight_limit() = 100;\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -312,24 +361,30 @@ TEST(SemanticAnalyzerTest, TestCase4_BindMutableRefToConstLocation) {
         "    alias = 200; // This would illegally mutate static_score if allowed!\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -354,24 +409,30 @@ TEST(SemanticAnalyzerTest, TestCase5_PassConstRefToConstRefParam) {
         "    print_val(data);\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -391,24 +452,30 @@ TEST(SemanticAnalyzerTest, TestCase6_ReturnLocalConstRef) {
         "    return temporary;\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -424,24 +491,30 @@ TEST(SemanticAnalyzerTest, TestCase7_ConstDroppingFail) {
         "func get_static_value :: () -> const float& { return static_value; }\n"
         "func main :: () { val :: float& = get_static_value(); }";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -457,24 +530,30 @@ TEST(SemanticAnalyzerTest, TestCase8_ConstDroppingSuccess) {
         "func get_static_value :: () -> const float& { return static_value; }\n"
         "func main :: () { val :: float = get_static_value(); }";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -499,24 +578,30 @@ TEST(SemanticAnalyzerTest, BadCase_Metres_ProcessDistance_ArithmeticNotSupported
         "    return result;\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -542,24 +627,30 @@ TEST(SemanticAnalyzerTest, GoodCase_Handle_UserHandle_UID_BootstrapId) {
         "    user_id :: UID = raw_id as UID;\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -583,24 +674,30 @@ TEST(SemanticAnalyzerTest, BadCase_USD_GBP_TypeMismatch) {
         "    wallet_b :: GBP = wallet_a;\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -625,24 +722,30 @@ TEST(SemanticAnalyzerTest, BadCase_Age_TemporaryReference) {
         "    update_age(25 as Age);\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -670,24 +773,30 @@ TEST(SemanticAnalyzerTest, GoodCase_Handle_TypeTransparency) {
         "    increment_raw(active_handle);\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -717,24 +826,30 @@ TEST(SemanticAnalyzerTest, BadCase_ItemCount_TypeMismatch) {
         "    corrupt_count(stock);\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -756,24 +871,30 @@ TEST(SemanticAnalyzerTest, CzcTestCode_ConstReferenceAssignment) {
         "    a = b;\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -791,24 +912,30 @@ TEST(SemanticAnalyzerTest, NewType_SecondsFrames_Success) {
         "    f :: Frames = s as Frames;\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -828,24 +955,30 @@ TEST(SemanticAnalyzerTest, StructVector_GetDefaultX_Success) {
         "    val :: int32 = Vector{1, 2}.x;\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -864,24 +997,30 @@ TEST(SemanticAnalyzerTest, RefHolder_UninitializedReference_Failure) {
         "    rh :: RefHolder;\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
@@ -897,24 +1036,30 @@ TEST(SemanticAnalyzerTest, ConstReference_AssignmentFailure) {
         "    y :: int32& = x;\n"
         "}";
 
-    auto lexer_ptr = create_lexer(source);
+    int lexer_error_count = 0;
+    auto lexer_ptr = create_lexer(source, lexer_error_count);
     ASSERT_TRUE(lexer_ptr != nullptr) << "Failed to create lexer";
 
-    auto parser_ptr = create_parser(lexer_ptr);
+    int parser_error_count = 0;
+    auto parser_ptr = create_parser(lexer_ptr, parser_error_count);
     ASSERT_TRUE(parser_ptr != nullptr) << "Failed to create parser";
 
     auto sa_ptr = create_semantic_analyzer(parser_ptr);
     ASSERT_TRUE(sa_ptr != nullptr) << "Failed to create semantic analyzer";
 
     int analyze_result = cz_semantic_analyzer_analyze(sa_ptr.get());
-    int error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int semantic_error_count = sa_ptr->error_list ? sa_ptr->error_list->n_errors : 0;
+    int error_count = lexer_error_count + parser_error_count + semantic_error_count;
 
     if (error_count > 0) {
-        fprintf(stderr, "Semantic analysis failed with %d errors:\n", error_count);
-        for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
-            CZ_Error err = sa_ptr->error_list->errors[i];
-            fprintf(stderr, "  Error %zu: %s at line %d, column %d\n",
-                    i, err.message, err.line, err.column);
+        fprintf(stderr, "Analysis failed with %d errors (%d lexer, %d parser, %d semantic):\n",
+                error_count, lexer_error_count, parser_error_count, semantic_error_count);
+        if (semantic_error_count > 0) {
+            for (size_t i = 0; i < sa_ptr->error_list->n_errors; i++) {
+                CZ_Error err = sa_ptr->error_list->errors[i];
+                fprintf(stderr, "  Semantic Error %zu: %s at line %d, column %d\n",
+                        i, err.message, err.line, err.column);
+            }
         }
     }
 
