@@ -1,4 +1,8 @@
 #include <llvm-c/Core.h>
+#include <llvm-c/Target.h>
+#include <llvm-c/TargetMachine.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 #include "cz_code_generator.h"
@@ -195,4 +199,54 @@ void cz_code_generator_free(CZ_CodeGenerator* cg) {
     }
     free(cg);
     LLVMShutdown();
+}
+
+int cz_code_generator_generate(CZ_CodeGenerator* cg) {
+    /* TODO: Implement LLVM code generation. */
+    (void)cg;
+    return 0;
+}
+
+int cz_code_generator_emit_object_file(LLVMModuleRef module, const char* output_filename) {
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+
+    char* target_triple = LLVMGetDefaultTargetTriple();
+    LLVMSetTarget(module, target_triple);
+
+    LLVMTargetRef target;
+    char* error = NULL;
+    if (LLVMGetTargetFromTriple(target_triple, &target, &error)) {
+        fprintf(stderr, "LLVM Target Error: %s\n", error);
+        LLVMDisposeMessage(error);
+        LLVMDisposeMessage(target_triple);
+        return 0;
+    }
+
+    LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(
+        target,
+        target_triple,
+        "generic",
+        "",
+        LLVMCodeGenLevelDefault,
+        LLVMRelocPIC,
+        LLVMCodeModelDefault
+    );
+
+    LLVMTargetDataRef data_layout = LLVMCreateTargetDataLayout(target_machine);
+    LLVMSetModuleDataLayout(module, data_layout);
+
+    if (LLVMTargetMachineEmitToFile(target_machine, module, (char*)output_filename, LLVMObjectFile, &error)) {
+        fprintf(stderr, "Failed to emit object file: %s\n", error);
+        LLVMDisposeMessage(error);
+        LLVMDisposeTargetData(data_layout);
+        LLVMDisposeTargetMachine(target_machine);
+        LLVMDisposeMessage(target_triple);
+        return 0;
+    }
+
+    LLVMDisposeTargetData(data_layout);
+    LLVMDisposeTargetMachine(target_machine);
+    LLVMDisposeMessage(target_triple);
+    return 1;
 }

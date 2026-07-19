@@ -114,6 +114,23 @@ const LLVMTypeRef cz_environment_backend_lookup_type(const CZ_Environment_Backen
 CZ_CodeGenerator* cz_code_generator_create(CZ_SemanticAnalyzer* sa);
 
 /**
+ * @brief LLVM Code Generation
+ *
+ * @param cg Pointer to CZ_CodeGenerator struct
+ * @return int 1 if successful, 0 if failure.
+ */
+int cz_code_generator_generate(CZ_CodeGenerator* cg);
+
+/**
+ * @brief Emit LLVM module to object file.
+ *
+ * @param module LLVMModule inside CZ_CodeGenerator struct.
+ * @param output_filename Output filename (*.o)
+ * @return int 1 if successful, 0 otherwise.
+ */
+int cz_code_generator_emit_object_file(LLVMModuleRef module, const char* output_filename);
+
+/**
  * @brief Free the memory allocated for CZ_CodeGenerator
  *
  * @param cg Pointer to allocated CZ_CodeGenerator.
