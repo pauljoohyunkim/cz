@@ -183,6 +183,15 @@ void cz_global_type_table_print(const CZ_GlobalTypeTable* gtt);
  */
 bool cz_type_is_const(const CZ_Type* type);
 
+/**
+ * @brief A helper for primitive type kind is numerical.
+ * 
+ * @param primitive_type Primitive type
+ * @return true Primitive type is numerical.
+ * @return false Primitive type is not numerical.
+ */
+bool cz_primitive_type_is_numerical(CZ_PrimitiveType primitive_type);
+
 #ifdef __cplusplus
 }
 #endif

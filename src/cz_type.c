@@ -323,3 +323,14 @@ bool cz_type_is_const(const CZ_Type* type) {
     
     return false;
 }
+
+bool cz_primitive_type_is_numerical(CZ_PrimitiveType primitive_type) {
+    switch (primitive_type) {
+        case CZ_PRIMITIVE_FLOAT:
+        case CZ_PRIMITIVE_INT32:
+            return true;
+        default:
+            return false;
+    }
+    return false;
+}
