@@ -1,12 +1,10 @@
-struct Vector {
-    x :: int32;
-    y :: int32&;
-}
 
-y :: int32 = 1;
+typedef int32 Handle;
+typedef Handle UserHandle;
+newtype int32 UID;
 
-func testfunc :: () -> int32 {
-    v :: Vector = Vector {
-        .y = y
-    };
+func bootstrap_id :: () {
+    raw_id :: UserHandle = 1024;
+
+    user_id :: UID = raw_id as UID;
 }
