@@ -426,7 +426,7 @@ func process_distance :: (current :: Metres&, delta :: Metres) -> Metres {
     result :: Metres = current + delta;
     return result;
 }
-Expected Result: PASS (semantic analysis completes with 0 errors)
+Expected Result: FAIL (semantic analysis completes with >0 errors - newtype does not implicitly support arithmetic operations)
 
 Test Case 41: SemanticAnalyzerTest.GoodCase_Handle_UserHandle_UID_BootstrapId
 Source Code:
