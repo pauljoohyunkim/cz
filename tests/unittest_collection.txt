@@ -554,7 +554,7 @@ struct Vector {
 }
 
 func get_default_x :: () -> int32 {
-    val :: int32 = Vector{1, 2}.x;
+    val :: int32 = Vector{.x=1, .y=2}.x;
 }
 Expected Result: PASS (semantic analysis completes with 0 errors)
 

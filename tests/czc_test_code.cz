@@ -1,12 +1,11 @@
-newtype int32 A;
-newtype A B;
+struct Vector {
+    x :: int32;
+    y :: int32;
+}
 
-typedef int32 Handle;
-typedef Handle UserHandle;
-newtype int32 UID;
-
-func bootstrap_id :: () {
-    raw_id :: UserHandle = 1024;
-
-    user_id :: UID = raw_id as UID;
+func get_default_x :: () -> int32 {
+    // Vector{1, 2} is an R-value. 
+    // Accessing .x on an R-value struct yields an R-value copy.
+    // This should safely initialize a plain copy variable.
+    val :: int32 = Vector{.x = 1, .y = 2}.x; 
 }
