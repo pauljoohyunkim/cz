@@ -1831,7 +1831,10 @@ static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Env
             }
             break;
         case CZ_AST_StructInitNodeType:
-
+            if (cz_semantic_analyzer_check_struct_init(sa, env, expr) != 1) {
+                goto error_cleanup;
+            }
+            break;
         default:
             cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Not yet supported.");
             goto error_cleanup;
