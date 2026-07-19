@@ -1,3 +1,5 @@
+newtype int32 A;
+newtype A B;
 
 typedef int32 Handle;
 typedef Handle UserHandle;

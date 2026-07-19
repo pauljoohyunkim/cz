@@ -1838,6 +1838,7 @@ static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa
 static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+static int cz_semantic_analyzer_cast_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 
 static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
     NULL_POINTER_TO_GOTO(sa, error_cleanup);
@@ -1877,6 +1878,11 @@ static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Env
             break;
         case CZ_AST_StructInitNodeType:
             if (cz_semantic_analyzer_check_struct_init(sa, env, expr) != 1) {
+                goto error_cleanup;
+            }
+            break;
+        case CZ_AST_CastExpressionNodeType:
+            if (cz_semantic_analyzer_cast_expression(sa, env, expr) != 1) {
                 goto error_cleanup;
             }
             break;
@@ -2588,6 +2594,78 @@ static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_En
 
     return 1;
 
+error_cleanup:
+    cz_ast_decoration_free(decor);
+    return 0;
+}
+
+static int cz_semantic_analyzer_cast_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
+    CZ_AST_Decoration* decor = NULL;
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(expr, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_CastExpressionNodeType, error_cleanup);
+
+    // 1. Evaluate expression and type check
+    if (cz_semantic_analyzer_check_expression(sa, env, expr->cast_expression.expression) != 1) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+        "Expression type could not be deduced for casting.");
+        goto error_cleanup;
+    }
+
+    const CZ_Type* target_type = cz_type_from_type_node(expr->cast_expression.type, sa->gtt);
+    if (target_type == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+        "Cast expression target type could not be deduced.");
+        goto error_cleanup;
+    }
+    if (target_type->kind == CZ_TYPE_KIND_REFERENCE) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+        "Casting to reference type is not allowed.");
+        goto error_cleanup;
+    }
+
+    // 2. Unwrap and check
+    const CZ_Type* decayed_expr_type = cz_semantic_analyzer_decay_operand_type(expr->cast_expression.expression->decoration->resolved_type);
+    const CZ_Type* decayed_target_type = cz_semantic_analyzer_decay_operand_type(target_type);
+    NULL_POINTER_TO_GOTO(decayed_expr_type, error_cleanup);
+    NULL_POINTER_TO_GOTO(decayed_target_type, error_cleanup);
+    if ((decayed_expr_type->kind != CZ_TYPE_KIND_PRIMITIVE && decayed_expr_type->kind != CZ_TYPE_KIND_NEWTYPE) ||
+    (decayed_target_type->kind != CZ_TYPE_KIND_PRIMITIVE && decayed_target_type->kind != CZ_TYPE_KIND_NEWTYPE)) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+            "Casting is only supported between primitives and newtypes.");
+        goto error_cleanup;
+    }
+    const CZ_Type* primitive_expr_type = decayed_expr_type->kind == CZ_TYPE_KIND_NEWTYPE ? decayed_expr_type->newtype.underlying : decayed_expr_type;
+    const CZ_Type* primitive_target_type = decayed_target_type->kind == CZ_TYPE_KIND_NEWTYPE ? decayed_target_type->newtype.underlying : decayed_target_type;
+    if (primitive_expr_type->kind != CZ_TYPE_KIND_PRIMITIVE || primitive_target_type->kind != CZ_TYPE_KIND_PRIMITIVE) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+        "Underlying type is not a primitive, which is not supported for casting.");
+        goto error_cleanup;
+    }
+
+    if (primitive_expr_type->primitive == primitive_target_type->primitive) {
+        // 2.1 Casting to same "machine type" is supported.
+        // This is good.
+    } else if (cz_primitive_type_is_numerical(primitive_expr_type->primitive) &&
+        // 2.2 Numerical values can be casted to each other.
+        cz_primitive_type_is_numerical(primitive_target_type->primitive)) {
+        // This is good.
+    } else {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+        "Casting not possible between these two.");
+        goto error_cleanup;
+    }
+    
+    decor = cz_ast_decoration_create(target_type,
+        CZ_VALUE_CATEGORY_RVALUE,
+        expr->cast_expression.expression->decoration->is_constexpr,
+        false,
+        env->scope_level);
+    expr->decoration = decor;
+    decor = NULL;
+
+    return 1;
 error_cleanup:
     cz_ast_decoration_free(decor);
     return 0;
