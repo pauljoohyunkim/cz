@@ -1072,6 +1072,8 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
                 }
             }
 
+            // Set the initializer to a "read-only" default_initializer in field.
+            struct_type->structure.layout->fields[i].default_initializer = member_node->variable_declaration.expression;
         }
     }
 
@@ -2396,10 +2398,88 @@ static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_En
         goto error_cleanup;
     }
 
-    // 2. For each initializer check with the struct definition
-    // 2.1 Check for any duplicate members in struct initializer.
-    // 2.2 Check and match type with the struct member definitions
-    // 2.3 All parameters are optional except for reference.
+    if (expr->struct_declaration.member_count > struct_lookup->structure.layout->field_count) {
+        cz_error_list_push_error(
+            sa->error_list, sa->filename, expr->line, expr->col,
+            "There are only %d members in struct %s, but %d initializer "
+            "members given",
+            struct_lookup->structure.layout->field_count, struct_name,
+            expr->struct_declaration.member_count);
+        goto error_cleanup;
+    }
+
+
+    // 2. Check that all const and reference initializers are actually given.
+    // 2.1 All parameters are optional except for reference and const.
+    for (unsigned int i = 0; i < struct_lookup->structure.layout->field_count; i++) {
+        const CZ_StructField* field = &struct_lookup->structure.layout->fields[i];
+        const CZ_Type* field_type = field->type;
+        if ((cz_type_is_const(field_type) || field_type->kind == CZ_TYPE_KIND_REFERENCE) &&
+             field->default_initializer == NULL) {
+            // Currently field is either const or reference, but default initializer is not given.
+            // Check if it is part of the initializers.
+            const char* field_name = field->name;
+            bool found = false;
+            for (unsigned int j = 0; j < expr->struct_declaration.member_count; i++) {
+                const char* member_name = expr->struct_declaration.members[j]->struct_init_member.identifier->identifier.name;
+                if (member_name == field_name || strcmp(member_name, field_name)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+                "Initializer %s for struct %s is required.", field_name, struct_name);
+                goto error_cleanup;
+            }
+        }
+
+    }
+
+    // 3. For each initializer check with the struct definition
+    for (unsigned int i = 0; i < expr->struct_declaration.member_count; i++) {
+        // 3.1 Check duplicate member in initializer
+        const char* member_name = expr->struct_declaration.members[i]->struct_init_member.identifier->identifier.name;
+        for (unsigned int j = 0; j < i; j++) {
+            const char* prev_member_name = expr->struct_declaration.members[j]->struct_init_member.identifier->identifier.name;
+            if (member_name == prev_member_name) {
+                cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+                "Initializer member %s is given duplicate.", struct_name);
+                goto error_cleanup;
+            }
+        }
+        // 3.2 Correct member names.
+        int member_field_idx = -1;
+        for (unsigned int j = 0; j < struct_lookup->structure.layout->field_count; j++) {
+            if (struct_lookup->structure.layout->fields[j].name == member_name ||
+                strcmp(struct_lookup->structure.layout->fields[j].name, member_name) == 0) {
+                member_field_idx = j;
+                break;
+            }
+        }
+        if (member_field_idx < 0) {
+            cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+            "Member name %s is not valid.", member_name);
+            goto error_cleanup;
+        }
+
+        // 3.3. Check and match type with the struct member definitions
+        if (cz_semantic_analyzer_check_expression(sa, env, expr->struct_declaration.members[i]->struct_init_member.expression) != 1) {
+            goto error_cleanup;
+        }
+        const CZ_AST_Decoration* member_init_decor = expr->struct_declaration.members[i]->struct_init_member.expression->decoration;
+        NULL_POINTER_TO_GOTO(member_init_decor, error_cleanup);
+        // 3.3.1 Fields should match in decay types.
+        const CZ_Type* decay_member_init_type = cz_semantic_analyzer_decay_operand_type(member_init_decor->resolved_type);
+        const CZ_Type* decay_field_type = cz_semantic_analyzer_decay_operand_type(struct_lookup->structure.layout->fields[member_field_idx].type);
+        if (!cz_type_equals(decay_member_init_type, decay_field_type)) {
+            cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+            "Type for initializer of member \"%s\" does not match the declared type.", member_name);
+            goto error_cleanup;
+        }
+        // 3.3.2 If field type is reference, initializer must be an non-const l-value
+    }
+    
 
 
 

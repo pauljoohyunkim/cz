@@ -8,6 +8,7 @@ extern "C" {
 #include <stdbool.h>
 
 typedef struct CZ_Type CZ_Type;
+typedef struct CZ_AST_Node CZ_AST_Node;
 
 typedef enum {
     CZ_PRIMITIVE_VOID,
@@ -29,6 +30,7 @@ typedef struct {
     const char* name;
     const CZ_Type* type;
     unsigned int idx;
+    const CZ_AST_Node* default_initializer;
 } CZ_StructField;
 
 typedef struct {

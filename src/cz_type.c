@@ -50,6 +50,8 @@ void cz_struct_layout_free(CZ_StructLayout* layout) {
 
             // Type is owned by type table.
             layout->fields[i].type = NULL;
+
+            layout->fields[i].default_initializer = NULL;
         }
         free(layout->fields);
         layout->fields = NULL;
