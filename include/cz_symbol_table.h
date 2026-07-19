@@ -24,10 +24,12 @@ typedef struct {
 typedef struct {
     CZ_SymbolKind kind;
     const char* name;
+    unsigned int scope_level;
 
     union {
         struct {
             const CZ_Type* type;
+            bool is_constexpr;
         } value;
 
         struct {
@@ -51,9 +53,10 @@ struct CZ_Environment {
  * 
  * @param kind Symbol kind
  * @param name Name of the symbol. Will internally copy.
+ * @param scope_level Scope level (0 for global, 1 for function parameters, 2 and onward are block variables.)
  * @return CZ_Symbol* Allocated CZ_Symbol on success, NULL on failure.
  */
-CZ_Symbol* cz_symbol_create(CZ_SymbolKind kind, const char* name);
+CZ_Symbol* cz_symbol_create(CZ_SymbolKind kind, const char* name, unsigned int scope_level);
 
 /**
  * @brief Frees allocated CZ_Symbol
@@ -100,3 +103,20 @@ int cz_environment_push_symbol(CZ_Environment* env, const CZ_Symbol* symbol);
 #endif
 
 #endif  /* CZ_SYMBOL_TABLE_H */
+
+/**
+ * @brief Print CZ_Symbol information with indentation
+ *
+ * @param symbol Pointer to CZ_Symbol to print
+ * @param depth Indentation level (number of tabs)
+ */
+void cz_symbol_print(const CZ_Symbol* symbol, unsigned int depth);
+
+/**
+ * @brief Print CZ_Environment information with indentation
+ *
+ * @param env Pointer to CZ_Environment to print
+ * @param depth Indentation level (number of tabs)
+ * @param cascade Set to true to print parent chain
+ */
+void cz_environment_print(const CZ_Environment* env, unsigned int depth, bool cascade);

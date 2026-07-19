@@ -20,12 +20,16 @@ typedef enum {
 typedef struct {
     const CZ_Type* resolved_type;
     CZ_ValueCategory value_category;
+    bool is_constexpr;
+    bool is_reference_source;
+    unsigned int scope_level;
 } CZ_AST_Decoration;
 
 typedef enum {
     CZ_AST_ProgramNodeType,
     CZ_AST_StructDeclarationNodeType,
-    CZ_AST_StructMemberNodeType,
+    CZ_AST_StructInitNodeType,
+    CZ_AST_StructInitMemberNodeType,
     CZ_AST_FunctionDeclarationNodeType,
     CZ_AST_ParameterListNodeType,
 
@@ -72,22 +76,21 @@ struct CZ_AST_Node {
             unsigned int capacity;
         } program;
 
-        /** Used for node_type == CZ_AST_StructDeclarationNodeType */
+        /** Used for node_type == CZ_AST_StructDeclarationNodeType or CZ_AST_StructInitNodeType */
         struct {
             /** Identifier node (CZ_AST_IdentifierNodeType) */
             CZ_AST_Node* identifier;
-            /** Array of CZ_AST_Node* (each being a struct member, CZ_AST_StructMemberNodeType) */
+            /** [StructDeclaration] Array of CZ_AST_Node* (each being a variable_declaration) */
+            /** [StructInit] Array of CZ_AST_Node* (each being a struct_init_member) */
             CZ_AST_Node** members;
             unsigned int member_count;
         } struct_declaration;
 
-        /** Used for node_type == CZ_AST_StructMemberNodeType */
         struct {
-            /** Identifier node (CZ_AST_IdentifierNodeType) */
             CZ_AST_Node* identifier;
-            /** Type node (CZ_AST_TypeNodeType) */
-            CZ_AST_Node* type;
-        } struct_member;
+
+            CZ_AST_Node* expression;
+        } struct_init_member;
 
         /** Used for node_type == CZ_AST_FunctionDeclarationNodeType */
         struct {
@@ -104,6 +107,7 @@ struct CZ_AST_Node {
             /** Array of CZ_AST_Node* (each being a parameter, likely VariableDeclaration node) */
             CZ_AST_Node** params;
             unsigned int param_count;
+            CZ_Environment* scope;
         } parameter_list;
 
         /** Used for node_type == CZ_AST_BlockStatementNodeType */
@@ -135,8 +139,6 @@ struct CZ_AST_Node {
 
         /** Used for node_type == CZ_AST_ReturnStatementNodeType */
         struct {
-            /** Whether this is a reference return */
-            bool is_ref;
             /** Expression node (can be any expression) */
             CZ_AST_Node* expression;
         } return_statement;
@@ -161,6 +163,8 @@ struct CZ_AST_Node {
             CZ_AST_Node* iteration_step;
             /** Body statement node */
             CZ_AST_Node* body;
+
+            CZ_Environment* scope;
         } for_statement;
 
         /** Used for node_type == CZ_AST_WhileStatementNodeType */
@@ -233,13 +237,13 @@ struct CZ_AST_Node {
             /** Literal type token */
             CZ_TokenType literal_type;
             /** Lexeme text (not a node) */
-            char* lexeme;
+            const char* lexeme;
         } literal;
 
         /** Used for node_type == CZ_AST_IdentifierNodeType */
         struct {
             /** Identifier name (not a node) */
-            char* name;
+            const char* name;
         } identifier;
 
         /** Used for node_type == CZ_AST_CastExpressionNodeType */
@@ -259,6 +263,26 @@ struct CZ_AST_Node {
         } struct_member_access;
     };
 };
+
+/**
+ * @brief Creates decoration for AST node (for expressions)
+ * 
+ * @param type CZ_Type from global type table.
+ * @param val_category Whether or not expression is l-value or r-value.
+ * @param is_constexpr Whether or not expression is constexpr.
+ * @param is_reference_source Whether or not expression is source of reference.
+ * @param scope_level 0 means global, 1 means function parameter, 2 for local variables and subsequent levels mean inner blocks.
+ * @return CZ_AST_Decoration* Pointer to CZ_AST_Decoration allocated on success, NULL on failure.
+ */
+CZ_AST_Decoration* cz_ast_decoration_create(const CZ_Type* type, CZ_ValueCategory val_category, bool is_constexpr, bool is_reference_source, unsigned int scope_level);
+
+/**
+ * @brief Frees AST node decoration.
+ * 
+ * @param decor Pointer to CZ_AST_Decoration
+ */
+void cz_ast_decoration_free(CZ_AST_Decoration* decor);
+
 
 /**
  * @brief Creates AST node from type.

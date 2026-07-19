@@ -8,6 +8,7 @@ extern "C" {
 #include <stdbool.h>
 
 typedef struct CZ_Type CZ_Type;
+typedef struct CZ_AST_Node CZ_AST_Node;
 
 typedef enum {
     CZ_PRIMITIVE_VOID,
@@ -29,6 +30,7 @@ typedef struct {
     const char* name;
     const CZ_Type* type;
     unsigned int idx;
+    const CZ_AST_Node* default_initializer;
 } CZ_StructField;
 
 typedef struct {
@@ -47,18 +49,18 @@ struct CZ_Type {
             const CZ_StructLayout* layout;
         } structure;
 
-        CZ_Type* const_of;
+        const CZ_Type* const_of;
 
-        CZ_Type* reference_to;
+        const CZ_Type* reference_to;
 
         struct {
             const char* name;
-            CZ_Type* underlying;
+            const CZ_Type* underlying;
         } newtype;
 
         struct {
-            CZ_Type* return_type;
-            CZ_Type** param_types;
+            const CZ_Type* return_type;
+            const CZ_Type** param_types;
             unsigned int param_count;
         } function;
     };
@@ -66,11 +68,11 @@ struct CZ_Type {
 
 typedef struct {
     const char** names;
-    CZ_Type** named_types;  // Shallow pointer! points to somewhere in all_allocations
+    const CZ_Type** named_types;  // Shallow pointer! points to somewhere in all_allocations
     unsigned int named_entry_count;
     unsigned int named_entry_capacity;
 
-    CZ_Type** all_allocations;      // Owner of all types!
+    const CZ_Type** all_allocations;      // Owner of all types!
     unsigned int all_entry_count;
     unsigned int all_allocations_capacity;
 } CZ_GlobalTypeTable;
@@ -112,6 +114,8 @@ void cz_type_free(CZ_Type* type);
  * @brief Create global type table
  * 
  * @return CZ_GlobalTypeTable* Pointer to CZ_GlobalTypeTable on success, NULL on failure.
+ * 
+ * Note that this will also create primitive types such as int32 and float.
  */
 CZ_GlobalTypeTable* cz_global_type_table_create(void);
 
@@ -136,6 +140,16 @@ void cz_global_type_table_free(CZ_GlobalTypeTable* gtt);
 int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, const CZ_Type* type);
 
 /**
+ * @brief Checks if types match (structurally)
+ * 
+ * @param a Type 1
+ * @param b Type 2
+ * @return true Equal
+ * @return false Not equal
+ */
+bool cz_type_equals(const CZ_Type* a, const CZ_Type* b);
+
+/**
  * @brief Find an existing identical type in the global type table.
  * 
  * @param gtt Pointer to CZ_GlobalTypeTable
@@ -152,6 +166,31 @@ const CZ_Type* cz_global_type_table_find_type(const CZ_GlobalTypeTable* gtt, con
  * @return const CZ_Type* Pointer to the existing canonical type, or NULL if not found.
  */
 const CZ_Type* cz_global_type_table_find_type_by_name(const CZ_GlobalTypeTable* gtt, const char* query);
+
+/**
+ * @brief Print CZ_GlobalTypeTable information.
+ *
+ * @param gtt Pointer to CZ_GlobalTypeTable to print
+ */
+void cz_global_type_table_print(const CZ_GlobalTypeTable* gtt);
+
+/**
+ * @brief Check if type is const, regardless of if it is reference or not
+ * 
+ * @param type Pointer to CZ_Type
+ * @return true Type is const (or reference to a const.)
+ * @return false Type is not const.
+ */
+bool cz_type_is_const(const CZ_Type* type);
+
+/**
+ * @brief A helper for primitive type kind is numerical.
+ * 
+ * @param primitive_type Primitive type
+ * @return true Primitive type is numerical.
+ * @return false Primitive type is not numerical.
+ */
+bool cz_primitive_type_is_numerical(CZ_PrimitiveType primitive_type);
 
 #ifdef __cplusplus
 }

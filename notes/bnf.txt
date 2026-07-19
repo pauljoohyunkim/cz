@@ -36,7 +36,7 @@
 ;; --- Declarations & Assignments ---
 <variable_decl>    ::= <param_decl> [ "=" <expression> ]
 
-<assignment_stmt>  ::= <identifier> <assignment_op> <expression>
+<assignment_stmt>  ::= <expression> <assignment_op> <expression>
 <assignment_op>    ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^="
 
 <return_stmt>      ::= "return" [ <expression> ]
@@ -48,7 +48,11 @@
 
 <struct_decl>      ::= "struct" <identifier> "{" <struct_member_list> "}"
 <struct_member_list> ::= <struct_member> ";" <struct_member_list> | ""
-<struct_member>    ::= <identifier> "::" <type>
+<struct_member>    ::= <variable_decl>
+
+<struct_init>      ::= <identifier> "{" <struct_init_list> "}"
+<struct_init_list>   ::= [ <struct_init_member> ( "," <struct_init_member> )* [ "," ] ]
+<struct_init_member> ::= "." <identifier> "=" <expression>
 
 ;; --- Types (Supporting Explicit References) ---
 <mutability>       ::= "const" | ""
@@ -68,14 +72,12 @@
                      | <relational> ">=" <bitwise_or> 
                      | <bitwise_or>
 
-;; Bitwise OR (|)
 <bitwise_or>       ::= <bitwise_or> "|" <bitwise_xor> 
                      | <bitwise_xor>
 
-<bitwise_xor>      ::= <bitwise_xor> "^" <bitwise_and>
+<bitwise_xor>      ::= <bitwise_xor> "^" <bitwise_and> 
                      | <bitwise_and>
 
-;; Bitwise AND (&)
 <bitwise_and>      ::= <bitwise_and> "&" <additive> 
                      | <additive>
 
@@ -83,22 +85,34 @@
                      | <additive> "-" <multiplicative> 
                      | <multiplicative>
 
-<multiplicative>   ::= <multiplicative> "*" <unary> 
-                     | <multiplicative> "/" <unary> 
-                     | <multiplicative> "%" <unary> 
+<multiplicative>   ::= <multiplicative> "*" <cast_expr> 
+                     | <multiplicative> "/" <cast_expr> 
+                     | <multiplicative> "%" <cast_expr> 
+                     | <cast_expr>
+
+;; --- Type Casting (Right-Associative / High Precedence) ---
+;; Binds tighter than multiplication, but looser than unary operations
+<cast_expr>        ::= <unary> "as" <type> 
                      | <unary>
 
 ;; Unary operators naturally associate right-to-left (e.g., -!-x)
-<unary>            ::= "-" <postfix> | "!" <postfix> | <postfix>
+<unary>            ::= "-" <postfix> 
+                     | "!" <postfix> 
+                     | <postfix>
 
-<postfix>          ::= <postfix> "(" <argument_list> ")"
-                     | <postfix> "." <identifier>
+;; --- Postfix Operators (Left-Associative / Highest Operator Precedence) ---
+<postfix>          ::= <postfix> "(" <argument_list> ")"   ;; Function Call
+                     | <postfix> "." <identifier>          ;; Struct Member Access
                      | <primary>
 
+;; --- Primary Leaf Values ---
 <primary>          ::= <identifier> 
                      | "NUMERICAL_LITERAL" 
                      | "STRING_LITERAL" 
+                     | "TRUE"
+                     | "FALSE"
                      | "(" <expression> ")" 
+                     | <struct_init>
 
 ;; --- Argument List Helper ---
 <argument_list>    ::= <expression> <argument_rest> | ""

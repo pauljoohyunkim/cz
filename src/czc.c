@@ -112,8 +112,27 @@ int main(int argc, char** argv) {
         goto error_cleanup_exit;
     }
 
-    //printf("--- Global Environment ---\n");
-    //cz_environment_print(sa->global_env, 0);
+    printf("--- Global Environment ---\n");
+    cz_environment_print(sa->global_env, 0, false);
+    // Print function body environments
+    if (sa->program && sa->program->program.global_declaration_list) {
+        for (unsigned int i = 0; i < sa->program->program.declaration_count; i++) {
+            const CZ_AST_Node* decl = sa->program->program.global_declaration_list[i];
+            if (decl && decl->node_type == CZ_AST_FunctionDeclarationNodeType) {
+                const char* func_name = decl->function_declaration.function_identifier->identifier.name;
+                if (decl->function_declaration.body &&
+                    decl->function_declaration.body->statement_list.scope) {
+                    printf("\n--- Function '%s' Body Environment (scope level %u) ---\n",
+                           func_name,
+                           decl->function_declaration.body->statement_list.scope->scope_level);
+                    cz_environment_print(decl->function_declaration.body->statement_list.scope, 0, false);
+                }
+            }
+        }
+    }
+    printf("\n--- Global Type Table ---\n");
+    cz_global_type_table_print(sa->gtt);
+
     //ret = cz_semantic_analyzer_full_analyze(sa);
     //if (ret != 1) {
     //    printf("Failure semantic analysis (pass II)\n");

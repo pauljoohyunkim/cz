@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "cz_type.h"
@@ -49,6 +50,8 @@ void cz_struct_layout_free(CZ_StructLayout* layout) {
 
             // Type is owned by type table.
             layout->fields[i].type = NULL;
+
+            layout->fields[i].default_initializer = NULL;
         }
         free(layout->fields);
         layout->fields = NULL;
@@ -89,6 +92,7 @@ CZ_GlobalTypeTable* cz_global_type_table_create(void) {
     CZ_GlobalTypeTable* gtt = NULL;
     CZ_Type** named_types = NULL;
     CZ_Type** all_allocations = NULL;
+    CZ_Type* primitive_type = NULL;
     const char** names = NULL;
 
     gtt = (CZ_GlobalTypeTable*) calloc(1, sizeof(CZ_GlobalTypeTable));
@@ -105,12 +109,41 @@ CZ_GlobalTypeTable* cz_global_type_table_create(void) {
     names = (const char**) calloc(gtt->named_entry_capacity, sizeof(const char*));
 
     // Link them
-    gtt->named_types = named_types;
+    gtt->named_types = (const CZ_Type**) named_types;
     named_types = NULL;
-    gtt->all_allocations = all_allocations;
+    gtt->all_allocations = (const CZ_Type**) all_allocations;
     all_allocations = NULL;
     gtt->names = names;
     names = NULL;
+
+    // Create int32
+    {
+        primitive_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+        primitive_type->primitive = CZ_PRIMITIVE_INT32;
+        if (cz_global_type_table_push_type(gtt, "int32", primitive_type) != 1) {
+            goto error_cleanup;
+        }
+        primitive_type = NULL;
+    }
+    // Create bool
+    {
+        primitive_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+        primitive_type->primitive = CZ_PRIMITIVE_BOOL;
+        if (cz_global_type_table_push_type(gtt, "bool", primitive_type) != 1) {
+            goto error_cleanup;
+        }
+        primitive_type = NULL;
+    }
+    // Create float
+    {
+        primitive_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+        primitive_type->primitive = CZ_PRIMITIVE_FLOAT;
+        if (cz_global_type_table_push_type(gtt, "float", primitive_type) != 1) {
+            goto error_cleanup;
+        }
+        primitive_type = NULL;
+    }
+
 
     return gtt;
 
@@ -119,6 +152,7 @@ error_cleanup:
     free(named_types);
     free(all_allocations);
     free(names);
+    cz_type_free(primitive_type);
     return NULL;
 }
 
@@ -132,7 +166,7 @@ void cz_global_type_table_free(CZ_GlobalTypeTable* gtt) {
         free(gtt->names);
         free(gtt->named_types);
         for (unsigned int i = 0; i < gtt->all_entry_count; i++) {
-            cz_type_free(gtt->all_allocations[i]);
+            cz_type_free((CZ_Type*)gtt->all_allocations[i]);
             gtt->all_allocations[i] = NULL;
         }
         free(gtt->all_allocations);
@@ -143,8 +177,8 @@ void cz_global_type_table_free(CZ_GlobalTypeTable* gtt) {
 
 int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, const CZ_Type* type) {
     const char** new_names = NULL;
-    CZ_Type** new_named_types = NULL;
-    CZ_Type** new_all_allocations = NULL;
+    const CZ_Type** new_named_types = NULL;
+    const CZ_Type** new_all_allocations = NULL;
     NULL_POINTER_TO_GOTO(gtt, error_cleanup);
     NULL_POINTER_TO_GOTO(type, error_cleanup);
 
@@ -155,10 +189,10 @@ int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, co
     if (lookup_type == NULL) {
         // All allocation
         if (gtt->all_allocations_capacity == gtt->all_entry_count) {
-            new_all_allocations = (CZ_Type**) realloc(gtt->all_allocations, sizeof(CZ_Type*) * (gtt->all_allocations_capacity) * 2);
+            new_all_allocations = realloc(gtt->all_allocations, sizeof(const CZ_Type*) * (gtt->all_allocations_capacity) * 2);
             NULL_POINTER_TO_GOTO(new_all_allocations, error_cleanup);
 
-            gtt->all_allocations = new_all_allocations;
+            gtt->all_allocations = (const CZ_Type**) new_all_allocations;
             new_all_allocations = NULL;
             gtt->all_allocations_capacity *= 2;
         }
@@ -175,12 +209,12 @@ int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, co
             new_names = (const char**) realloc(gtt->names, sizeof(const char*) * (gtt->named_entry_capacity) * 2);
             NULL_POINTER_TO_GOTO(new_names, error_cleanup);
 
-            new_named_types = (CZ_Type**) realloc(gtt->named_types, sizeof(CZ_Type*) * (gtt->named_entry_capacity) * 2);
+            new_named_types = (const CZ_Type**) realloc(gtt->named_types, sizeof(const CZ_Type*) * (gtt->named_entry_capacity) * 2);
             NULL_POINTER_TO_GOTO(new_named_types, error_cleanup);
 
             gtt->names = new_names;
             new_names = NULL;
-            gtt->named_types = new_named_types;
+            gtt->named_types = (const CZ_Type**) new_named_types;
             new_named_types = NULL;
             gtt->named_entry_capacity *= 2;
         }
@@ -199,7 +233,7 @@ error_cleanup:
     return 0;
 }
 
-static bool cz_type_equals(const CZ_Type* a, const CZ_Type* b) {
+bool cz_type_equals(const CZ_Type* a, const CZ_Type* b) {
     if (a == b) return true; // Fast-path: identical pointers
     if (!a || !b) return false;
     if (a->kind != b->kind) return false;
@@ -259,4 +293,44 @@ const CZ_Type* cz_global_type_table_find_type_by_name(const CZ_GlobalTypeTable* 
     }
 
     return NULL;
+}
+
+void cz_global_type_table_print(const CZ_GlobalTypeTable* gtt) {
+    if (gtt == NULL) {
+        printf("NULL global type table\n");
+        return;
+    }
+
+    printf("Global Type Table:\n");
+    printf("  Named entries (%u/%u):\n", gtt->named_entry_count, gtt->named_entry_capacity);
+    for (unsigned int i = 0; i < gtt->named_entry_count; i++) {
+        printf("    [%u] Name: %s, Type: %p\n", i, gtt->names[i], (void*)gtt->named_types[i]);
+    }
+    printf("  All allocations (%u/%u):\n", gtt->all_entry_count, gtt->all_allocations_capacity);
+    for (unsigned int i = 0; i < gtt->all_entry_count; i++) {
+        printf("    [%u] Type: %p\n", i, (void*)gtt->all_allocations[i]);
+    }
+}
+
+bool cz_type_is_const(const CZ_Type* type) {
+    if (type == NULL) return false;
+    if (type->kind == CZ_TYPE_KIND_CONST) return true;
+    
+    if (type->kind == CZ_TYPE_KIND_REFERENCE) {
+        return cz_type_is_const(type->reference_to);
+    }
+    // TODO: Const array type->array_of here too
+    
+    return false;
+}
+
+bool cz_primitive_type_is_numerical(CZ_PrimitiveType primitive_type) {
+    switch (primitive_type) {
+        case CZ_PRIMITIVE_FLOAT:
+        case CZ_PRIMITIVE_INT32:
+            return true;
+        default:
+            return false;
+    }
+    return false;
 }
