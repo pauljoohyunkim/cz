@@ -172,7 +172,7 @@ error_cleanup:
     return NULL;
 }
 
-const CZ_Type* cz_type_table_get_or_create_const(CZ_GlobalTypeTable* gtt, const CZ_Type* base_type) {
+static const CZ_Type* cz_type_table_get_or_create_const(CZ_GlobalTypeTable* gtt, const CZ_Type* base_type) {
     CZ_Type* const_type = NULL;
     if (gtt == NULL || base_type == NULL) return NULL;
 
@@ -1072,6 +1072,8 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
                 }
             }
 
+            // Set the initializer to a "read-only" default_initializer in field.
+            struct_type->structure.layout->fields[i].default_initializer = member_node->variable_declaration.expression;
         }
     }
 
@@ -1097,6 +1099,7 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
     NULL_POINTER_TO_GOTO(var_symbol, error_cleanup);
     const CZ_Type* var_decl_type = var_symbol->data.value.type;
 
+    const CZ_Type* decayed_lhs_type = cz_semantic_analyzer_decay_operand_type(var_decl_type);
     // 2. Check if there is an initializer.
     // 2.1 If no initializer, check if variable is either const or reference. (If either is true, error)
     if (decl->variable_declaration.expression == NULL) {
@@ -1107,6 +1110,23 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
         }
 
         // Nothing more to check since RHS does not exist.
+        // 5. If variable is struct but it contains reference or const, RHS is required.
+        if (decayed_lhs_type->kind == CZ_TYPE_KIND_STRUCT && decl->variable_declaration.expression == NULL) {
+            for (unsigned int i = 0; i < decayed_lhs_type->structure.layout->field_count; i++) {
+                const CZ_StructField* field = &decayed_lhs_type->structure.layout->fields[i];
+                
+                if ((cz_type_is_const(field->type) || field->type->kind == CZ_TYPE_KIND_REFERENCE) &&
+                    field->default_initializer == NULL) {
+                    
+                    cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+                        "Variable \"%s\" of struct type \"%s\" requires an initializer because field \"%s\" is a reference or const with no default value.",
+                        decl->variable_declaration.identifier->identifier.name,
+                        decayed_lhs_type->structure.name,
+                        field->name);
+                    goto error_cleanup;
+                }
+            }
+        }
         return 1;
     }
     
@@ -1119,6 +1139,12 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
 
     const CZ_AST_Decoration* rhs_decoration = decl->variable_declaration.expression->decoration;
     NULL_POINTER_TO_GOTO(rhs_decoration, error_cleanup);
+    // 3.1. Global initializers must be compile-time constants (constexpr)
+    if (!rhs_decoration->is_constexpr) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+            "Global variable \"%s\" initializer must be a compile-time constant expression.", var_name);
+        goto error_cleanup;
+    }
 
     // 4. If variable is reference
     if (var_decl_type->kind == CZ_TYPE_KIND_REFERENCE) {
@@ -1142,8 +1168,8 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
 
     }
 
-    // 5. If explicit type, do types match after decaying.
-    const CZ_Type* decayed_lhs_type = cz_semantic_analyzer_decay_operand_type(var_decl_type);
+
+    // 6. If explicit type, do types match after decaying.
     const CZ_Type* decayed_rhs_type = cz_semantic_analyzer_decay_operand_type(rhs_decoration->resolved_type);
     if (!cz_type_equals(decayed_lhs_type, decayed_rhs_type)) {
         cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
@@ -1151,8 +1177,10 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
         goto error_cleanup;
     }
     
-    // 6. Update symbol.
+    // 7. Update symbol.
     var_symbol->data.value.is_constexpr = rhs_decoration->is_constexpr && cz_type_is_const(var_symbol->data.value.type);
+
+    return 1;
 
 error_cleanup:
     return 0;
@@ -1318,9 +1346,28 @@ static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_Semantic
         }
     }
 
-    // 6. Decay type match
+    const CZ_Type* decayed_var_type = cz_semantic_analyzer_decay_operand_type(var_type);
+
+    // 6. If variable is struct but it contains reference or const, RHS is required.
+    if (decayed_var_type->kind == CZ_TYPE_KIND_STRUCT && stmt->variable_declaration.expression == NULL) {
+        for (unsigned int i = 0; i < decayed_var_type->structure.layout->field_count; i++) {
+            const CZ_StructField* field = &decayed_var_type->structure.layout->fields[i];
+            
+            if ((cz_type_is_const(field->type) || field->type->kind == CZ_TYPE_KIND_REFERENCE) &&
+                field->default_initializer == NULL) {
+                
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                    "Variable \"%s\" of struct type \"%s\" requires an initializer because field \"%s\" is a reference or const with no default value.",
+                    stmt->variable_declaration.identifier->identifier.name,
+                    decayed_var_type->structure.name,
+                    field->name);
+                goto error_cleanup;
+            }
+        }
+    }
+
+    // 7. Decay type match
     if (stmt->variable_declaration.expression != NULL) {
-        const CZ_Type* decayed_var_type = cz_semantic_analyzer_decay_operand_type(var_type);
         const CZ_Type* decayed_expr_type = cz_semantic_analyzer_decay_operand_type(stmt->variable_declaration.expression->decoration->resolved_type);
         if (!cz_type_equals(decayed_var_type, decayed_expr_type)) {
             cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
@@ -1790,6 +1837,7 @@ static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, 
 static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 
 static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
     NULL_POINTER_TO_GOTO(sa, error_cleanup);
@@ -1824,6 +1872,11 @@ static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Env
             break;
         case CZ_AST_StructMemberAccessNodeType:
             if (cz_semantic_analyzer_check_struct_access(sa, env, expr) != 1) {
+                goto error_cleanup;
+            }
+            break;
+        case CZ_AST_StructInitNodeType:
+            if (cz_semantic_analyzer_check_struct_init(sa, env, expr) != 1) {
                 goto error_cleanup;
             }
             break;
@@ -2270,9 +2323,11 @@ static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer*
     // 2. Decoration
     CZ_ValueCategory value_cat = CZ_VALUE_CATEGORY_LVALUE;
 
-    // A function symbol or a compile-time constant cannot be an L-value (assignable)
-    if (symbol->data.value.type->kind == CZ_TYPE_KIND_FUNCTION || symbol->data.value.is_constexpr) {
+    if (symbol->data.value.type->kind == CZ_TYPE_KIND_FUNCTION) {
         value_cat = CZ_VALUE_CATEGORY_RVALUE;
+    } else {
+        // Both mutable variables AND named const/constexpr variables are L-values!
+        value_cat = CZ_VALUE_CATEGORY_LVALUE;
     }
 
     decor = cz_ast_decoration_create(symbol->data.value.type, value_cat, symbol->data.value.is_constexpr, symbol->data.value.type->kind == CZ_TYPE_KIND_REFERENCE, symbol->scope_level);
@@ -2366,8 +2421,174 @@ static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_
     return 1;
 
 error_cleanup:
-    if (decor != NULL) {
-        cz_ast_decoration_free(decor);
+    cz_ast_decoration_free(decor);
+    return 0;
+}
+
+static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
+    CZ_AST_Decoration* decor = NULL;
+    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(expr, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_StructInitNodeType, error_cleanup);
+
+    // Reduce chain: expr->struct_declaration.identifier->identifier.name
+    const CZ_AST_Node* struct_id_node = expr->struct_declaration.identifier;
+    const char* struct_name = struct_id_node->identifier.name;
+
+    // 1. Look up struct and check if it is a valid struct.
+    const CZ_Type* struct_lookup = cz_global_type_table_find_type_by_name(sa->gtt, struct_name);
+    if (struct_lookup == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+        "Symbol %s is not defined.", struct_name);
+        goto error_cleanup;
     }
+    if (struct_lookup->kind != CZ_TYPE_KIND_STRUCT) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+        "\"%s\" is not a struct.", struct_name);
+        goto error_cleanup;
+    }
+
+    // Reduce chain: expr->struct_declaration.member_count and struct_lookup->structure.layout->field_count
+    const unsigned int member_count = expr->struct_declaration.member_count;
+    const unsigned int field_count = struct_lookup->structure.layout->field_count;
+
+    if (member_count > field_count) {
+        cz_error_list_push_error(
+            sa->error_list, sa->filename, expr->line, expr->col,
+            "There are only %d members in struct %s, but %d initializer "
+            "members given",
+            field_count, struct_name,
+            member_count);
+        goto error_cleanup;
+    }
+
+
+    // 2. Check that all const and reference initializers are actually given.
+    // 2.1 All parameters are optional except for reference and const.
+    for (unsigned int i = 0; i < field_count; i++) {
+        const CZ_StructField* field = &struct_lookup->structure.layout->fields[i];
+        const CZ_Type* field_type = field->type;
+        if ((cz_type_is_const(field_type) || field_type->kind == CZ_TYPE_KIND_REFERENCE) &&
+             field->default_initializer == NULL) {
+            // Currently field is either const or reference, but default initializer is not given.
+            // Check if it is part of the initializers.
+            const char* field_name = field->name;
+            bool found = false;
+            for (unsigned int j = 0; j < member_count; j++) {
+                // Reduce chain: expr->struct_declaration.members[j]->struct_init_member.identifier->identifier.name
+                const CZ_AST_Node* member_node = expr->struct_declaration.members[j];
+                const CZ_AST_Node* member_id_node = member_node->struct_init_member.identifier;
+                const char* member_name = member_id_node->identifier.name;
+                if (member_name == field_name || strcmp(member_name, field_name) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+                "Initializer %s for struct %s is required.", field_name, struct_name);
+                goto error_cleanup;
+            }
+        }
+
+    }
+
+    bool initializer_is_constexpr = true;
+    // 3. For each initializer check with the struct definition
+    for (unsigned int i = 0; i < member_count; i++) {
+        // 3.1 Check duplicate member in initializer
+        // Reduce chain: expr->struct_declaration.members[i]->struct_init_member.identifier->identifier.name
+        const CZ_AST_Node* member_node_i = expr->struct_declaration.members[i];
+        const CZ_AST_Node* member_id_node_i = member_node_i->struct_init_member.identifier;
+        const char* member_name = member_id_node_i->identifier.name;
+        for (unsigned int j = 0; j < i; j++) {
+            // Reduce chain: expr->struct_declaration.members[j]->struct_init_member.identifier->identifier.name
+            const CZ_AST_Node* member_node_j = expr->struct_declaration.members[j];
+            const CZ_AST_Node* member_id_node_j = member_node_j->struct_init_member.identifier;
+            const char* prev_member_name = member_id_node_j->identifier.name;
+            if (member_name == prev_member_name || strcmp(member_name, prev_member_name) == 0) {
+                cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+                "Initializer member %s is given duplicate.", struct_name);
+                goto error_cleanup;
+            }
+        }
+        // 3.2 Correct member names.
+        int member_field_idx = -1;
+        for (unsigned int j = 0; j < field_count; j++) {
+            if (struct_lookup->structure.layout->fields[j].name == member_name ||
+                strcmp(struct_lookup->structure.layout->fields[j].name, member_name) == 0) {
+                member_field_idx = j;
+                break;
+            }
+        }
+        if (member_field_idx < 0) {
+            cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+            "Member name %s is not valid.", member_name);
+            goto error_cleanup;
+        }
+
+        // 3.3. Check and match type with the struct member definitions
+        // Reduce chain: expr->struct_declaration.members[i]->struct_init_member.expression
+        const CZ_AST_Node* member_expr = expr->struct_declaration.members[i]->struct_init_member.expression;
+        if (cz_semantic_analyzer_check_expression(sa, env, member_expr) != 1) {
+            goto error_cleanup;
+        }
+        // Reduce chain: expr->struct_declaration.members[i]->struct_init_member.expression->decoration
+        const CZ_AST_Decoration* member_init_decor = member_expr->decoration;
+        NULL_POINTER_TO_GOTO(member_init_decor, error_cleanup);
+        // 3.3.1 Fields should match in decay types.
+        const CZ_Type* decay_member_init_type = cz_semantic_analyzer_decay_operand_type(member_init_decor->resolved_type);
+        // Reduce chain: struct_lookup->structure.layout->fields[member_field_idx].type
+        const CZ_Type* field_type = struct_lookup->structure.layout->fields[member_field_idx].type;
+        const CZ_Type* decay_field_type = cz_semantic_analyzer_decay_operand_type(field_type);
+        if (!cz_type_equals(decay_member_init_type, decay_field_type)) {
+            cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+            "Type for initializer of member \"%s\" does not match the declared type.", member_name);
+            goto error_cleanup;
+        }
+        // Reduce chain: struct_lookup->structure.layout->fields[member_field_idx].type->kind
+        if (field_type->kind == CZ_TYPE_KIND_REFERENCE) {
+            // 3.3.2 If field type is reference, initializer must be an l-value
+            if (member_init_decor->value_category != CZ_VALUE_CATEGORY_LVALUE) {
+                cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+                "Initializer of member \"%s\" is declared as reference, and l-value initializer is required", member_name);
+                goto error_cleanup;
+            }
+
+            // 3.3.3 If field type is not const, then initializer must not be const.
+            // Reduce chain: struct_lookup->structure.layout->fields[member_field_idx].type
+            // Reduce chain: member_init_decor->resolved_type
+            if (!cz_type_is_const(field_type) &&
+                cz_type_is_const(member_init_decor->resolved_type)) {
+                cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+                "Initializer of member \"%s\" is declared as reference, and initializer is const", member_name);
+                goto error_cleanup;
+
+            }
+        }
+        if (!member_init_decor->is_constexpr) {
+            initializer_is_constexpr = false;
+        }
+    }
+
+    decor = cz_ast_decoration_create(struct_lookup,
+        CZ_VALUE_CATEGORY_RVALUE,
+        initializer_is_constexpr,
+        false,
+        env->scope_level);
+    if (decor == NULL) {
+        cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
+            "Allocating AST decorator failure.");
+        goto error_cleanup;
+    }
+
+    expr->decoration = decor;
+    decor = NULL;
+
+    return 1;
+
+error_cleanup:
+    cz_ast_decoration_free(decor);
     return 0;
 }

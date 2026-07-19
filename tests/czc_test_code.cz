@@ -1,13 +1,10 @@
-struct Vector {
-    x :: int32;
-    y :: int32;
-}
 
-func get_x :: (v :: Vector&) -> int32 {
-    return v.x;
-}
+typedef int32 Handle;
+typedef Handle UserHandle;
+newtype int32 UID;
 
-func incr_x :: (v :: Vector&) -> int32 {
-    new_x :: int32 = v.x + 1;
-    return new_x;
+func bootstrap_id :: () {
+    raw_id :: UserHandle = 1024;
+
+    user_id :: UID = raw_id as UID;
 }
