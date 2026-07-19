@@ -1805,19 +1805,21 @@ static int cz_semantic_analyzer_check_function_call_expression(CZ_SemanticAnalyz
     NULL_POINTER_TO_GOTO(expr, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_FunctionCallNodeType, error_cleanup);
 
-    // 1. Check callee and see if it a function (will support things like (f(3))(2))
+    // 1. Check callee and see if it is a function (supports higher-order expressions like (f(3))(2))
     if (cz_semantic_analyzer_check_expression(sa, env, expr->function_call.callee) != 1) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
             "Function callee type could not be deduced.");
         goto error_cleanup;
     }
+    
     // 2. Check if it is function.
     if (expr->function_call.callee->decoration->resolved_type->kind != CZ_TYPE_KIND_FUNCTION) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
             "Callee is not a function.");
         goto error_cleanup;
     }
-    // 3. Param count.
+    
+    // 3. Param count validation.
     if (expr->function_call.callee->decoration->resolved_type->function.param_count != expr->function_call.arg_count) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
             "Function expects %d arguments but only received %d arguments.",
@@ -1825,14 +1827,17 @@ static int cz_semantic_analyzer_check_function_call_expression(CZ_SemanticAnalyz
             expr->function_call.arg_count);
         goto error_cleanup;
     }
+    
     unsigned int param_count = expr->function_call.callee->decoration->resolved_type->function.param_count;
-    // 4. Argument type check
+    
+    // 4. Argument type checking loop
     for (unsigned int i = 0; i < param_count; i++) {
         if (cz_semantic_analyzer_check_expression(sa, env, expr->function_call.arguments[i]) != 1) {
             cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
                 "Function argument type could not be deduced.");
             goto error_cleanup;
         }
+        
         // 4.1 Decayed type check
         const CZ_Type* param_type = expr->function_call.callee->decoration->resolved_type->function.param_types[i];
         const CZ_Type* arg_type = expr->function_call.arguments[i]->decoration->resolved_type;
@@ -1840,39 +1845,44 @@ static int cz_semantic_analyzer_check_function_call_expression(CZ_SemanticAnalyz
         const CZ_Type* decayed_arg_type = cz_semantic_analyzer_decay_operand_type(arg_type);
         if (!cz_type_equals(decayed_param_type, decayed_arg_type)) {
             cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
-                "Function argument does not match.");
+                "Function argument does not match parameter type.");
             goto error_cleanup;
         }
-        // 4.2 If parameter is reference
+        
+        // 4.2 Reference Semantics Enforcement
         if (param_type->kind == CZ_TYPE_KIND_REFERENCE) {
-            // 4.2.1 Argument must be l-value.
+            // 4.2.1 Argument must be an assignable l-value
             if (expr->function_call.arguments[i]->decoration->value_category != CZ_VALUE_CATEGORY_LVALUE) {
                 cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
                     "Function parameter is reference, but argument passed is not an l-value.");
                 goto error_cleanup;
             }
 
-            // 4.2.2 If argument is const, then param type must not be mutable.
+            // 4.2.2 Check mutability compatibility (Prevent casting away constness)
             if (cz_type_is_const(arg_type) && !cz_type_is_const(param_type)) {
                 cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
                     "Function is defined with mutable parameter but you passed a const argument. Cannot cast away constness.");
                 goto error_cleanup;
             }
-
         }
     }
 
-    decor = cz_ast_decoration_create(expr->function_call.callee->decoration->resolved_type->function.return_type,
-        CZ_VALUE_CATEGORY_RVALUE,
-        false,
-        expr->function_call.callee->decoration->resolved_type->function.return_type->kind != CZ_TYPE_KIND_REFERENCE,
-        env->scope_level);
+    // 5. Determine if returning a reference context (LVALUE) or copy context (RVALUE)
+    const CZ_Type* return_type = expr->function_call.callee->decoration->resolved_type->function.return_type;
+    CZ_ValueCategory value_cat = (return_type->kind == CZ_TYPE_KIND_REFERENCE) ? CZ_VALUE_CATEGORY_LVALUE : CZ_VALUE_CATEGORY_RVALUE;
+
+    decor = cz_ast_decoration_create(
+        return_type,
+        value_cat,
+        false, // is_constexpr (Function results are computed at runtime)
+        return_type->kind == CZ_TYPE_KIND_REFERENCE, 
+        env->scope_level
+    );
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;
     }
 
-    // Transfer decoration
     expr->decoration = decor;
     decor = NULL;
 
