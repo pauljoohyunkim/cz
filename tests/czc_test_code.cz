@@ -3,6 +3,10 @@ struct Vector {
     y :: int32&;
 }
 
+y :: int32 = 1;
+
 func testfunc :: () -> int32 {
-    v :: Vector;
+    v :: Vector = Vector {
+        .y = y
+    };
 }

@@ -1099,6 +1099,7 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
     NULL_POINTER_TO_GOTO(var_symbol, error_cleanup);
     const CZ_Type* var_decl_type = var_symbol->data.value.type;
 
+    const CZ_Type* decayed_lhs_type = cz_semantic_analyzer_decay_operand_type(var_decl_type);
     // 2. Check if there is an initializer.
     // 2.1 If no initializer, check if variable is either const or reference. (If either is true, error)
     if (decl->variable_declaration.expression == NULL) {
@@ -1109,6 +1110,23 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
         }
 
         // Nothing more to check since RHS does not exist.
+        // 5. If variable is struct but it contains reference or const, RHS is required.
+        if (decayed_lhs_type->kind == CZ_TYPE_KIND_STRUCT && decl->variable_declaration.expression == NULL) {
+            for (unsigned int i = 0; i < decayed_lhs_type->structure.layout->field_count; i++) {
+                const CZ_StructField* field = &decayed_lhs_type->structure.layout->fields[i];
+                
+                if ((cz_type_is_const(field->type) || field->type->kind == CZ_TYPE_KIND_REFERENCE) &&
+                    field->default_initializer == NULL) {
+                    
+                    cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+                        "Variable \"%s\" of struct type \"%s\" requires an initializer because field \"%s\" is a reference or const with no default value.",
+                        decl->variable_declaration.identifier->identifier.name,
+                        decayed_lhs_type->structure.name,
+                        field->name);
+                    goto error_cleanup;
+                }
+            }
+        }
         return 1;
     }
     
@@ -1121,6 +1139,12 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
 
     const CZ_AST_Decoration* rhs_decoration = decl->variable_declaration.expression->decoration;
     NULL_POINTER_TO_GOTO(rhs_decoration, error_cleanup);
+    // 3.1. Global initializers must be compile-time constants (constexpr)
+    if (!rhs_decoration->is_constexpr) {
+        cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
+            "Global variable \"%s\" initializer must be a compile-time constant expression.", var_name);
+        goto error_cleanup;
+    }
 
     // 4. If variable is reference
     if (var_decl_type->kind == CZ_TYPE_KIND_REFERENCE) {
@@ -1144,8 +1168,8 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
 
     }
 
-    // 5. If explicit type, do types match after decaying.
-    const CZ_Type* decayed_lhs_type = cz_semantic_analyzer_decay_operand_type(var_decl_type);
+
+    // 6. If explicit type, do types match after decaying.
     const CZ_Type* decayed_rhs_type = cz_semantic_analyzer_decay_operand_type(rhs_decoration->resolved_type);
     if (!cz_type_equals(decayed_lhs_type, decayed_rhs_type)) {
         cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
@@ -1153,8 +1177,10 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
         goto error_cleanup;
     }
     
-    // 6. Update symbol.
+    // 7. Update symbol.
     var_symbol->data.value.is_constexpr = rhs_decoration->is_constexpr && cz_type_is_const(var_symbol->data.value.type);
+
+    return 1;
 
 error_cleanup:
     return 0;
@@ -1320,9 +1346,28 @@ static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_Semantic
         }
     }
 
-    // 6. Decay type match
+    const CZ_Type* decayed_var_type = cz_semantic_analyzer_decay_operand_type(var_type);
+
+    // 6. If variable is struct but it contains reference or const, RHS is required.
+    if (decayed_var_type->kind == CZ_TYPE_KIND_STRUCT && stmt->variable_declaration.expression == NULL) {
+        for (unsigned int i = 0; i < decayed_var_type->structure.layout->field_count; i++) {
+            const CZ_StructField* field = &decayed_var_type->structure.layout->fields[i];
+            
+            if ((cz_type_is_const(field->type) || field->type->kind == CZ_TYPE_KIND_REFERENCE) &&
+                field->default_initializer == NULL) {
+                
+                cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
+                    "Variable \"%s\" of struct type \"%s\" requires an initializer because field \"%s\" is a reference or const with no default value.",
+                    stmt->variable_declaration.identifier->identifier.name,
+                    decayed_var_type->structure.name,
+                    field->name);
+                goto error_cleanup;
+            }
+        }
+    }
+
+    // 7. Decay type match
     if (stmt->variable_declaration.expression != NULL) {
-        const CZ_Type* decayed_var_type = cz_semantic_analyzer_decay_operand_type(var_type);
         const CZ_Type* decayed_expr_type = cz_semantic_analyzer_decay_operand_type(stmt->variable_declaration.expression->decoration->resolved_type);
         if (!cz_type_equals(decayed_var_type, decayed_expr_type)) {
             cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
