@@ -668,21 +668,6 @@ error_cleanup:
 /* --- PASS 2 ---*/
 // Needs to check for constness, constexpr, and references.
 
-/**
- * @brief Simple helper for stripping const and reference.
- * 
- * @param type Pointer to CZ_Type
- * @return const CZ_Type* Pointer to unwrapped CZ_Type.
- */
-static const CZ_Type* cz_semantic_analyzer_decay_operand_type(const CZ_Type* type) {
-    if (type->kind == CZ_TYPE_KIND_REFERENCE) {
-        type = type->reference_to;
-    }
-    if (type->kind == CZ_TYPE_KIND_CONST) {
-        type = type->const_of;
-    }
-    return type;
-}
 static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
 static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
 static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
@@ -1047,8 +1032,8 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
             }
 
             // 3.2.2 Decay type match
-            const CZ_Type* decay_member_type = cz_semantic_analyzer_decay_operand_type(field_type);
-            const CZ_Type* decay_expr_type = cz_semantic_analyzer_decay_operand_type(initializer_decor->resolved_type);
+            const CZ_Type* decay_member_type = cz_type_decay_type(field_type);
+            const CZ_Type* decay_expr_type = cz_type_decay_type(initializer_decor->resolved_type);
             if (!cz_type_equals(decay_member_type, decay_expr_type)) {
                 cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Type for member and initializer for member idx %d does not match.", i+1);
                 goto error_cleanup;
@@ -1099,7 +1084,7 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
     NULL_POINTER_TO_GOTO(var_symbol, error_cleanup);
     const CZ_Type* var_decl_type = var_symbol->data.value.type;
 
-    const CZ_Type* decayed_lhs_type = cz_semantic_analyzer_decay_operand_type(var_decl_type);
+    const CZ_Type* decayed_lhs_type = cz_type_decay_type(var_decl_type);
     // 2. Check if there is an initializer.
     // 2.1 If no initializer, check if variable is either const or reference. (If either is true, error)
     if (decl->variable_declaration.expression == NULL) {
@@ -1170,7 +1155,7 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
 
 
     // 6. If explicit type, do types match after decaying.
-    const CZ_Type* decayed_rhs_type = cz_semantic_analyzer_decay_operand_type(rhs_decoration->resolved_type);
+    const CZ_Type* decayed_rhs_type = cz_type_decay_type(rhs_decoration->resolved_type);
     if (!cz_type_equals(decayed_lhs_type, decayed_rhs_type)) {
         cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
             "Variable  \"%s\" type does not match the type of RHS.", var_name);
@@ -1346,7 +1331,7 @@ static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_Semantic
         }
     }
 
-    const CZ_Type* decayed_var_type = cz_semantic_analyzer_decay_operand_type(var_type);
+    const CZ_Type* decayed_var_type = cz_type_decay_type(var_type);
 
     // 6. If variable is struct but it contains reference or const, RHS is required.
     if (decayed_var_type->kind == CZ_TYPE_KIND_STRUCT && stmt->variable_declaration.expression == NULL) {
@@ -1368,7 +1353,7 @@ static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_Semantic
 
     // 7. Decay type match
     if (stmt->variable_declaration.expression != NULL) {
-        const CZ_Type* decayed_expr_type = cz_semantic_analyzer_decay_operand_type(stmt->variable_declaration.expression->decoration->resolved_type);
+        const CZ_Type* decayed_expr_type = cz_type_decay_type(stmt->variable_declaration.expression->decoration->resolved_type);
         if (!cz_type_equals(decayed_var_type, decayed_expr_type)) {
             cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
                 "Declared type for \"%s\" does not match the decayed type of initializer.", var_name);
@@ -1468,8 +1453,8 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
     NULL_POINTER_TO_GOTO(bool_type, error_cleanup);
 
     // Decay and strip const for operation validation (same as binary expression checker)
-    const CZ_Type* decayed_lhs_type = cz_semantic_analyzer_decay_operand_type(lhs_type);
-    const CZ_Type* decayed_rhs_type = cz_semantic_analyzer_decay_operand_type(rhs_type);
+    const CZ_Type* decayed_lhs_type = cz_type_decay_type(lhs_type);
+    const CZ_Type* decayed_rhs_type = cz_type_decay_type(rhs_type);
     NULL_POINTER_TO_GOTO(decayed_lhs_type, error_cleanup);
     NULL_POINTER_TO_GOTO(decayed_rhs_type, error_cleanup);
 
@@ -1635,9 +1620,9 @@ static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, 
     }
 
     // 2. Decay type match
-    const CZ_Type* decayed_return_type = cz_semantic_analyzer_decay_operand_type(sa->current_function_return);
+    const CZ_Type* decayed_return_type = cz_type_decay_type(sa->current_function_return);
     NULL_POINTER_TO_GOTO(decayed_return_type, error_cleanup);
-    const CZ_Type* decayed_expr_type = cz_semantic_analyzer_decay_operand_type(stmt->return_statement.expression->decoration->resolved_type);
+    const CZ_Type* decayed_expr_type = cz_type_decay_type(stmt->return_statement.expression->decoration->resolved_type);
     NULL_POINTER_TO_GOTO(decayed_expr_type, error_cleanup);
     if (!cz_type_equals(decayed_return_type, decayed_expr_type)) {
         cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
@@ -1698,7 +1683,7 @@ static int cz_semantic_analyzer_check_if_statement(CZ_SemanticAnalyzer* sa, CZ_E
             "Could not check the type inside the if condition");
         goto error_cleanup;
     }
-    const CZ_Type* decayed_condition_type = cz_semantic_analyzer_decay_operand_type(stmt->if_statement.condition->decoration->resolved_type);
+    const CZ_Type* decayed_condition_type = cz_type_decay_type(stmt->if_statement.condition->decoration->resolved_type);
     NULL_POINTER_TO_GOTO(decayed_condition_type, error_cleanup);
     if (decayed_condition_type->kind != CZ_TYPE_KIND_PRIMITIVE || decayed_condition_type->primitive != CZ_PRIMITIVE_BOOL) {
         cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
@@ -1765,7 +1750,7 @@ static int cz_semantic_analyzer_check_for_statement(CZ_SemanticAnalyzer* sa, CZ_
                 "Could not check the type inside the for condition");
             goto error_cleanup;
         }
-        const CZ_Type* decayed_condition_type = cz_semantic_analyzer_decay_operand_type(stmt->for_statement.condition->decoration->resolved_type);
+        const CZ_Type* decayed_condition_type = cz_type_decay_type(stmt->for_statement.condition->decoration->resolved_type);
         NULL_POINTER_TO_GOTO(decayed_condition_type, error_cleanup);
         if (decayed_condition_type->kind != CZ_TYPE_KIND_PRIMITIVE || decayed_condition_type->primitive != CZ_PRIMITIVE_BOOL) {
             cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
@@ -1810,7 +1795,7 @@ static int cz_semantic_analyzer_check_while_statement(CZ_SemanticAnalyzer* sa, C
             "Could not check the type inside the while condition");
         goto error_cleanup;
     }
-    const CZ_Type* decayed_condition_type = cz_semantic_analyzer_decay_operand_type(stmt->while_statement.condition->decoration->resolved_type);
+    const CZ_Type* decayed_condition_type = cz_type_decay_type(stmt->while_statement.condition->decoration->resolved_type);
     NULL_POINTER_TO_GOTO(decayed_condition_type, error_cleanup);
     if (decayed_condition_type->kind != CZ_TYPE_KIND_PRIMITIVE || decayed_condition_type->primitive != CZ_PRIMITIVE_BOOL) {
         cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
@@ -1941,8 +1926,8 @@ static int cz_semantic_analyzer_check_function_call_expression(CZ_SemanticAnalyz
         // 4.1 Decayed type check
         const CZ_Type* param_type = expr->function_call.callee->decoration->resolved_type->function.param_types[i];
         const CZ_Type* arg_type = expr->function_call.arguments[i]->decoration->resolved_type;
-        const CZ_Type* decayed_param_type = cz_semantic_analyzer_decay_operand_type(param_type);
-        const CZ_Type* decayed_arg_type = cz_semantic_analyzer_decay_operand_type(arg_type);
+        const CZ_Type* decayed_param_type = cz_type_decay_type(param_type);
+        const CZ_Type* decayed_arg_type = cz_type_decay_type(arg_type);
         if (!cz_type_equals(decayed_param_type, decayed_arg_type)) {
             cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
                 "Function argument does not match parameter type.");
@@ -2020,8 +2005,8 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
     const CZ_Type* rhs_type = rhs_node->decoration->resolved_type;
 
     // Strip away reference and const.
-    lhs_type = cz_semantic_analyzer_decay_operand_type(lhs_type);
-    rhs_type = cz_semantic_analyzer_decay_operand_type(rhs_type);
+    lhs_type = cz_type_decay_type(lhs_type);
+    rhs_type = cz_type_decay_type(rhs_type);
 
     if (lhs_type->kind != CZ_TYPE_KIND_PRIMITIVE || rhs_type->kind != CZ_TYPE_KIND_PRIMITIVE) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
@@ -2196,7 +2181,7 @@ static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, 
     const CZ_Type* operand_type = operand_node->decoration->resolved_type;
 
     // Decay and strip const
-    operand_type = cz_semantic_analyzer_decay_operand_type(operand_type);
+    operand_type = cz_type_decay_type(operand_type);
 
     if (operand_type->kind != CZ_TYPE_KIND_PRIMITIVE) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Invalid type. (Even after stripping reference and const, not a primitive)");
@@ -2368,7 +2353,7 @@ static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_
 
     // 2. Decay check base expression to strip references safely
     const CZ_Type* struct_type = expr->struct_member_access.object->decoration->resolved_type;
-    const CZ_Type* decayed_struct_type = cz_semantic_analyzer_decay_operand_type(struct_type);
+    const CZ_Type* decayed_struct_type = cz_type_decay_type(struct_type);
     NULL_POINTER_TO_GOTO(decayed_struct_type, error_cleanup);
     
     if (decayed_struct_type->kind != CZ_TYPE_KIND_STRUCT) {
@@ -2544,10 +2529,10 @@ static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_En
         const CZ_AST_Decoration* member_init_decor = member_expr->decoration;
         NULL_POINTER_TO_GOTO(member_init_decor, error_cleanup);
         // 3.3.1 Fields should match in decay types.
-        const CZ_Type* decay_member_init_type = cz_semantic_analyzer_decay_operand_type(member_init_decor->resolved_type);
+        const CZ_Type* decay_member_init_type = cz_type_decay_type(member_init_decor->resolved_type);
         // Reduce chain: struct_lookup->structure.layout->fields[member_field_idx].type
         const CZ_Type* field_type = struct_lookup->structure.layout->fields[member_field_idx].type;
-        const CZ_Type* decay_field_type = cz_semantic_analyzer_decay_operand_type(field_type);
+        const CZ_Type* decay_field_type = cz_type_decay_type(field_type);
         if (!cz_type_equals(decay_member_init_type, decay_field_type)) {
             cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
             "Type for initializer of member \"%s\" does not match the declared type.", member_name);
@@ -2626,8 +2611,8 @@ static int cz_semantic_analyzer_cast_expression(CZ_SemanticAnalyzer* sa, CZ_Envi
     }
 
     // 2. Unwrap and check
-    const CZ_Type* decayed_expr_type = cz_semantic_analyzer_decay_operand_type(expr->cast_expression.expression->decoration->resolved_type);
-    const CZ_Type* decayed_target_type = cz_semantic_analyzer_decay_operand_type(target_type);
+    const CZ_Type* decayed_expr_type = cz_type_decay_type(expr->cast_expression.expression->decoration->resolved_type);
+    const CZ_Type* decayed_target_type = cz_type_decay_type(target_type);
     NULL_POINTER_TO_GOTO(decayed_expr_type, error_cleanup);
     NULL_POINTER_TO_GOTO(decayed_target_type, error_cleanup);
     if ((decayed_expr_type->kind != CZ_TYPE_KIND_PRIMITIVE && decayed_expr_type->kind != CZ_TYPE_KIND_NEWTYPE) ||

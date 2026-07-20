@@ -192,6 +192,14 @@ bool cz_type_is_const(const CZ_Type* type);
  */
 bool cz_primitive_type_is_numerical(CZ_PrimitiveType primitive_type);
 
+/**
+ * @brief Strips const and reference modifiers from a type.
+ * 
+ * @param type Pointer to CZ_Type
+ * @return const CZ_Type* Pointer to the base type (with const and reference removed).
+ */
+const CZ_Type* cz_type_decay_type(const CZ_Type* type);
+
 #ifdef __cplusplus
 }
 #endif

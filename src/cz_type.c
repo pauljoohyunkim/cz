@@ -334,3 +334,13 @@ bool cz_primitive_type_is_numerical(CZ_PrimitiveType primitive_type) {
     }
     return false;
 }
+
+const CZ_Type* cz_type_decay_type(const CZ_Type* type) {
+    if (type->kind == CZ_TYPE_KIND_REFERENCE) {
+        type = type->reference_to;
+    }
+    if (type->kind == CZ_TYPE_KIND_CONST) {
+        type = type->const_of;
+    }
+    return type;
+}

@@ -190,13 +190,20 @@ void cz_code_generator_free(CZ_CodeGenerator* cg) {
     LLVMShutdown();
 }
 
-static int cz_code_generator_register_type_mapping(CZ_CodeGenerator* cg, CZ_Environment* env, const CZ_AST_Node* node);
+int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenerator* cg);
 
 int cz_code_generator_generate(CZ_CodeGenerator* cg) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
     NULL_POINTER_TO_GOTO(cg->program, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(cg->program, CZ_AST_ProgramNodeType, error_cleanup);
     NULL_POINTER_TO_GOTO(cg->program->program.global_declaration_list, error_cleanup);
+
+    // Pass 1 to build type map. (Primitive & Opaque Struct)
+    if (cz_code_generator_fill_type_map_primitive_opaque_struct(cg) != 1) {
+        goto error_cleanup;
+    }
+    
+    // Pass 2 to build type map. (Reference & Struct Body)
 
     for (unsigned int i = 0; i < cg->program->program.declaration_count; i++) {
         const CZ_AST_Node* statement = cg->program->program.global_declaration_list[i];
@@ -214,7 +221,7 @@ int cz_code_generator_generate(CZ_CodeGenerator* cg) {
                 break;
             case CZ_AST_TypedefDeclarationNodeType:
             case CZ_AST_NewtypeDeclarationNodeType:
-                cz_code_generator_register_type_mapping(cg, cg->global_env, statement);
+                // Do nothing.
                 break;
             default:
                 break;
@@ -237,16 +244,22 @@ error_cleanup:
     return 0;
 }
 
-static int cz_code_generator_register_type_mapping(CZ_CodeGenerator* cg, CZ_Environment* env, const CZ_AST_Node* node) {
+int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenerator* cg) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(node, error_cleanup);
-    if (node->node_type != CZ_AST_TypedefDeclarationNodeType && node->node_type != CZ_AST_NewtypeDeclarationNodeType) goto error_cleanup;
+    NULL_POINTER_TO_GOTO(cg->gtt, error_cleanup);
+    NULL_POINTER_TO_GOTO(cg->global_env_b, error_cleanup);
 
-    const char* new_type_name = node->typedef_declaration.new_type->identifier.name;
-    const CZ_Type* new_type = cz_global_type_table_find_type_by_name(cg->gtt, new_type_name);
-
-    if (new_type == NULL) goto error_cleanup;
+    for (unsigned int i = 0; i < cg->gtt->all_entry_count; i++) {
+        const CZ_Type* type = cg->gtt->all_allocations[i];
+        // For each type,
+        // 1. First of all, skip references.
+        if (type->kind == CZ_TYPE_KIND_REFERENCE) {
+            continue;
+        }
+        
+        // 2. Then drop constness.
+        // 3. Check if newtype, primitive, or struct.
+    }
 
     return 1;
 error_cleanup:
