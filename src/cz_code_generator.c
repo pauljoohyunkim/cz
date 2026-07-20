@@ -398,9 +398,24 @@ int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
                 llvm_types[j] = llvm_member_type;
             }
             LLVMStructSetBody(llvm_struct_type, llvm_types, type->structure.layout->field_count, 0);
+        } else if (type->kind == CZ_TYPE_KIND_REFERENCE) {
+            // Similarly as it is done in struct member of which are references.
+            LLVMTypeRef llvm_type = cz_environment_backend_lookup_type(cg->global_env_b, type, false);
+            if (llvm_type == NULL) {
+                // Register.
+                llvm_type = LLVMPointerTypeInContext(cg->ctx, 0);
+                NULL_POINTER_TO_GOTO(llvm_type, error_cleanup);
+
+                if (cz_environment_backend_push_type_map(cg->global_env_b, type, llvm_type) != 1) {
+                    goto error_cleanup;
+                }
+            }
+        } else if (type->kind == CZ_TYPE_KIND_FUNCTION) {
+
         }
-        
     }
+
+
 
     return 1;
 
