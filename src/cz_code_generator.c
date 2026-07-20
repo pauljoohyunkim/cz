@@ -191,6 +191,7 @@ void cz_code_generator_free(CZ_CodeGenerator* cg) {
 }
 
 int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenerator* cg);
+int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg);
 
 int cz_code_generator_generate(CZ_CodeGenerator* cg) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
@@ -203,7 +204,7 @@ int cz_code_generator_generate(CZ_CodeGenerator* cg) {
         goto error_cleanup;
     }
     
-    // Pass 2 to build type map. (Reference & Struct Body)
+    // Pass 2 to build type map. (Reference & Struct Body & Function)
 
     for (unsigned int i = 0; i < cg->program->program.declaration_count; i++) {
         const CZ_AST_Node* statement = cg->program->program.global_declaration_list[i];
@@ -266,6 +267,9 @@ static inline LLVMTypeRef cz_backend_lower_type(CZ_CodeGenerator* cg, const CZ_T
             return cz_backend_lower_type(cg, type->newtype.underlying);
         case CZ_TYPE_KIND_STRUCT:
             return LLVMStructCreateNamed(cg->ctx, type->structure.name);
+        case CZ_TYPE_KIND_REFERENCE:
+            // TODO: Opaque pointer 
+            return LLVMPointerTypeInContext(cg->ctx, 0);
         default:
             break;
     }
@@ -338,6 +342,50 @@ int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenerator* cg
 
     return 1;
 error_cleanup:
+    return 0;
+}
+
+int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
+    LLVMTypeRef* llvm_types = NULL;
+    NULL_POINTER_TO_GOTO(cg, error_cleanup);
+    NULL_POINTER_TO_GOTO(cg->gtt, error_cleanup);
+
+    // Fill reference, structs, and functions
+    for (unsigned int i = 0; i < cg->gtt->all_entry_count; i++) {
+        const CZ_Type* type = cg->gtt->all_allocations[i];
+        
+        // 1. For struct, fill the inner members.
+        if (type->kind == CZ_TYPE_KIND_STRUCT) {
+            LLVMTypeRef llvm_struct_type = cz_environment_backend_lookup_type(cg->global_env_b, type, false);
+            NULL_POINTER_TO_GOTO(llvm_struct_type, error_cleanup);
+
+            llvm_types = (LLVMTypeRef*) calloc(type->structure.layout->field_count, sizeof(LLVMTypeRef));
+            NULL_POINTER_TO_GOTO(llvm_types, error_cleanup);
+
+            for (unsigned int j = 0; j < type->structure.layout->field_count; j++) {
+                const CZ_Type* member_type = type->structure.layout->fields[j].type;
+                LLVMTypeRef llvm_member_type = cz_environment_backend_lookup_type(cg->global_env_b, member_type, false);
+                if (llvm_member_type == NULL) {
+                    // Check if it is a reference.
+                    if (member_type->kind == CZ_TYPE_KIND_REFERENCE) {
+                        llvm_member_type = cz_backend_lower_type(cg, member_type);
+                        if (cz_environment_backend_push_type_map(cg->global_env_b, member_type, llvm_member_type) != 1) {
+                            goto error_cleanup;
+                        }
+                    }
+                }
+
+                llvm_types[j] = llvm_member_type;
+            }
+            LLVMStructSetBody(llvm_struct_type, llvm_types, type->structure.layout->field_count, 0);
+        }
+        
+    }
+
+    return 1;
+
+error_cleanup:
+    free(llvm_types);
     return 0;
 }
 
