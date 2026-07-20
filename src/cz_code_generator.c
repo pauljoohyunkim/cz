@@ -369,24 +369,28 @@ int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
                 LLVMTypeRef llvm_member_type = cz_environment_backend_lookup_type(cg->global_env_b, member_type, false);
 
                 if (llvm_member_type == NULL) {
-                    if (member_type->kind == CZ_TYPE_KIND_REFERENCE)
-                    {
+                    // Need to add to map
 
-                        // TODO: Constness check!
+                    bool is_reference = false;
+                    if (member_type->kind == CZ_TYPE_KIND_REFERENCE) {
+                        is_reference = true;
+                    } else if (member_type->kind == CZ_TYPE_KIND_CONST && 
+                            member_type->const_of->kind == CZ_TYPE_KIND_REFERENCE) {
+                        is_reference = true;
+                    }
 
-                        // Generates the opaque LLVM ptr type
-                        llvm_member_type = cz_backend_lower_type(cg, member_type);
+                    if (is_reference) {
+                        // 3. Lowering a reference *always* yields an LLVM opaque pointer (ptr)
+                        llvm_member_type = LLVMPointerTypeInContext(cg->ctx, 0);
                         NULL_POINTER_TO_GOTO(llvm_member_type, error_cleanup);
-
-                        // Map the full reference type pointer (int32&) to the LLVM pointer type
-                        if (cz_environment_backend_push_type_map(cg->global_env_b, member_type, llvm_member_type) != 1)
-                        {
+                        
+                        // 4. Register the EXACT GTT pointer that the struct field requested 
+                        // (This preserves whether it was const int32& or int32&)
+                        if (cz_environment_backend_push_type_map(cg->global_env_b, member_type, llvm_member_type) != 1) {
                             goto error_cleanup;
                         }
-                    }
-                    else
-                    {
-                        // If it's a structural/primitive type missing, it's a real bug
+                    } else {
+                        cz_error_list_push_error(cg->error_list, cg->filename, 0, 0, "Developer Error: Struct member is not reference but it has not been accounted for in pass 1.");
                         goto error_cleanup;
                     }
                 }
