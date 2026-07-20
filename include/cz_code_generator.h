@@ -43,8 +43,13 @@ typedef struct {
     CZ_AST_Node* program;
     CZ_Environment* global_env;
     CZ_Environment_Backend* global_env_b;
+    CZ_GlobalTypeTable* gtt;
+    CZ_StringPool* sp;
 
     const char* filename;
+    const char* code;
+    size_t code_length;
+
 
     CZ_ErrorList* error_list;
 } CZ_CodeGenerator;

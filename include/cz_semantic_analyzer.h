@@ -11,7 +11,7 @@ extern "C" {
 
 typedef struct {
     const char* filename;
-    char* code;
+    const char* code;
     size_t code_length;
     CZ_Token* tokens;
     size_t n_tokens;
@@ -21,7 +21,7 @@ typedef struct {
     CZ_Environment* global_env;
     CZ_GlobalTypeTable* gtt;
 
-    CZ_Type* current_function_return;
+    const CZ_Type* current_function_return;
     //bool is_inside_loop;
 
     CZ_ErrorList* error_list;

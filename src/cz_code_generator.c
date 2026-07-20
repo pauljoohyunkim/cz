@@ -7,6 +7,9 @@
 #include <string.h>
 #include "cz_code_generator.h"
 
+#define NULL_POINTER_TO_GOTO(ptr, label) do { if ((ptr) == NULL) goto label; } while (0)
+#define INVALID_NODE_TYPE_TO_GOTO(node, node_type_enum, label) do { if ((node)->node_type != (node_type_enum)) goto label; } while (0)
+
 CZ_Environment_Backend* cz_environment_backend_create(void) {
     CZ_Environment_Backend* env_b = (CZ_Environment_Backend*) calloc(1, sizeof(CZ_Environment_Backend));
 
@@ -174,6 +177,12 @@ CZ_CodeGenerator* cz_code_generator_create(CZ_SemanticAnalyzer* sa) {
     sa->program = NULL;
     cg->global_env = sa->global_env;
     sa->global_env = NULL;
+    cg->gtt = sa->gtt;
+    sa->gtt = NULL;
+    cg->code = sa->code;
+    sa->code = NULL;
+    cg->sp = sa->sp;
+    sa->sp = NULL;
 
     return cg;
 
@@ -196,14 +205,72 @@ void cz_code_generator_free(CZ_CodeGenerator* cg) {
         cz_environment_backend_free(cg->global_env_b);
         cz_environment_free(cg->global_env);
         cz_error_list_free(cg->error_list);
+        cz_global_type_table_free(cg->gtt);
+        free((char*)cg->code);
+        cz_string_pool_free(cg->sp);
     }
     free(cg);
     LLVMShutdown();
 }
 
+static int cz_code_generator_register_type_mapping(CZ_CodeGenerator* cg, CZ_Environment* env, const CZ_AST_Node* node);
+
 int cz_code_generator_generate(CZ_CodeGenerator* cg) {
-    /* TODO: Implement LLVM code generation. */
-    (void)cg;
+    NULL_POINTER_TO_GOTO(cg, error_cleanup);
+    NULL_POINTER_TO_GOTO(cg->program, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(cg->program, CZ_AST_ProgramNodeType, error_cleanup);
+    NULL_POINTER_TO_GOTO(cg->program->program.global_declaration_list, error_cleanup);
+
+    for (unsigned int i = 0; i < cg->program->program.declaration_count; i++) {
+        const CZ_AST_Node* statement = cg->program->program.global_declaration_list[i];
+        NULL_POINTER_TO_GOTO(statement, error_cleanup);
+
+        // TODO: error checking
+        switch (statement->node_type) {
+            case CZ_AST_FunctionDeclarationNodeType:
+                //cz_code_generator_declare_function(cg, cg->global_env, cg->global_env_b, statement);
+                break;
+            case CZ_AST_StructDeclarationNodeType:
+                break;
+            case CZ_AST_VariableDeclarationNodeType:
+                //cz_code_generator_declare_global_variable(cg, cg->global_env, cg->global_env_b, statement);
+                break;
+            case CZ_AST_TypedefDeclarationNodeType:
+            case CZ_AST_NewtypeDeclarationNodeType:
+                cz_code_generator_register_type_mapping(cg, cg->global_env, statement);
+                break;
+            default:
+                break;
+        }
+    }
+
+    //for (unsigned int i = 0; i < cg->program->program.declaration_count; i++) {
+    //    const CZ_AST_Node* statement = cg->program->program.global_declaration_list[i];
+    //    NULL_POINTER_TO_GOTO(statement, error_cleanup);
+
+    //    if (statement->node_type != CZ_AST_FunctionDeclarationNodeType) {
+    //        continue;
+    //    }
+
+    //    cz_code_generator_declare_function_body(cg, cg->global_env, cg->global_env_b, statement);
+    //}
+
+    return 1;
+error_cleanup:
+    return 0;
+}
+
+static int cz_code_generator_register_type_mapping(CZ_CodeGenerator* cg, CZ_Environment* env, const CZ_AST_Node* node) {
+    NULL_POINTER_TO_GOTO(cg, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
+    if (node->node_type != CZ_AST_TypedefDeclarationNodeType && node->node_type != CZ_AST_NewtypeDeclarationNodeType) goto error_cleanup;
+
+    const char* new_type_name = node->typedef_declaration.new_type->identifier.name;
+    const CZ_Type* new_type = cz_global_type_table_find_type_by_name(cg->gtt, new_type_name);
+
+    return 1;
+error_cleanup:
     return 0;
 }
 

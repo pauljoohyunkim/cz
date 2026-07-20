@@ -265,7 +265,7 @@ error_cleanup:
 
 void cz_semantic_analyzer_free(CZ_SemanticAnalyzer* sa) {
     if (sa != NULL) {
-        free(sa->code);
+        free((char*)sa->code);
         free(sa->tokens);
         cz_ast_root_free(sa->program);
         cz_string_pool_free(sa->sp);
@@ -2536,7 +2536,7 @@ static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_En
 
         // 3.3. Check and match type with the struct member definitions
         // Reduce chain: expr->struct_declaration.members[i]->struct_init_member.expression
-        const CZ_AST_Node* member_expr = expr->struct_declaration.members[i]->struct_init_member.expression;
+        CZ_AST_Node* member_expr = expr->struct_declaration.members[i]->struct_init_member.expression;
         if (cz_semantic_analyzer_check_expression(sa, env, member_expr) != 1) {
             goto error_cleanup;
         }

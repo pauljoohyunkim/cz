@@ -18,7 +18,7 @@ typedef struct {
 
 typedef struct {
     const char* filename;
-    char* code;
+    const char* code;
     size_t code_length;
     unsigned int idx;
     unsigned int row;

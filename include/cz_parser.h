@@ -13,7 +13,7 @@ extern "C" {
 
 typedef struct {
     const char* filename;
-    char* code;
+    const char* code;
     size_t code_length;
     CZ_Token* tokens;
     size_t n_tokens;

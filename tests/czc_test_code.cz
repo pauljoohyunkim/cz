@@ -1,11 +1,1 @@
-struct Vector {
-    x :: int32;
-    y :: int32;
-}
-
-func get_default_x :: () -> int32 {
-    // Vector{1, 2} is an R-value. 
-    // Accessing .x on an R-value struct yields an R-value copy.
-    // This should safely initialize a plain copy variable.
-    val :: int32 = Vector{.x = 1, .y = 2}.x; 
-}
+typedef int32 int;

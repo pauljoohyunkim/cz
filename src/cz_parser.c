@@ -105,7 +105,7 @@ int cz_parser_parse(CZ_Parser* parser) {
 
 void cz_parser_free(CZ_Parser* parser) {
     if (parser != NULL) {
-        free(parser->code);
+        free((char*)parser->code);
         parser->code = NULL;
         free(parser->tokens);
         parser->tokens = NULL;

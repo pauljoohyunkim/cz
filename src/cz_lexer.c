@@ -125,7 +125,7 @@ CZ_Lexer* cz_lexer_create(const char* code, const char* filename) {
         return NULL;
     }
     // Copy code
-    strncpy(lexer->code, code, code_length);
+    strncpy((char*)lexer->code, code, code_length);
 
     // Add error list
     lexer->error_list = cz_error_list_create();
@@ -724,7 +724,7 @@ int cz_lexer_analyze(CZ_Lexer* lexer) {
 void cz_lexer_free(CZ_Lexer* lexer) {
     if (lexer != NULL) {
         free(lexer->tokens);
-        free(lexer->code);
+        free((char*)lexer->code);
         cz_error_list_free(lexer->error_list);
         cz_string_pool_free(lexer->sp);
         free(lexer);

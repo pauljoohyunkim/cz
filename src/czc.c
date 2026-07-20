@@ -3,7 +3,7 @@
 #include "cz_lexer.h"
 #include "cz_parser.h"
 #include "cz_semantic_analyzer.h"
-//#include "cz_code_generator.h"
+#include "cz_code_generator.h"
 
 static long get_file_size(const char *filename) {
     // Open in binary mode ("rb") to get an exact byte count
@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
     CZ_Lexer* lexer = NULL;
     CZ_Parser* parser = NULL;
     CZ_SemanticAnalyzer* sa = NULL;
-    //CZ_CodeGenerator* cg = NULL;
+    CZ_CodeGenerator* cg = NULL;
     bool generate_code = true;
 
     FILE* fp = fopen(source_filename, "r");
@@ -133,12 +133,6 @@ int main(int argc, char** argv) {
     printf("\n--- Global Type Table ---\n");
     cz_global_type_table_print(sa->gtt);
 
-    //ret = cz_semantic_analyzer_full_analyze(sa);
-    //if (ret != 1) {
-    //    printf("Failure semantic analysis (pass II)\n");
-    //    goto error_cleanup_exit;
-    //}
-
     if (sa->error_list->n_errors > 0) {
         for (unsigned int i = 0; i < sa->error_list->n_errors; i++) {
             printf("Semantic Analyzer: line %d col %d: %s\n",
@@ -148,7 +142,6 @@ int main(int argc, char** argv) {
         }
         generate_code = false;
     }
-    /*
 
     if (!generate_code) {
         printf("Skipping code generation\n");
@@ -185,8 +178,6 @@ int main(int argc, char** argv) {
 
 
     cz_code_generator_free(cg);
-    */
-
     cz_semantic_analyzer_free(sa);
     cz_parser_free(parser);
     cz_lexer_free(lexer);
@@ -194,7 +185,7 @@ int main(int argc, char** argv) {
     return 0;
 
 error_cleanup_exit:
-    //cz_code_generator_free(cg);
+    cz_code_generator_free(cg);
     cz_semantic_analyzer_free(sa);
     cz_parser_free(parser);
     cz_lexer_free(lexer);
