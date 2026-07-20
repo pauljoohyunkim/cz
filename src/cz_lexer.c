@@ -102,50 +102,58 @@ error_cleanup:
 }
 
 CZ_Lexer* cz_lexer_create(const char* code, const char* filename) {
-    if (code == NULL) {
-        return NULL;
-    }
+    CZ_Lexer* lexer = NULL;
+    CZ_Token* tokens = NULL;
+    char* code_copy = NULL;
+    CZ_ErrorList* error_list = NULL;
+    CZ_StringPool* sp = NULL;
+
+    NULL_POINTER_TO_GOTO(code, error_cleanup);
 
     const size_t code_length = strlen(code);
 
-    CZ_Lexer* lexer = (CZ_Lexer*) calloc(1, sizeof(CZ_Lexer));
+    lexer = (CZ_Lexer*) calloc(1, sizeof(CZ_Lexer));
+    NULL_POINTER_TO_GOTO(lexer, error_cleanup);
+
     // Token array allocation
     lexer->n_tokens_capacity = 8;
     lexer->n_tokens = 0;
-    lexer->tokens = (CZ_Token*) calloc(lexer->n_tokens_capacity, sizeof(CZ_Token));
-    if (lexer->tokens == NULL) {
-        cz_lexer_free(lexer);
-        return NULL;
-    }
+    tokens = (CZ_Token*) calloc(lexer->n_tokens_capacity, sizeof(CZ_Token));
+    NULL_POINTER_TO_GOTO(tokens, error_cleanup);
 
     // Code allocation
-    lexer->code = (char*) calloc(code_length + 1, sizeof(char));
-    if (lexer->code == NULL) {
-        cz_lexer_free(lexer);
-        return NULL;
-    }
-    // Copy code
-    strncpy((char*)lexer->code, code, code_length);
+    code_copy = (char*) calloc(code_length + 1, sizeof(char));
+    NULL_POINTER_TO_GOTO(code_copy, error_cleanup);
+    strncpy(code_copy, code, code_length);
 
     // Add error list
-    lexer->error_list = cz_error_list_create();
-    if (lexer->error_list == NULL) {
-        cz_lexer_free(lexer);
-        return NULL;
-    }
+    error_list = cz_error_list_create();
+    NULL_POINTER_TO_GOTO(error_list, error_cleanup);
 
-    lexer->sp = cz_string_pool_create();
-    if (lexer->sp == NULL) {
-        cz_lexer_free(lexer);
-        return NULL;
-    }
+    sp = cz_string_pool_create();
+    NULL_POINTER_TO_GOTO(sp, error_cleanup);
 
+    // Now we have all resources, assign to lexer
+    lexer->tokens = tokens;
+    lexer->code = code_copy;
+    lexer->error_list = error_list;
+    lexer->sp = sp;
+
+    // Set the other fields
     lexer->filename = filename;
     lexer->row = 1;
     lexer->col = 1;
     lexer->code_length = code_length;
 
     return lexer;
+
+error_cleanup:
+    free(tokens);
+    free(code_copy);
+    cz_error_list_free(error_list);
+    cz_string_pool_free(sp);
+    cz_lexer_free(lexer);
+    return NULL;
 }
 
 /**

@@ -57,20 +57,15 @@ static inline bool cz_parser_is_sync_token(CZ_TokenType token_type);
 static int cz_parser_sync(CZ_Parser* parser);
 
 CZ_Parser* cz_parser_create(CZ_Lexer* lexer) {
-    if (lexer == NULL) {
-        return NULL;
-    }
+    CZ_Parser* parser = NULL;
+    CZ_ErrorList* error_list = NULL;
+    NULL_POINTER_TO_GOTO(lexer, error_cleanup);
 
-    CZ_Parser* parser = (CZ_Parser*) calloc(1, sizeof(CZ_Parser));
-    if (parser == NULL) {
-        return NULL;
-    }
+    parser = (CZ_Parser*) calloc(1, sizeof(CZ_Parser));
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
-    parser->error_list = cz_error_list_create();
-    if (parser->error_list == NULL) {
-        cz_parser_free(parser);
-        return NULL;
-    }
+    error_list = cz_error_list_create();
+    NULL_POINTER_TO_GOTO(error_list, error_cleanup);
 
     // Transfer code string ownership
     parser->code = lexer->code;
@@ -88,7 +83,13 @@ CZ_Parser* cz_parser_create(CZ_Lexer* lexer) {
     parser->sp = lexer->sp;
     lexer->sp = NULL;
 
+    parser->error_list = error_list;
+
     return parser;
+
+error_cleanup:
+    cz_parser_free(parser);
+    return NULL;
 }
 
 int cz_parser_parse(CZ_Parser* parser) {
