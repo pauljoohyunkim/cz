@@ -398,6 +398,8 @@ int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
                 llvm_types[j] = llvm_member_type;
             }
             LLVMStructSetBody(llvm_struct_type, llvm_types, type->structure.layout->field_count, 0);
+            free(llvm_types);
+            llvm_types = NULL;
         } else if (type->kind == CZ_TYPE_KIND_REFERENCE) {
             // Similarly as it is done in struct member of which are references.
             LLVMTypeRef llvm_type = cz_environment_backend_lookup_type(cg->global_env_b, type, false);
@@ -411,12 +413,35 @@ int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
                 }
             }
         } else if (type->kind == CZ_TYPE_KIND_FUNCTION) {
+            // Return Type
+            LLVMTypeRef llvm_ret_type = cz_environment_backend_lookup_type(cg->global_env_b, type->function.return_type, false);
+            NULL_POINTER_TO_GOTO(llvm_ret_type, error_cleanup);
 
+            // Parameters
+            unsigned int param_count = type->function.param_count;
+            llvm_types = (LLVMTypeRef*) calloc(param_count, sizeof(LLVMTypeRef));
+            NULL_POINTER_TO_GOTO(llvm_types, error_cleanup);
+
+            for (unsigned int j = 0; j < param_count; j++) {
+                const CZ_Type* param_type = type->function.param_types[j];
+                LLVMTypeRef llvm_param_type = cz_environment_backend_lookup_type(cg->global_env_b, param_type, false);
+                NULL_POINTER_TO_GOTO(llvm_param_type, error_cleanup);
+                llvm_types[j] = llvm_param_type;
+            }
+
+            LLVMTypeRef llvm_func_type = LLVMFunctionType(llvm_ret_type, llvm_types, param_count, 0);
+            NULL_POINTER_TO_GOTO(llvm_func_type, error_cleanup);
+
+            if (cz_environment_backend_push_type_map(cg->global_env_b, type, llvm_func_type) != 1) {
+                goto error_cleanup;
+            }
+            free(llvm_types);
+            llvm_types = NULL;
         }
     }
 
 
-
+    free(llvm_types);
     return 1;
 
 error_cleanup:

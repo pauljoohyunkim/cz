@@ -1,1 +1,4 @@
-newtype int32& intref;
+struct Vector {
+    x :: int32;
+    y :: int32;
+}
