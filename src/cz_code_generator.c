@@ -87,7 +87,7 @@ const LLVMValueRef cz_environment_backend_lookup(const CZ_Environment_Backend *e
 const LLVMTypeRef cz_environment_backend_lookup_type(const CZ_Environment_Backend *env_b, const CZ_Type* type, bool cascade) {
     if (env_b == NULL || type == NULL) return NULL;
 
-    // Search the backend's symbol map for a matching entry.
+    // Search the backend's type map for a matching entry.
     for (unsigned int i = 0; i < env_b->type_count; ++i) {
         if (env_b->type_map[i].type_name == type) {
             return env_b->type_map[i].ref;
@@ -364,14 +364,30 @@ int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
 
             for (unsigned int j = 0; j < type->structure.layout->field_count; j++) {
                 const CZ_Type* member_type = type->structure.layout->fields[j].type;
+
+                // 1. Look up the raw type exactly as it is (e.g. look for "int32&")
                 LLVMTypeRef llvm_member_type = cz_environment_backend_lookup_type(cg->global_env_b, member_type, false);
+
                 if (llvm_member_type == NULL) {
-                    // Check if it is a reference.
-                    if (member_type->kind == CZ_TYPE_KIND_REFERENCE) {
+                    if (member_type->kind == CZ_TYPE_KIND_REFERENCE)
+                    {
+
+                        // TODO: Constness check!
+
+                        // Generates the opaque LLVM ptr type
                         llvm_member_type = cz_backend_lower_type(cg, member_type);
-                        if (cz_environment_backend_push_type_map(cg->global_env_b, member_type, llvm_member_type) != 1) {
+                        NULL_POINTER_TO_GOTO(llvm_member_type, error_cleanup);
+
+                        // Map the full reference type pointer (int32&) to the LLVM pointer type
+                        if (cz_environment_backend_push_type_map(cg->global_env_b, member_type, llvm_member_type) != 1)
+                        {
                             goto error_cleanup;
                         }
+                    }
+                    else
+                    {
+                        // If it's a structural/primitive type missing, it's a real bug
+                        goto error_cleanup;
                     }
                 }
 
