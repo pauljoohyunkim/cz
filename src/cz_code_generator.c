@@ -18,107 +18,84 @@ CZ_Environment_Backend* cz_environment_backend_create(void) {
 
 void cz_environment_backend_free(CZ_Environment_Backend* env_b) {
     if (env_b != NULL) {
-        for (unsigned int i = 0; i < env_b->value_count; i++) {
-            free(env_b->value_map[i].var_name);
-        }
+        // Note: We do not free the symbol or type_name as they are owned by symbol table and global type table.
         free(env_b->value_map);
-        for (unsigned int i = 0; i < env_b->type_count; i++) {
-            free(env_b->type_map[i].type_name);
-        }
         free(env_b->type_map);
     }
     free(env_b);
 }
 
-int cz_environment_backend_push_map(CZ_Environment_Backend *env_b, const char *name, struct LLVMOpaqueValue *val) {
-    char* name_cpy = NULL;
-    CZ_VarName_To_LLVMValueRef* new_map = NULL;
+int cz_environment_backend_push_val_map(CZ_Environment_Backend *env_b, const CZ_Symbol* symbol, LLVMValueRef llvmval) {
+    CZ_Symbol_To_LLVMValueRef* new_map = NULL;
 
-    if (env_b == NULL || name == NULL) return 0;
+    if (env_b == NULL || symbol == NULL) return 0;
 
-    new_map = (CZ_VarName_To_LLVMValueRef *)realloc(env_b->value_map, sizeof(CZ_VarName_To_LLVMValueRef) * (env_b->value_count+1));
+    new_map = (CZ_Symbol_To_LLVMValueRef *)realloc(env_b->value_map, sizeof(CZ_Symbol_To_LLVMValueRef) * (env_b->value_count+1));
     if (new_map == NULL) goto error_cleanup;
-
-    name_cpy = (char*)calloc(strlen(name) + 1, sizeof(char));
-    if (name_cpy == NULL) goto error_cleanup;
-    strcpy(name_cpy, name);
 
     env_b->value_map = new_map;
     new_map = NULL;
-    env_b->value_map[env_b->value_count].var_name = name_cpy;
-    env_b->value_map[env_b->value_count].ref = val;
+    env_b->value_map[env_b->value_count].symbol = symbol;
+    env_b->value_map[env_b->value_count].ref = llvmval;
     env_b->value_count++;
 
     return 1;
 
 error_cleanup:
-    free(name_cpy);
     free(new_map);
     return 0;
 }
 
-int cz_environment_backend_push_type_map(CZ_Environment_Backend *env_b, const char *name, struct LLVMOpaqueType *type) {
-    char* name_cpy = NULL;
-    CZ_TypeName_To_LLVMTypeRef* new_map = NULL;
+int cz_environment_backend_push_type_map(CZ_Environment_Backend *env_b, const CZ_Type* type, LLVMTypeRef llvmtype) {
+    CZ_Type_To_LLVMTypeRef* new_map = NULL;
 
-    if (env_b == NULL || name == NULL) return 0;
+    if (env_b == NULL || type == NULL) return 0;
 
-    new_map = (CZ_TypeName_To_LLVMTypeRef *)realloc(env_b->type_map, sizeof(CZ_TypeName_To_LLVMTypeRef) * (env_b->type_count+1));
+    new_map = (CZ_Type_To_LLVMTypeRef *)realloc(env_b->type_map, sizeof(CZ_Type_To_LLVMTypeRef) * (env_b->type_count+1));
     if (new_map == NULL) goto error_cleanup;
-
-    name_cpy = (char*)calloc(strlen(name) + 1, sizeof(char));
-    if (name_cpy == NULL) goto error_cleanup;
-    strcpy(name_cpy, name);
 
     env_b->type_map = new_map;
     new_map = NULL;
-    env_b->type_map[env_b->type_count].type_name = name_cpy;
-    env_b->type_map[env_b->type_count].ref = type;
+    env_b->type_map[env_b->type_count].type_name = type;
+    env_b->type_map[env_b->type_count].ref = llvmtype;
     env_b->type_count++;
 
     return 1;
 
 error_cleanup:
-    free(name_cpy);
     free(new_map);
     return 0;
 }
 
-const LLVMValueRef cz_environment_backend_lookup(const CZ_Environment_Backend *env_b, const char *name, bool cascade) {
-    if (env_b == NULL || name == NULL) return NULL;
+const LLVMValueRef cz_environment_backend_lookup(const CZ_Environment_Backend *env_b, const CZ_Symbol* symbol, bool cascade) {
+    if (env_b == NULL || symbol == NULL) return NULL;
 
     // Search the backend's symbol map for a matching entry.
-    unsigned int len = strlen(name);
     for (unsigned int i = 0; i < env_b->value_count; ++i) {
-        if (env_b->value_map[i].var_name != NULL &&
-            strlen(env_b->value_map[i].var_name) == len &&
-            strncmp(env_b->value_map[i].var_name, name, len) == 0) {
+        if (env_b->value_map[i].symbol == symbol) {
             return env_b->value_map[i].ref;
         }
     }
 
     if (env_b->parent != NULL && cascade) {
-        return cz_environment_backend_lookup(env_b->parent, name, cascade);
+        return cz_environment_backend_lookup(env_b->parent, symbol, cascade);
     }
 
     return NULL;
 }
 
-const LLVMTypeRef cz_environment_backend_lookup_type(const CZ_Environment_Backend *env_b, const char *name, bool cascade) {
-    if (env_b == NULL || name == NULL) return NULL;
+const LLVMTypeRef cz_environment_backend_lookup_type(const CZ_Environment_Backend *env_b, const CZ_Type* type, bool cascade) {
+    if (env_b == NULL || type == NULL) return NULL;
 
     // Search the backend's symbol map for a matching entry.
-    unsigned int len = strlen(name);
     for (unsigned int i = 0; i < env_b->type_count; ++i) {
-        if (env_b->type_map[i].type_name != NULL &&
-            strlen(env_b->type_map[i].type_name) == len &&
-            strncmp(env_b->type_map[i].type_name, name, len) == 0) {
+        if (env_b->type_map[i].type_name == type) {
             return env_b->type_map[i].ref;
         }
     }
 
     if (env_b->parent != NULL && cascade) {
-        return cz_environment_backend_lookup_type(env_b->parent, name, cascade);
+        return cz_environment_backend_lookup_type(env_b->parent, type, cascade);
     }
 
     return NULL;
@@ -268,6 +245,8 @@ static int cz_code_generator_register_type_mapping(CZ_CodeGenerator* cg, CZ_Envi
 
     const char* new_type_name = node->typedef_declaration.new_type->identifier.name;
     const CZ_Type* new_type = cz_global_type_table_find_type_by_name(cg->gtt, new_type_name);
+
+    if (new_type == NULL) goto error_cleanup;
 
     return 1;
 error_cleanup:
