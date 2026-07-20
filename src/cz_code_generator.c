@@ -244,6 +244,37 @@ error_cleanup:
     return 0;
 }
 
+static inline LLVMTypeRef cz_backend_lower_type(CZ_CodeGenerator* cg, const CZ_Type* type) {
+    NULL_POINTER_TO_GOTO(cg, error_cleanup);
+    NULL_POINTER_TO_GOTO(type, error_cleanup);
+    switch (type->kind) {
+        case CZ_TYPE_KIND_PRIMITIVE:
+            switch (type->primitive) {
+                case CZ_PRIMITIVE_BOOL:
+                    return LLVMInt1TypeInContext(cg->ctx);
+                case CZ_PRIMITIVE_FLOAT:
+                    return LLVMFloatTypeInContext(cg->ctx);
+                case CZ_PRIMITIVE_INT32:
+                    return LLVMInt32TypeInContext(cg->ctx);
+                case CZ_PRIMITIVE_VOID:
+                    return LLVMVoidTypeInContext(cg->ctx);
+                default:
+                    break;
+            }
+            break;
+        case CZ_TYPE_KIND_NEWTYPE:
+            return cz_backend_lower_type(cg, type->newtype.underlying);
+        case CZ_TYPE_KIND_STRUCT:
+            return LLVMStructCreateNamed(cg->ctx, type->structure.name);
+        default:
+            break;
+    }
+
+    return NULL;
+error_cleanup:
+    return NULL;
+}
+
 int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenerator* cg) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
     NULL_POINTER_TO_GOTO(cg->gtt, error_cleanup);
@@ -258,7 +289,51 @@ int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenerator* cg
         }
         
         // 2. Then drop constness.
+        const CZ_Type* decayed_type = cz_type_decay_type(type);
+
         // 3. Check if newtype, primitive, or struct.
+        if (decayed_type->kind != CZ_TYPE_KIND_PRIMITIVE &&
+            decayed_type->kind != CZ_TYPE_KIND_STRUCT &&
+            decayed_type->kind != CZ_TYPE_KIND_NEWTYPE) {
+            continue;
+        }
+
+        // 4. Look up if mapping exists, and if it exists, skip.
+        LLVMTypeRef llvm_type_lookup = cz_environment_backend_lookup_type(cg->global_env_b, decayed_type, false);
+        if (llvm_type_lookup != NULL) {
+            continue;
+        }
+
+        // 5. If newtype, check if it is primitive or struct, then query again with inner type.
+        if (decayed_type->kind == CZ_TYPE_KIND_NEWTYPE) {
+            const CZ_Type* underlying = decayed_type->newtype.underlying;
+            // 5.1 If underlying primitive/struct is not in map, build it.
+            LLVMTypeRef llvm_underlying_type = cz_environment_backend_lookup_type(cg->global_env_b, underlying, false);
+            if (llvm_underlying_type == NULL) {
+                llvm_underlying_type = cz_backend_lower_type(cg, underlying);
+                NULL_POINTER_TO_GOTO(llvm_underlying_type, error_cleanup);
+
+                if (cz_environment_backend_push_type_map(cg->global_env_b, underlying, llvm_underlying_type) != 1) {
+                    cz_error_list_push_error(cg->error_list, cg->filename, 0, 0, "Failed to register underlying type.");
+                    goto error_cleanup;
+                }
+            }
+            // Now safely map the newtype alias to that exact same machine type.
+            if (cz_environment_backend_push_type_map(cg->global_env_b, decayed_type, llvm_underlying_type) != 1) {
+                cz_error_list_push_error(cg->error_list, cg->filename, 0, 0, "Failed to register newtype alias.");
+                goto error_cleanup;
+            }
+            continue;
+        }
+
+        // 6. Handle Standard Primitives & Struct Shells.
+        const LLVMTypeRef llvm_machine_type = cz_backend_lower_type(cg, decayed_type);
+        NULL_POINTER_TO_GOTO(llvm_machine_type, error_cleanup);
+        
+        if (cz_environment_backend_push_type_map(cg->global_env_b, decayed_type, llvm_machine_type) != 1) {
+            cz_error_list_push_error(cg->error_list, cg->filename, 0, 0, "Could not register type to LLVM.");
+            goto error_cleanup;
+        }
     }
 
     return 1;

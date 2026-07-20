@@ -1,6 +1,6 @@
+newtype int32 int;
+
 struct Vector {
     x :: int32;
     y :: int32;
 }
-
-newtype Vector vector;
