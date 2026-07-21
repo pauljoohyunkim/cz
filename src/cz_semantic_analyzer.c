@@ -751,6 +751,8 @@ static int cz_semantic_analyzer_struct_cycle_detect(CZ_SemanticAnalyzer* sa, con
         }
     }
 
+    states[struct_idx] = CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVED;
+
     return 1;
 
 error_cleanup:

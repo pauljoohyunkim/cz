@@ -204,7 +204,7 @@ static int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenera
 static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg);
 
 static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
-static LLVMValueRef cz_code_generate_generate_constexpr(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
+static LLVMValueRef cz_code_generate_generate_expr_const(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 
 int cz_code_generator_generate(CZ_CodeGenerator* cg) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
@@ -450,11 +450,12 @@ static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ
     if (stmt->variable_declaration.expression == NULL) {
         LLVMSetInitializer(llvm_global_var, LLVMConstNull(llvm_var_type));
     } else {
-        LLVMValueRef llvm_initializer = cz_code_generate_generate_constexpr(cg, env, env_b, stmt->variable_declaration.expression);
+        LLVMValueRef llvm_initializer = cz_code_generate_generate_expr_const(cg, env, env_b, stmt->variable_declaration.expression);
         if (llvm_initializer == NULL) {
-            cz_error_list_push_error(cg->error_list, cg->filename, stmt->line, stmt->col, "Could not get constexpr initializer for %s", var_name);
+            cz_error_list_push_error(cg->error_list, cg->filename, stmt->line, stmt->col, "Could not get initializer for %s", var_name);
             goto error_cleanup;
         }
+        LLVMSetInitializer(llvm_global_var, llvm_initializer);
     }
 
     if (cz_environment_backend_push_val_map(env_b, var_symbol, llvm_global_var) != 1) {
@@ -467,13 +468,43 @@ error_cleanup:
     return 0;
 }
 
-static LLVMValueRef cz_code_generate_generate_constexpr(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
+static LLVMValueRef cz_code_generate_generate_expr_const(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
     NULL_POINTER_TO_GOTO(env, error_cleanup);
     NULL_POINTER_TO_GOTO(env_b, error_cleanup);
     NULL_POINTER_TO_GOTO(node, error_cleanup);
 
-    return NULL;
+    LLVMValueRef llvm_val = NULL;
+
+    switch (node->node_type) {
+        case CZ_AST_LiteralNodeType:
+            switch (node->literal.literal_type) {
+                case CZ_TT_NUMERICAL_LITERAL:
+                    {
+                        if (strchr(node->literal.lexeme, '.') != NULL) {
+                            // Float
+                            float value = strtof(node->literal.lexeme, NULL);
+                            llvm_val = LLVMConstReal(LLVMFloatTypeInContext(cg->ctx), value);
+                        } else {
+                            // Integer
+                            int32_t value = strtol(node->literal.lexeme, NULL, 10);
+                            llvm_val = LLVMConstInt(LLVMInt32TypeInContext(cg->ctx), value, true);
+                        }
+                    }
+                    break;
+                case CZ_TT_TRUE:
+                    llvm_val = LLVMConstInt(LLVMInt1TypeInContext(cg->ctx), 1, false);
+                    break;
+                case CZ_TT_FALSE:
+                    llvm_val = LLVMConstInt(LLVMInt1TypeInContext(cg->ctx), 0, false);
+                    break;
+                default:
+                    goto error_cleanup;
+            }
+            break;
+    }
+
+    return llvm_val;
 
 error_cleanup:
     return NULL;
