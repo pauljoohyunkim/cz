@@ -2,3 +2,5 @@ one :: int32 = 1;
 pi :: const float = 3.14;
 t :: bool = true;
 f :: bool = false;
+minus_one :: int32 = -1;
+not_true :: bool = !true;

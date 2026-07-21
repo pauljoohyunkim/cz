@@ -477,6 +477,41 @@ static LLVMValueRef cz_code_generate_generate_expr_const(CZ_CodeGenerator* cg, c
     LLVMValueRef llvm_val = NULL;
 
     switch (node->node_type) {
+        case CZ_AST_UnaryExpressionNodeType:
+            {
+                LLVMValueRef llvm_operand = cz_code_generate_generate_expr_const(cg, env, env_b, node->unary_expression.operand);
+                LLVMTypeRef llvm_operand_type = cz_environment_backend_lookup_type(env_b, node->unary_expression.operand->decoration->resolved_type, true);
+                LLVMTypeKind llvm_operand_type_kind = LLVMGetTypeKind(llvm_operand_type);
+                switch (node->unary_expression.op) {
+                    case CZ_TT_MINUS:
+                        switch (llvm_operand_type_kind) {
+                            case LLVMFloatTypeKind:
+                                {
+                                    const LLVMValueRef zero_const = LLVMConstReal(LLVMFloatTypeInContext(cg->ctx), 0);
+                                    llvm_val = LLVMBuildFSub(cg->builder, zero_const, llvm_operand, "fnegtmp");
+                                }
+                                break;
+                            case LLVMIntegerTypeKind:
+                                {
+                                    const LLVMValueRef zero_const = LLVMConstInt(LLVMInt32TypeInContext(cg->ctx), 0, true);
+                                    llvm_val = LLVMBuildSub(cg->builder, zero_const, llvm_operand, "negtmp");
+                                }
+                                break;
+                        }
+                        break;
+                    case CZ_TT_EXCLAMATION:
+                        {
+                            if (llvm_operand_type_kind == LLVMIntegerTypeKind) {
+                                const LLVMValueRef one_const = LLVMConstInt(LLVMInt1TypeInContext(cg->ctx), 1, true);
+                                llvm_val = LLVMBuildXor(cg->builder, one_const, llvm_operand, "nottmp");
+                            }
+                        }
+                        break;
+                    default:
+                        goto error_cleanup;
+                }
+            }
+            break;
         case CZ_AST_LiteralNodeType:
             switch (node->literal.literal_type) {
                 case CZ_TT_NUMERICAL_LITERAL:
