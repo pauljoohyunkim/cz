@@ -186,15 +186,15 @@ static inline bool cz_parser_is_operation_right_associative(CZ_TokenType token_t
  * @return int 1 if successful, 0 if failure.
  */
 static int cz_parser_push_global_declaration(CZ_AST_Node* subnode, CZ_AST_Node* program_node) {
-    if (subnode == NULL || program_node == NULL) goto error_fail_return;
-    if (program_node->node_type != CZ_AST_ProgramNodeType) goto error_fail_return;
+    if (subnode == NULL || program_node == NULL) goto error_cleanup;
+    if (program_node->node_type != CZ_AST_ProgramNodeType) goto error_cleanup;
 
-    if (program_node->program.declaration_count > program_node->program.capacity) goto error_fail_return;
+    if (program_node->program.declaration_count > program_node->program.capacity) goto error_cleanup;
 
     // List full. Double the capacity.
     if (program_node->program.declaration_count == program_node->program.capacity) {
         CZ_AST_Node** new_list = (CZ_AST_Node**) realloc(program_node->program.global_declaration_list, sizeof(CZ_AST_Node*) * 2 * program_node->program.capacity);
-        NULL_POINTER_TO_GOTO(new_list, error_fail_return);
+        NULL_POINTER_TO_GOTO(new_list, error_cleanup);
 
         program_node->program.global_declaration_list = new_list;
         program_node->program.capacity *= 2;
@@ -205,7 +205,7 @@ static int cz_parser_push_global_declaration(CZ_AST_Node* subnode, CZ_AST_Node* 
 
     return 1;
 
-error_fail_return:
+error_cleanup:
     return 0;
 }
 
@@ -217,12 +217,12 @@ error_fail_return:
  * @return int 1 if successful. 0 if failure.
  */
 static int cz_parser_push_function_param(CZ_AST_Node* parameter_list, CZ_AST_Node* param) {
-    if (parameter_list == NULL || param == NULL) goto error_fail_return;
-    if (parameter_list->node_type != CZ_AST_ParameterListNodeType) goto error_fail_return;
+    if (parameter_list == NULL || param == NULL) goto error_cleanup;
+    if (parameter_list->node_type != CZ_AST_ParameterListNodeType) goto error_cleanup;
 
     // Increment capacity.
     CZ_AST_Node** new_list = (CZ_AST_Node**) realloc(parameter_list->parameter_list.params, sizeof(CZ_AST_Node*) * (parameter_list->parameter_list.param_count+1));
-    NULL_POINTER_TO_GOTO(new_list, error_fail_return);
+    NULL_POINTER_TO_GOTO(new_list, error_cleanup);
 
     parameter_list->parameter_list.params = new_list;
     new_list = NULL;
@@ -231,17 +231,17 @@ static int cz_parser_push_function_param(CZ_AST_Node* parameter_list, CZ_AST_Nod
 
     return 1;
 
-error_fail_return:
+error_cleanup:
     return 0;
 }
 
 static int cz_parser_push_statement_to_block(CZ_AST_Node* block, CZ_AST_Node* statement) {
-    if (block == NULL || statement == NULL) goto error_fail_return;
-    if (block->node_type != CZ_AST_BlockStatementNodeType) goto error_fail_return;
+    if (block == NULL || statement == NULL) goto error_cleanup;
+    if (block->node_type != CZ_AST_BlockStatementNodeType) goto error_cleanup;
 
     // Increment capacity.
     CZ_AST_Node** new_list = (CZ_AST_Node**) realloc(block->statement_list.statements, sizeof(CZ_AST_Node*) * (block->statement_list.statement_count+1));
-    NULL_POINTER_TO_GOTO(new_list, error_fail_return);
+    NULL_POINTER_TO_GOTO(new_list, error_cleanup);
 
     block->statement_list.statements = new_list;
     block->statement_list.statements[block->statement_list.statement_count] = statement;
@@ -249,18 +249,18 @@ static int cz_parser_push_statement_to_block(CZ_AST_Node* block, CZ_AST_Node* st
 
     return 1;
 
-error_fail_return:
+error_cleanup:
     return 0;
 }
 
 static int cz_parser_push_struct_member_to_members(CZ_AST_Node* struct_decl, CZ_AST_Node* member) {
-    if (struct_decl == NULL || member == NULL) goto error_fail_return;
+    if (struct_decl == NULL || member == NULL) goto error_cleanup;
     if (!(struct_decl->node_type == CZ_AST_StructDeclarationNodeType && member->node_type == CZ_AST_VariableDeclarationNodeType) &&
         !(struct_decl->node_type == CZ_AST_StructInitNodeType && member->node_type == CZ_AST_StructInitMemberNodeType)) return 0;
 
     // Increment capacity.
     CZ_AST_Node** new_list = (CZ_AST_Node**) realloc(struct_decl->struct_declaration.members, sizeof(CZ_AST_Node*) * (struct_decl->struct_declaration.member_count+1));
-    NULL_POINTER_TO_GOTO(new_list, error_fail_return);
+    NULL_POINTER_TO_GOTO(new_list, error_cleanup);
 
     struct_decl->struct_declaration.members = new_list;
     struct_decl->struct_declaration.members[struct_decl->struct_declaration.member_count] = member;
@@ -268,17 +268,17 @@ static int cz_parser_push_struct_member_to_members(CZ_AST_Node* struct_decl, CZ_
 
     return 1;
 
-error_fail_return:
+error_cleanup:
     return 0;
 }
 
 static int cz_parser_push_argument_to_function_call_argument_list(CZ_AST_Node* function_call, CZ_AST_Node* argument) {
-    if (function_call == NULL || argument == NULL) goto error_fail_return;
-    if (function_call->node_type != CZ_AST_FunctionCallNodeType) goto error_fail_return;
+    if (function_call == NULL || argument == NULL) goto error_cleanup;
+    if (function_call->node_type != CZ_AST_FunctionCallNodeType) goto error_cleanup;
 
     // Increment capacity.
     CZ_AST_Node** new_list = (CZ_AST_Node**) realloc(function_call->function_call.arguments, sizeof(CZ_AST_Node*) * (function_call->function_call.arg_count+1));
-    NULL_POINTER_TO_GOTO(new_list, error_fail_return);
+    NULL_POINTER_TO_GOTO(new_list, error_cleanup);
 
     function_call->function_call.arguments = new_list;
     function_call->function_call.arguments[function_call->function_call.arg_count] = argument;
@@ -286,7 +286,7 @@ static int cz_parser_push_argument_to_function_call_argument_list(CZ_AST_Node* f
 
     return 1;
 
-error_fail_return:
+error_cleanup:
     return 0;
 }
 
@@ -414,21 +414,21 @@ static CZ_AST_Node* cz_parser_create_struct_decl(CZ_Parser* parser) {
     // struct
     {
         CZ_Token* struct_token = cz_parser_consume_token(parser, CZ_TT_STRUCT);
-        NULL_POINTER_TO_GOTO(struct_token, error_free_node);
+        NULL_POINTER_TO_GOTO(struct_token, error_cleanup);
     }
 
     // identifier
     identifier = cz_parser_create_identifier(parser);
-    NULL_POINTER_TO_GOTO(identifier, error_free_node);
+    NULL_POINTER_TO_GOTO(identifier, error_cleanup);
 
     // {
     {
         CZ_Token* left_curly = cz_parser_consume_token(parser, CZ_TT_LEFT_CURLY_BRACKET);
-        NULL_POINTER_TO_GOTO(left_curly, error_free_node);
+        NULL_POINTER_TO_GOTO(left_curly, error_cleanup);
     }
 
     node = cz_ast_node_create(CZ_AST_StructDeclarationNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-    NULL_POINTER_TO_GOTO(node, error_free_node);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     // struct member list
     // 1. Check if empty.
@@ -438,16 +438,16 @@ static CZ_AST_Node* cz_parser_create_struct_decl(CZ_Parser* parser) {
     if (cz_parser_peek_token_type(parser, 0) != CZ_TT_RIGHT_CURLY_BRACKET) {
         do {
             member = cz_parser_create_variable_decl(parser);
-            NULL_POINTER_TO_GOTO(member, error_free_node);
+            NULL_POINTER_TO_GOTO(member, error_cleanup);
 
             if (cz_parser_push_struct_member_to_members(node, member) != 1) {
-                goto error_free_node;
+                goto error_cleanup;
             }
             member = NULL;
 
             {
                 CZ_Token* semicolon = cz_parser_consume_token(parser, CZ_TT_SEMICOLON);
-                NULL_POINTER_TO_GOTO(semicolon, error_free_node);
+                NULL_POINTER_TO_GOTO(semicolon, error_cleanup);
             }
 
         } while (cz_parser_peek_token_type(parser, 0) != CZ_TT_RIGHT_CURLY_BRACKET);
@@ -456,7 +456,7 @@ static CZ_AST_Node* cz_parser_create_struct_decl(CZ_Parser* parser) {
     // }
     {
         CZ_Token* right_curly = cz_parser_consume_token(parser, CZ_TT_RIGHT_CURLY_BRACKET);
-        NULL_POINTER_TO_GOTO(right_curly, error_free_node);
+        NULL_POINTER_TO_GOTO(right_curly, error_cleanup);
     }
 
     node->struct_declaration.identifier = identifier;
@@ -464,7 +464,7 @@ static CZ_AST_Node* cz_parser_create_struct_decl(CZ_Parser* parser) {
 
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(node);
     cz_ast_root_free(identifier);
     cz_ast_root_free(member);
@@ -477,15 +477,15 @@ static CZ_AST_Node* cz_parser_create_struct_init(CZ_Parser* parser) {
     CZ_AST_Node* member = NULL;
 
     node = cz_ast_node_create(CZ_AST_StructInitNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-    NULL_POINTER_TO_GOTO(node, error_free_node);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     identifier = cz_parser_create_identifier(parser);
-    NULL_POINTER_TO_GOTO(identifier, error_free_node);
+    NULL_POINTER_TO_GOTO(identifier, error_cleanup);
 
     // {
     {
         CZ_Token* left_curly_token = cz_parser_consume_token(parser, CZ_TT_LEFT_CURLY_BRACKET);
-        NULL_POINTER_TO_GOTO(left_curly_token, error_free_node);
+        NULL_POINTER_TO_GOTO(left_curly_token, error_cleanup);
     }
 
     // --- Struct Init list ---
@@ -494,9 +494,9 @@ static CZ_AST_Node* cz_parser_create_struct_init(CZ_Parser* parser) {
         // Not empty!
         // Do one entry first.
         member = cz_parser_create_struct_init_member(parser);
-        NULL_POINTER_TO_GOTO(member, error_free_node);
+        NULL_POINTER_TO_GOTO(member, error_cleanup);
         if (cz_parser_push_struct_member_to_members(node, member) != 1) {
-            goto error_free_node;
+            goto error_cleanup;
         }
         member = NULL;
 
@@ -504,13 +504,13 @@ static CZ_AST_Node* cz_parser_create_struct_init(CZ_Parser* parser) {
         while (cz_parser_peek_token_type(parser, 0) == CZ_TT_COMMA) {
             {
                 CZ_Token* comma = cz_parser_consume_token(parser, CZ_TT_COMMA);
-                NULL_POINTER_TO_GOTO(comma, error_free_node);
+                NULL_POINTER_TO_GOTO(comma, error_cleanup);
             }
 
             member = cz_parser_create_struct_init_member(parser);
-            NULL_POINTER_TO_GOTO(member, error_free_node);
+            NULL_POINTER_TO_GOTO(member, error_cleanup);
             if (cz_parser_push_struct_member_to_members(node, member) != 1) {
-                goto error_free_node;
+                goto error_cleanup;
             }
             member = NULL;
         }
@@ -519,14 +519,14 @@ static CZ_AST_Node* cz_parser_create_struct_init(CZ_Parser* parser) {
     // }
     {
         CZ_Token* right_curly_token = cz_parser_consume_token(parser, CZ_TT_RIGHT_CURLY_BRACKET);
-        NULL_POINTER_TO_GOTO(right_curly_token, error_free_node);
+        NULL_POINTER_TO_GOTO(right_curly_token, error_cleanup);
     }
     
     node->struct_declaration.identifier = identifier;
     identifier = NULL;
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(node);
     cz_ast_root_free(identifier);
     return NULL;
@@ -537,28 +537,28 @@ static CZ_AST_Node* cz_parser_create_struct_init_member(CZ_Parser* parser) {
     CZ_AST_Node* identifier = NULL;
     CZ_AST_Node* expression = NULL;
 
-    NULL_POINTER_TO_GOTO(parser, error_free_node);
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
     // .
     {
         CZ_Token* period_token = cz_parser_consume_token(parser, CZ_TT_PERIOD);
-        NULL_POINTER_TO_GOTO(period_token, error_free_node);
+        NULL_POINTER_TO_GOTO(period_token, error_cleanup);
     }
 
     identifier = cz_parser_create_identifier(parser);
-    NULL_POINTER_TO_GOTO(identifier, error_free_node);
+    NULL_POINTER_TO_GOTO(identifier, error_cleanup);
 
     // =
     {
         CZ_Token* equal_token = cz_parser_consume_token(parser, CZ_TT_EQUAL);
-        NULL_POINTER_TO_GOTO(equal_token, error_free_node);
+        NULL_POINTER_TO_GOTO(equal_token, error_cleanup);
     }
 
     expression = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
-    NULL_POINTER_TO_GOTO(expression, error_free_node);
+    NULL_POINTER_TO_GOTO(expression, error_cleanup);
 
     node = cz_ast_node_create(CZ_AST_StructInitMemberNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-    NULL_POINTER_TO_GOTO(node, error_free_node);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     node->struct_init_member.identifier = identifier;
     identifier = NULL;
@@ -567,7 +567,7 @@ static CZ_AST_Node* cz_parser_create_struct_init_member(CZ_Parser* parser) {
 
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(node);
     cz_ast_root_free(identifier);
     cz_ast_root_free(expression);
@@ -578,18 +578,18 @@ static CZ_AST_Node* cz_parser_create_variable_decl(CZ_Parser* parser) {
     CZ_AST_Node* node = NULL;
     CZ_AST_Node* expression = NULL;
 
-    NULL_POINTER_TO_GOTO(parser, error_free_node);
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
     node = cz_parser_create_param_decl(parser);
-    NULL_POINTER_TO_GOTO(node, error_free_node);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     // See if there is assignment at declaration.
     if (cz_parser_peek_token_type(parser, 0) == CZ_TT_EQUAL) {
         CZ_Token* equal_token = cz_parser_consume_token(parser, CZ_TT_EQUAL);
-        NULL_POINTER_TO_GOTO(equal_token, error_free_node);
+        NULL_POINTER_TO_GOTO(equal_token, error_cleanup);
 
         expression = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
-        NULL_POINTER_TO_GOTO(expression, error_free_node);
+        NULL_POINTER_TO_GOTO(expression, error_cleanup);
 
         node->variable_declaration.expression = expression;
         // We have transferred ownership of expression to the node, so set expression to NULL to avoid freeing in error label.
@@ -598,7 +598,7 @@ static CZ_AST_Node* cz_parser_create_variable_decl(CZ_Parser* parser) {
 
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(expression);
     cz_ast_root_free(node);
     return NULL;
@@ -614,17 +614,17 @@ static CZ_AST_Node* cz_parser_create_type_decl(CZ_Parser* parser, bool is_strong
     // typedef / newtype
     {
         CZ_Token* type_token = cz_parser_consume_token(parser, is_strong ? CZ_TT_NEWTYPE : CZ_TT_TYPEDEF);
-        NULL_POINTER_TO_GOTO(type_token, error_free_node);
+        NULL_POINTER_TO_GOTO(type_token, error_cleanup);
     }
 
     type = cz_parser_create_base_type(parser);
-    NULL_POINTER_TO_GOTO(type, error_free_node);
+    NULL_POINTER_TO_GOTO(type, error_cleanup);
 
     new_type = cz_parser_create_identifier(parser);
-    NULL_POINTER_TO_GOTO(new_type, error_free_node);
+    NULL_POINTER_TO_GOTO(new_type, error_cleanup);
 
     node = cz_ast_node_create(is_strong ? CZ_AST_NewtypeDeclarationNodeType : CZ_AST_TypedefDeclarationNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-    NULL_POINTER_TO_GOTO(node, error_free_node);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     node->typedef_declaration.type = type;
     type = NULL;
@@ -633,7 +633,7 @@ static CZ_AST_Node* cz_parser_create_type_decl(CZ_Parser* parser, bool is_strong
 
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(node);
     cz_ast_root_free(type);
     cz_ast_root_free(new_type);
@@ -645,25 +645,25 @@ static CZ_AST_Node* cz_parser_create_assignment(CZ_Parser* parser) {
     CZ_AST_Node* l_expression = NULL;
     CZ_AST_Node* r_expression = NULL;
 
-    NULL_POINTER_TO_GOTO(parser, error_free_node);
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
     l_expression = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
-    NULL_POINTER_TO_GOTO(l_expression, error_free_node);
+    NULL_POINTER_TO_GOTO(l_expression, error_cleanup);
 
 
     CZ_TokenType op_token_type = cz_parser_peek_token_type(parser, 0);
     if (cz_token_type_is_assignment(op_token_type)) {
         CZ_Token* op_token = cz_parser_consume_token(parser, op_token_type);
-        NULL_POINTER_TO_GOTO(op_token, error_free_node);
+        NULL_POINTER_TO_GOTO(op_token, error_cleanup);
     } else {
-        goto error_free_node;
+        goto error_cleanup;
     }
         
     r_expression = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
-    NULL_POINTER_TO_GOTO(r_expression, error_free_node);
+    NULL_POINTER_TO_GOTO(r_expression, error_cleanup);
 
     node = cz_ast_node_create(CZ_AST_AssignmentStatementNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-    NULL_POINTER_TO_GOTO(node, error_free_node);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     node->binary_expression.op = op_token_type;
     node->binary_expression.left = l_expression;
@@ -673,7 +673,7 @@ static CZ_AST_Node* cz_parser_create_assignment(CZ_Parser* parser) {
 
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(node);
     cz_ast_root_free(l_expression);
     cz_ast_root_free(r_expression);
@@ -687,48 +687,48 @@ static CZ_AST_Node* cz_parser_create_function_decl(CZ_Parser* parser) {
     CZ_AST_Node* node = NULL;
     CZ_AST_Node* body = NULL;
 
-    NULL_POINTER_TO_GOTO(parser, error_free_node);
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
     // func
     {
         CZ_Token* func_token = cz_parser_consume_token(parser, CZ_TT_FUNC);
-        NULL_POINTER_TO_GOTO(func_token, error_free_node);
+        NULL_POINTER_TO_GOTO(func_token, error_cleanup);
     }
 
     // identifier
     function_identifier = cz_parser_create_identifier(parser);
-    NULL_POINTER_TO_GOTO(function_identifier, error_free_node);
+    NULL_POINTER_TO_GOTO(function_identifier, error_cleanup);
 
     // :: (
     {
         CZ_Token* type_separator = cz_parser_consume_token(parser, CZ_TT_COLON_COLON);
-        NULL_POINTER_TO_GOTO(type_separator, error_free_node);
+        NULL_POINTER_TO_GOTO(type_separator, error_cleanup);
         CZ_Token* left_paren = cz_parser_consume_token(parser, CZ_TT_LEFT_PARENTHESIS);
-        NULL_POINTER_TO_GOTO(left_paren, error_free_node);
+        NULL_POINTER_TO_GOTO(left_paren, error_cleanup);
     }
 
     // param_list
     param_list = cz_parser_create_param_list(parser);
-    NULL_POINTER_TO_GOTO(param_list, error_free_node);
+    NULL_POINTER_TO_GOTO(param_list, error_cleanup);
 
     // ) ->
     {
         CZ_Token* right_paren = cz_parser_consume_token(parser, CZ_TT_RIGHT_PARENTHESIS);
-        NULL_POINTER_TO_GOTO(right_paren, error_free_node);
+        NULL_POINTER_TO_GOTO(right_paren, error_cleanup);
     }
 
     if (cz_parser_peek_token_type(parser, 0) == CZ_TT_RIGHT_ARROW) {
         {
             CZ_Token* arrow = cz_parser_consume_token(parser, CZ_TT_RIGHT_ARROW);
-            NULL_POINTER_TO_GOTO(arrow, error_free_node);
+            NULL_POINTER_TO_GOTO(arrow, error_cleanup);
         }
 
         // type
         type = cz_parser_create_type(parser);
-        NULL_POINTER_TO_GOTO(type, error_free_node);
+        NULL_POINTER_TO_GOTO(type, error_cleanup);
     } else {
         type = cz_ast_node_create(CZ_AST_TypeNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-        NULL_POINTER_TO_GOTO(type, error_free_node);
+        NULL_POINTER_TO_GOTO(type, error_cleanup);
         type->type_expression.is_const = false;
         type->type_expression.is_reference = false;
         type->type_expression.is_function_type = false;
@@ -738,10 +738,10 @@ static CZ_AST_Node* cz_parser_create_function_decl(CZ_Parser* parser) {
     
     // body
     body = cz_parser_create_block(parser);
-    NULL_POINTER_TO_GOTO(body, error_free_node);
+    NULL_POINTER_TO_GOTO(body, error_cleanup);
 
     node = cz_ast_node_create(CZ_AST_FunctionDeclarationNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-    NULL_POINTER_TO_GOTO(node, error_free_node);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     node->function_declaration.function_identifier = function_identifier;
     function_identifier = NULL;
@@ -754,7 +754,7 @@ static CZ_AST_Node* cz_parser_create_function_decl(CZ_Parser* parser) {
 
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(function_identifier);
     cz_ast_root_free(type);
     cz_ast_root_free(param_list);
@@ -767,10 +767,10 @@ static CZ_AST_Node* cz_parser_create_param_list(CZ_Parser* parser) {
     CZ_AST_Node* node = NULL;
     CZ_AST_Node* param = NULL;
 
-    NULL_POINTER_TO_GOTO(parser, error_free_node);
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
     node = cz_ast_node_create(CZ_AST_ParameterListNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-    NULL_POINTER_TO_GOTO(node, error_free_node);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     // No need to allocate as realloc in param_push will handle.
     node->parameter_list.params = NULL;
@@ -787,34 +787,34 @@ static CZ_AST_Node* cz_parser_create_param_list(CZ_Parser* parser) {
     // Single
     {
         param = cz_parser_create_param_decl(parser);
-        NULL_POINTER_TO_GOTO(param, error_free_node);
+        NULL_POINTER_TO_GOTO(param, error_cleanup);
 
         if (cz_parser_push_function_param(node, param) != 1) {
             cz_ast_root_free(param);
             param = NULL;
-            goto error_free_node;
+            goto error_cleanup;
         }
         param = NULL;
     }
 
     while (cz_parser_peek_token_type(parser, 0) == CZ_TT_COMMA) {
         CZ_Token* comma = cz_parser_consume_token(parser, CZ_TT_COMMA);
-        NULL_POINTER_TO_GOTO(comma, error_free_node);
+        NULL_POINTER_TO_GOTO(comma, error_cleanup);
 
         param = cz_parser_create_param_decl(parser);
-        NULL_POINTER_TO_GOTO(param, error_free_node);
+        NULL_POINTER_TO_GOTO(param, error_cleanup);
 
         if (cz_parser_push_function_param(node, param) != 1) {
             cz_ast_root_free(param);
             param = NULL;
-            goto error_free_node;
+            goto error_cleanup;
         }
         param = NULL;
     }
 
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(param);
     cz_ast_root_free(node);
     return NULL;
@@ -825,23 +825,23 @@ static CZ_AST_Node* cz_parser_create_param_decl(CZ_Parser* parser) {
     CZ_AST_Node* type = NULL;
     CZ_AST_Node* node = NULL;
 
-    NULL_POINTER_TO_GOTO(parser, error_free_node);
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
     // Identifier
     identifier = cz_parser_create_identifier(parser);
-    NULL_POINTER_TO_GOTO(identifier, error_free_node);
+    NULL_POINTER_TO_GOTO(identifier, error_cleanup);
 
     // ::
     {
         CZ_Token* token = cz_parser_consume_token(parser, CZ_TT_COLON_COLON);
-        NULL_POINTER_TO_GOTO(token, error_free_node);
+        NULL_POINTER_TO_GOTO(token, error_cleanup);
     }
 
     type = cz_parser_create_type(parser);
-    NULL_POINTER_TO_GOTO(type, error_free_node);
+    NULL_POINTER_TO_GOTO(type, error_cleanup);
 
     node = cz_ast_node_create(CZ_AST_VariableDeclarationNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-    NULL_POINTER_TO_GOTO(node, error_free_node);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     node->variable_declaration.identifier = identifier;
     node->variable_declaration.type = type;
@@ -853,7 +853,7 @@ static CZ_AST_Node* cz_parser_create_param_decl(CZ_Parser* parser) {
 
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(type);
     cz_ast_root_free(identifier);
     cz_ast_root_free(node);
@@ -864,34 +864,34 @@ static CZ_AST_Node* cz_parser_create_block(CZ_Parser* parser) {
     CZ_AST_Node* node = NULL;
     CZ_AST_Node* statement = NULL;
 
-    NULL_POINTER_TO_GOTO(parser, error_free_node);
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
     // {
     {
         CZ_Token* left_curly = cz_parser_consume_token(parser, CZ_TT_LEFT_CURLY_BRACKET);
-        NULL_POINTER_TO_GOTO(left_curly, error_free_node);
+        NULL_POINTER_TO_GOTO(left_curly, error_cleanup);
     }
 
     node = cz_ast_node_create(CZ_AST_BlockStatementNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-    NULL_POINTER_TO_GOTO(node, error_free_node);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     while (cz_parser_peek_token_type(parser, 0) != CZ_TT_RIGHT_CURLY_BRACKET) {
         statement = cz_parser_create_statement(parser);
-        NULL_POINTER_TO_GOTO(statement, error_free_node);
+        NULL_POINTER_TO_GOTO(statement, error_cleanup);
 
-        if (cz_parser_push_statement_to_block(node, statement) != 1) goto error_free_node;
+        if (cz_parser_push_statement_to_block(node, statement) != 1) goto error_cleanup;
         statement = NULL;
     }
 
     // }
     {
         CZ_Token* right_curly = cz_parser_consume_token(parser, CZ_TT_RIGHT_CURLY_BRACKET);
-        NULL_POINTER_TO_GOTO(right_curly, error_free_node);
+        NULL_POINTER_TO_GOTO(right_curly, error_cleanup);
     }
 
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(node);
     cz_ast_root_free(statement);
     return NULL;
@@ -901,7 +901,7 @@ static CZ_AST_Node* cz_parser_create_statement(CZ_Parser* parser) {
     CZ_AST_Node* node = NULL;
     CZ_AST_Node* lhs = NULL;
     CZ_AST_Node* rhs = NULL;
-    NULL_POINTER_TO_GOTO(parser, error_free_node);
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
     const CZ_TokenType peeked = cz_parser_peek_token_type(parser, 0);
 
@@ -910,7 +910,7 @@ static CZ_AST_Node* cz_parser_create_statement(CZ_Parser* parser) {
             node = cz_parser_create_return_statement(parser);
             {
                 CZ_Token* semicolon = cz_parser_consume_token(parser, CZ_TT_SEMICOLON);
-                NULL_POINTER_TO_GOTO(semicolon, error_free_node);
+                NULL_POINTER_TO_GOTO(semicolon, error_cleanup);
             }
             break;
         case CZ_TT_IF:
@@ -930,7 +930,7 @@ static CZ_AST_Node* cz_parser_create_statement(CZ_Parser* parser) {
         //    node = cz_parser_create_variable_decl(parser);
         //    {
         //        CZ_Token* semicolon = cz_parser_consume_token(parser, CZ_TT_SEMICOLON);
-        //        NULL_POINTER_TO_GOTO(semicolon, error_free_node);
+        //        NULL_POINTER_TO_GOTO(semicolon, error_cleanup);
         //    }
         //    break;
         case CZ_TT_IDENTIFIER:
@@ -943,7 +943,7 @@ static CZ_AST_Node* cz_parser_create_statement(CZ_Parser* parser) {
                 node = cz_parser_create_variable_decl(parser);
             } else {
                 lhs = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
-                NULL_POINTER_TO_GOTO(lhs, error_free_node);
+                NULL_POINTER_TO_GOTO(lhs, error_cleanup);
 
                 if (cz_token_type_is_assignment(cz_parser_peek_token_type(parser, 0))) {
                     // Assignment
@@ -951,14 +951,14 @@ static CZ_AST_Node* cz_parser_create_statement(CZ_Parser* parser) {
                     // Consume assignment token
                     const CZ_TokenType assignment_operator_token_type = cz_parser_peek_token_type(parser, 0);
                     CZ_Token* assignment_operator_token = cz_parser_consume_token(parser, assignment_operator_token_type);
-                    NULL_POINTER_TO_GOTO(assignment_operator_token, error_free_node);
+                    NULL_POINTER_TO_GOTO(assignment_operator_token, error_cleanup);
 
                     // Consume RHS expression
                     rhs = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
-                    NULL_POINTER_TO_GOTO(rhs, error_free_node);
+                    NULL_POINTER_TO_GOTO(rhs, error_cleanup);
 
                     node = cz_ast_node_create(CZ_AST_AssignmentStatementNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-                    NULL_POINTER_TO_GOTO(node, error_free_node);
+                    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
                     node->binary_expression.op = assignment_operator_token_type;
                     node->binary_expression.left = lhs;
@@ -976,22 +976,22 @@ static CZ_AST_Node* cz_parser_create_statement(CZ_Parser* parser) {
             // All three cases require semicolon at the end.
             {
                 CZ_Token* semicolon = cz_parser_consume_token(parser, CZ_TT_SEMICOLON);
-                NULL_POINTER_TO_GOTO(semicolon, error_free_node);
+                NULL_POINTER_TO_GOTO(semicolon, error_cleanup);
             }
             break;
         default:
             node = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
             {
                 CZ_Token* semicolon = cz_parser_consume_token(parser, CZ_TT_SEMICOLON);
-                NULL_POINTER_TO_GOTO(semicolon, error_free_node);
+                NULL_POINTER_TO_GOTO(semicolon, error_cleanup);
             }
             break;
     }
-    NULL_POINTER_TO_GOTO(node, error_free_node);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(node);
     cz_ast_root_free(lhs);
     cz_ast_root_free(rhs);
@@ -1006,25 +1006,25 @@ static CZ_AST_Node* cz_parser_create_return_statement(CZ_Parser* parser) {
 
     {
         CZ_Token* return_token = cz_parser_consume_token(parser, CZ_TT_RETURN);
-        NULL_POINTER_TO_GOTO(return_token, error_free_node);
+        NULL_POINTER_TO_GOTO(return_token, error_cleanup);
     }
 
     if (cz_parser_peek_token_type(parser, 0) != CZ_TT_SEMICOLON) {
         expression = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
-        NULL_POINTER_TO_GOTO(expression, error_free_node);
+        NULL_POINTER_TO_GOTO(expression, error_cleanup);
     }
 
     
     // Wiring up.
     node = cz_ast_node_create(CZ_AST_ReturnStatementNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-    NULL_POINTER_TO_GOTO(node, error_free_node);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     node->return_statement.expression = expression;
     expression = NULL;
 
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(node);
     cz_ast_root_free(expression);
     return NULL;
@@ -1041,32 +1041,32 @@ static CZ_AST_Node* cz_parser_create_if_statement(CZ_Parser* parser) {
     // if (
     {
         CZ_Token* if_token = cz_parser_consume_token(parser, CZ_TT_IF);
-        NULL_POINTER_TO_GOTO(if_token, error_free_node);
+        NULL_POINTER_TO_GOTO(if_token, error_cleanup);
 
         CZ_Token* left_paren = cz_parser_consume_token(parser, CZ_TT_LEFT_PARENTHESIS);
-        NULL_POINTER_TO_GOTO(left_paren, error_free_node);
+        NULL_POINTER_TO_GOTO(left_paren, error_cleanup);
     }
 
     // Condition
     condition = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
-    NULL_POINTER_TO_GOTO(condition, error_free_node);
+    NULL_POINTER_TO_GOTO(condition, error_cleanup);
 
     // )
     {
         CZ_Token* right_paren = cz_parser_consume_token(parser, CZ_TT_RIGHT_PARENTHESIS);
-        NULL_POINTER_TO_GOTO(right_paren, error_free_node);
+        NULL_POINTER_TO_GOTO(right_paren, error_cleanup);
     }
 
     // Block
     if_branch = cz_parser_create_block(parser);
-    NULL_POINTER_TO_GOTO(if_branch, error_free_node);
+    NULL_POINTER_TO_GOTO(if_branch, error_cleanup);
 
     // else branch
     if (cz_parser_peek_token_type(parser, 0) == CZ_TT_ELSE) {
         // else
         {
             CZ_Token* else_token = cz_parser_consume_token(parser, CZ_TT_ELSE);
-            NULL_POINTER_TO_GOTO(else_token, error_free_node);
+            NULL_POINTER_TO_GOTO(else_token, error_cleanup);
         }
 
         CZ_TokenType else_peeked = cz_parser_peek_token_type(parser, 0);
@@ -1080,11 +1080,11 @@ static CZ_AST_Node* cz_parser_create_if_statement(CZ_Parser* parser) {
             default:
                 break;
         }
-        NULL_POINTER_TO_GOTO(else_branch, error_free_node);
+        NULL_POINTER_TO_GOTO(else_branch, error_cleanup);
     }
 
     node = cz_ast_node_create(CZ_AST_IfStatementNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-    NULL_POINTER_TO_GOTO(node, error_free_node);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     // Wire up
     node->if_statement.condition = condition;
@@ -1095,7 +1095,7 @@ static CZ_AST_Node* cz_parser_create_if_statement(CZ_Parser* parser) {
     else_branch = NULL;
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(node);
     cz_ast_root_free(condition);
     cz_ast_root_free(if_branch);
@@ -1112,15 +1112,15 @@ static CZ_AST_Node* cz_parser_create_for_statement(CZ_Parser* parser) {
     CZ_AST_Node* rhs = NULL;
     CZ_AST_Node* body = NULL;
 
-    NULL_POINTER_TO_GOTO(parser, error_node_free);
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
     // for (
     {
         CZ_Token* for_token = cz_parser_consume_token(parser, CZ_TT_FOR);
-        NULL_POINTER_TO_GOTO(for_token, error_node_free);
+        NULL_POINTER_TO_GOTO(for_token, error_cleanup);
 
         CZ_Token* left_paren = cz_parser_consume_token(parser, CZ_TT_LEFT_PARENTHESIS);
-        NULL_POINTER_TO_GOTO(left_paren, error_node_free);
+        NULL_POINTER_TO_GOTO(left_paren, error_cleanup);
     }
 
     // Initialization:
@@ -1128,10 +1128,10 @@ static CZ_AST_Node* cz_parser_create_for_statement(CZ_Parser* parser) {
     // Lookahead: idx=CZ_TT_IDENTIFIER, idx+1="assignment" -> assignment
     if (cz_parser_peek_token_type(parser, 0) == CZ_TT_IDENTIFIER && cz_parser_peek_token_type(parser, 1) == CZ_TT_COLON_COLON) {
         initialization = cz_parser_create_variable_decl(parser);
-        NULL_POINTER_TO_GOTO(initialization, error_node_free);
+        NULL_POINTER_TO_GOTO(initialization, error_cleanup);
     } else if (cz_parser_peek_token_type(parser, 0) == CZ_TT_IDENTIFIER && cz_token_type_is_assignment(cz_parser_peek_token_type(parser, 1))) {
         initialization = cz_parser_create_assignment(parser);
-        NULL_POINTER_TO_GOTO(initialization, error_node_free);
+        NULL_POINTER_TO_GOTO(initialization, error_cleanup);
     } else {
         initialization = NULL;
     }
@@ -1139,19 +1139,19 @@ static CZ_AST_Node* cz_parser_create_for_statement(CZ_Parser* parser) {
     // ;
     {
         CZ_Token* semicolon = cz_parser_consume_token(parser, CZ_TT_SEMICOLON);
-        NULL_POINTER_TO_GOTO(semicolon, error_node_free);
+        NULL_POINTER_TO_GOTO(semicolon, error_cleanup);
     }
 
     // condition
     if (cz_parser_peek_token_type(parser, 0) != CZ_TT_SEMICOLON) {
         condition = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
-        NULL_POINTER_TO_GOTO(condition, error_node_free);
+        NULL_POINTER_TO_GOTO(condition, error_cleanup);
     }
 
     // ;
     {
         CZ_Token* semicolon = cz_parser_consume_token(parser, CZ_TT_SEMICOLON);
-        NULL_POINTER_TO_GOTO(semicolon, error_node_free);
+        NULL_POINTER_TO_GOTO(semicolon, error_cleanup);
     }
 
     // iteration_step
@@ -1160,19 +1160,19 @@ static CZ_AST_Node* cz_parser_create_for_statement(CZ_Parser* parser) {
     // if so, consume, and create another expression then create assignment.
     if (cz_parser_peek_token_type(parser, 0) != CZ_TT_RIGHT_PARENTHESIS) {
         lhs = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
-        NULL_POINTER_TO_GOTO(lhs, error_node_free);
+        NULL_POINTER_TO_GOTO(lhs, error_cleanup);
 
         CZ_TokenType peeked = cz_parser_peek_token_type(parser, 0);
         if (cz_token_type_is_assignment(peeked)) {
             // Assignment
             const CZ_Token* assignment_token = cz_parser_consume_token(parser, peeked);
-            NULL_POINTER_TO_GOTO(assignment_token, error_node_free);
+            NULL_POINTER_TO_GOTO(assignment_token, error_cleanup);
 
             rhs = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
-            NULL_POINTER_TO_GOTO(rhs, error_node_free);
+            NULL_POINTER_TO_GOTO(rhs, error_cleanup);
 
             iteration_step = cz_ast_node_create(CZ_AST_AssignmentStatementNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-            NULL_POINTER_TO_GOTO(iteration_step, error_node_free);
+            NULL_POINTER_TO_GOTO(iteration_step, error_cleanup);
 
             iteration_step->binary_expression.op = peeked;
             iteration_step->binary_expression.left = lhs;
@@ -1188,14 +1188,14 @@ static CZ_AST_Node* cz_parser_create_for_statement(CZ_Parser* parser) {
     // )
     {
         CZ_Token* right_paren = cz_parser_consume_token(parser, CZ_TT_RIGHT_PARENTHESIS);
-        NULL_POINTER_TO_GOTO(right_paren, error_node_free);
+        NULL_POINTER_TO_GOTO(right_paren, error_cleanup);
     }
 
     body = cz_parser_create_block(parser);
-    NULL_POINTER_TO_GOTO(body, error_node_free);
+    NULL_POINTER_TO_GOTO(body, error_cleanup);
 
     node = cz_ast_node_create(CZ_AST_ForStatementNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-    NULL_POINTER_TO_GOTO(node, error_node_free);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     node->for_statement.initialization = initialization;
     initialization = NULL;
@@ -1208,7 +1208,7 @@ static CZ_AST_Node* cz_parser_create_for_statement(CZ_Parser* parser) {
 
     return node;
 
-error_node_free:
+error_cleanup:
     cz_ast_root_free(node);
     cz_ast_root_free(initialization);
     cz_ast_root_free(condition);
@@ -1224,21 +1224,21 @@ static CZ_AST_Node* cz_parser_create_while_statement(CZ_Parser* parser) {
     CZ_AST_Node* condition = NULL;
     CZ_AST_Node* body = NULL;
 
-    NULL_POINTER_TO_GOTO(parser, error_node_free);
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
     {
         CZ_Token* while_token = cz_parser_consume_token(parser, CZ_TT_WHILE);
-        NULL_POINTER_TO_GOTO(while_token, error_node_free);
+        NULL_POINTER_TO_GOTO(while_token, error_cleanup);
     }
 
     condition = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
-    NULL_POINTER_TO_GOTO(condition, error_node_free);
+    NULL_POINTER_TO_GOTO(condition, error_cleanup);
 
     body = cz_parser_create_block(parser);
-    NULL_POINTER_TO_GOTO(body, error_node_free);
+    NULL_POINTER_TO_GOTO(body, error_cleanup);
 
     node = cz_ast_node_create(CZ_AST_WhileStatementNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-    NULL_POINTER_TO_GOTO(node, error_node_free);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     node->while_statement.condition = condition;
     condition = NULL;
@@ -1247,7 +1247,7 @@ static CZ_AST_Node* cz_parser_create_while_statement(CZ_Parser* parser) {
 
     return node;
 
-error_node_free:
+error_cleanup:
     cz_ast_root_free(node);
     cz_ast_root_free(condition);
     cz_ast_root_free(body);
@@ -1258,20 +1258,20 @@ static CZ_AST_Node* cz_parser_create_type(CZ_Parser* parser) {
     CZ_AST_Node* node = NULL;
     bool is_const = false;
 
-    NULL_POINTER_TO_GOTO(parser, error_free_node);
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
     if (cz_parser_peek_token_type(parser, 0) == CZ_TT_CONST) {
         const CZ_Token* const_token = cz_parser_consume_token(parser, CZ_TT_CONST);
-        NULL_POINTER_TO_GOTO(const_token, error_free_node);
+        NULL_POINTER_TO_GOTO(const_token, error_cleanup);
         is_const = true;
     }
 
     node = cz_parser_create_base_type(parser);
-    NULL_POINTER_TO_GOTO(node, error_free_node);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
 
     if (cz_parser_peek_token_type(parser, 0) == CZ_TT_AMPERSAND) {
         CZ_Token* token = cz_parser_consume_token(parser, CZ_TT_AMPERSAND);
-        NULL_POINTER_TO_GOTO(token, error_free_node);
+        NULL_POINTER_TO_GOTO(token, error_cleanup);
 
         node->type_expression.is_reference = true;
     }
@@ -1279,7 +1279,7 @@ static CZ_AST_Node* cz_parser_create_type(CZ_Parser* parser) {
 
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(node);
     return NULL;
 }
@@ -1287,7 +1287,7 @@ error_free_node:
 static CZ_AST_Node* cz_parser_create_base_type(CZ_Parser* parser) {
     CZ_AST_Node* node = NULL;
 
-    NULL_POINTER_TO_GOTO(parser, error_free_node);
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
     CZ_TokenType peeked = cz_parser_peek_token_type(parser, 0);
 
@@ -1299,10 +1299,10 @@ static CZ_AST_Node* cz_parser_create_base_type(CZ_Parser* parser) {
         case CZ_TT_IDENTIFIER:
             {
                 CZ_Token* token = cz_parser_consume_token(parser, peeked);
-                NULL_POINTER_TO_GOTO(token, error_free_node);
+                NULL_POINTER_TO_GOTO(token, error_cleanup);
 
                 node = cz_ast_node_create(CZ_AST_TypeNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-                NULL_POINTER_TO_GOTO(node, error_free_node);
+                NULL_POINTER_TO_GOTO(node, error_cleanup);
 
                 node->type_expression.is_reference = false;
                 node->type_expression.is_function_type = false;
@@ -1326,12 +1326,12 @@ static CZ_AST_Node* cz_parser_create_base_type(CZ_Parser* parser) {
             break;
         default:
             cz_error_list_push_error(parser->error_list, parser->filename, cz_parser_get_line(parser), cz_parser_get_col(parser), "Unrecognized base type");
-            goto error_free_node;
+            goto error_cleanup;
     }
 
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(node);
     return NULL;
 }
@@ -1389,10 +1389,10 @@ static CZ_AST_Node* cz_parser_create_expression(CZ_Parser* parser, CZ_Precedence
     CZ_AST_Node* parent = NULL;
     CZ_AST_Node* argument = NULL;
 
-    NULL_POINTER_TO_GOTO(parser, error_free_node);
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
     lhs = cz_parser_create_unary(parser);
-    NULL_POINTER_TO_GOTO(lhs, error_free_node);
+    NULL_POINTER_TO_GOTO(lhs, error_cleanup);
 
     // Loop while next operator binds tighter than current threshold
     while (true) {
@@ -1403,30 +1403,30 @@ static CZ_AST_Node* cz_parser_create_expression(CZ_Parser* parser, CZ_Precedence
         if (op_power <= min_binding_power) break;
 
         CZ_Token* token = cz_parser_consume_token(parser, next_op);
-        NULL_POINTER_TO_GOTO(token, error_free_node);
+        NULL_POINTER_TO_GOTO(token, error_cleanup);
 
         if (next_op == CZ_TT_AS) {
             parent = cz_ast_node_create(CZ_AST_CastExpressionNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-            NULL_POINTER_TO_GOTO(parent, error_free_node);
+            NULL_POINTER_TO_GOTO(parent, error_cleanup);
             
             parent->cast_expression.expression = lhs;
             lhs = NULL;
             parent->cast_expression.type = cz_parser_create_type(parser); // Custom target parsing!
-            NULL_POINTER_TO_GOTO(parent->cast_expression.type, error_free_node);
+            NULL_POINTER_TO_GOTO(parent->cast_expression.type, error_cleanup);
             
             lhs = parent;
             parent = NULL;
             continue;
         } else if (next_op == CZ_TT_PERIOD) {
             parent = cz_ast_node_create(CZ_AST_StructMemberAccessNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-            NULL_POINTER_TO_GOTO(parent, error_free_node);
+            NULL_POINTER_TO_GOTO(parent, error_cleanup);
 
             parent->struct_member_access.object = lhs; // Left-hand expression moves to object slot
             lhs = NULL;
             
             // The right hand side MUST be a direct identifier name token
             CZ_AST_Node* struct_access_member = cz_parser_create_identifier(parser);
-            NULL_POINTER_TO_GOTO(struct_access_member, error_free_node);
+            NULL_POINTER_TO_GOTO(struct_access_member, error_cleanup);
             parent->struct_member_access.member = struct_access_member;
             struct_access_member = NULL;
 
@@ -1435,7 +1435,7 @@ static CZ_AST_Node* cz_parser_create_expression(CZ_Parser* parser, CZ_Precedence
             continue;
         } else if (next_op == CZ_TT_LEFT_PARENTHESIS) {
             parent = cz_ast_node_create(CZ_AST_FunctionCallNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-            NULL_POINTER_TO_GOTO(parent, error_free_node);
+            NULL_POINTER_TO_GOTO(parent, error_cleanup);
 
             // The expression built so far on the left is the thing being called!
             parent->function_call.callee = lhs; 
@@ -1445,10 +1445,10 @@ static CZ_AST_Node* cz_parser_create_expression(CZ_Parser* parser, CZ_Precedence
                 // There is at least one argument to parse.
                 while (true) {
                     argument = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
-                    NULL_POINTER_TO_GOTO(argument, error_free_node);
+                    NULL_POINTER_TO_GOTO(argument, error_cleanup);
 
                     if (cz_parser_push_argument_to_function_call_argument_list(parent, argument) != 1) {
-                        goto error_free_node;
+                        goto error_cleanup;
                     }
                     argument = NULL;
 
@@ -1459,7 +1459,7 @@ static CZ_AST_Node* cz_parser_create_expression(CZ_Parser* parser, CZ_Precedence
                     // ,
                     {
                         CZ_Token* comma_token = cz_parser_consume_token(parser, CZ_TT_COMMA);
-                        NULL_POINTER_TO_GOTO(comma_token, error_free_node);
+                        NULL_POINTER_TO_GOTO(comma_token, error_cleanup);
                     }
                 }
             }
@@ -1467,7 +1467,7 @@ static CZ_AST_Node* cz_parser_create_expression(CZ_Parser* parser, CZ_Precedence
             // )
             {
                 CZ_Token* right_paren = cz_parser_consume_token(parser, CZ_TT_RIGHT_PARENTHESIS);
-                NULL_POINTER_TO_GOTO(right_paren, error_free_node);
+                NULL_POINTER_TO_GOTO(right_paren, error_cleanup);
             }
 
 
@@ -1483,11 +1483,11 @@ static CZ_AST_Node* cz_parser_create_expression(CZ_Parser* parser, CZ_Precedence
         }
 
         rhs = cz_parser_create_expression(parser, next_min_power);
-        NULL_POINTER_TO_GOTO(rhs, error_free_node);
+        NULL_POINTER_TO_GOTO(rhs, error_cleanup);
 
         // Allocate parent binary node and wire them up
         parent = cz_ast_node_create(CZ_AST_BinaryExpressionNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-        NULL_POINTER_TO_GOTO(parent, error_free_node);
+        NULL_POINTER_TO_GOTO(parent, error_cleanup);
         parent->binary_expression.op = next_op;
         parent->binary_expression.left = lhs;
         parent->binary_expression.right = rhs;
@@ -1502,7 +1502,7 @@ static CZ_AST_Node* cz_parser_create_expression(CZ_Parser* parser, CZ_Precedence
 
     return lhs;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(rhs);
     cz_ast_root_free(parent);
     cz_ast_root_free(lhs);
@@ -1514,7 +1514,7 @@ static CZ_AST_Node* cz_parser_create_unary(CZ_Parser* parser) {
     CZ_AST_Node* node = NULL;
     CZ_AST_Node* subnode = NULL;
 
-    NULL_POINTER_TO_GOTO(parser, error_free_node);
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
     const CZ_TokenType cur_token_type = cz_parser_peek_token_type(parser, 0);
 
@@ -1523,13 +1523,13 @@ static CZ_AST_Node* cz_parser_create_unary(CZ_Parser* parser) {
         case CZ_TT_EXCLAMATION:
             {
                 CZ_Token* token = cz_parser_consume_token(parser, cur_token_type);
-                NULL_POINTER_TO_GOTO(token, error_free_node);
+                NULL_POINTER_TO_GOTO(token, error_cleanup);
 
                 node = cz_ast_node_create(CZ_AST_UnaryExpressionNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
-                NULL_POINTER_TO_GOTO(node, error_free_node);
+                NULL_POINTER_TO_GOTO(node, error_cleanup);
 
                 subnode = cz_parser_create_primary(parser);
-                NULL_POINTER_TO_GOTO(subnode, error_free_node);
+                NULL_POINTER_TO_GOTO(subnode, error_cleanup);
 
                 node->unary_expression.op = token->token_type;
                 node->unary_expression.operand = subnode;
@@ -1540,13 +1540,13 @@ static CZ_AST_Node* cz_parser_create_unary(CZ_Parser* parser) {
             break;
         default:
             node = cz_parser_create_primary(parser);
-            NULL_POINTER_TO_GOTO(node, error_free_node);
+            NULL_POINTER_TO_GOTO(node, error_cleanup);
             return node;
     }
 
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(subnode);
     cz_ast_root_free(node);
     return NULL;
@@ -1555,7 +1555,7 @@ error_free_node:
 static CZ_AST_Node* cz_parser_create_primary(CZ_Parser* parser) {
     CZ_AST_Node* node = NULL;
 
-    NULL_POINTER_TO_GOTO(parser, error_free_node);
+    NULL_POINTER_TO_GOTO(parser, error_cleanup);
 
     const CZ_TokenType cur_token_type = cz_parser_peek_token_type(parser, 0);
 
@@ -1567,43 +1567,43 @@ static CZ_AST_Node* cz_parser_create_primary(CZ_Parser* parser) {
         case CZ_TT_TRUE:
         case CZ_TT_FALSE:
             node = cz_parser_create_literal(parser);
-            NULL_POINTER_TO_GOTO(node, error_free_node);
+            NULL_POINTER_TO_GOTO(node, error_cleanup);
             break;
         case CZ_TT_IDENTIFIER:
             if (cz_parser_peek_token_type(parser, 1) == CZ_TT_LEFT_CURLY_BRACKET) {
                 node = cz_parser_create_struct_init(parser);
-                NULL_POINTER_TO_GOTO(node, error_free_node);
+                NULL_POINTER_TO_GOTO(node, error_cleanup);
             } else {
             node = cz_parser_create_identifier(parser);
-            NULL_POINTER_TO_GOTO(node, error_free_node);
+            NULL_POINTER_TO_GOTO(node, error_cleanup);
             }
 
             //if (cz_parser_peek_token_type(parser, 0) == CZ_TT_LEFT_PARENTHESIS) {
             //    // TODO: Function Call
-            //    goto error_free_node;
+            //    goto error_cleanup;
             //}
             break;
         case CZ_TT_LEFT_PARENTHESIS:
             token = cz_parser_consume_token(parser, CZ_TT_LEFT_PARENTHESIS);
-            NULL_POINTER_TO_GOTO(token, error_free_node);
+            NULL_POINTER_TO_GOTO(token, error_cleanup);
 
             node = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
-            NULL_POINTER_TO_GOTO(node, error_free_node);
+            NULL_POINTER_TO_GOTO(node, error_cleanup);
 
             token = cz_parser_consume_token(parser, CZ_TT_RIGHT_PARENTHESIS);
             if (token == NULL) {
                 cz_ast_root_free(node);
                 node = NULL;
-                goto error_free_node;
+                goto error_cleanup;
             }
             break;
         default:
             cz_error_list_push_error(parser->error_list, parser->filename, parser->tokens[parser->idx].line, parser->tokens[parser->idx].column, "Unexpected token for primary value.");
-            goto error_free_node;
+            goto error_cleanup;
     }
     return node;
 
-error_free_node:
+error_cleanup:
     cz_ast_root_free(node);
     return NULL;
 }
