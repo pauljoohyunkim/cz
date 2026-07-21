@@ -75,7 +75,7 @@ void cz_environment_free(CZ_Environment* env) {
     free(env);
 }
 
-const CZ_Symbol* cz_environment_lookup(CZ_Environment* env, const char* name, bool cascade) {
+const CZ_Symbol* cz_environment_lookup(const CZ_Environment* env, const char* name, bool cascade) {
     if (env == NULL || name == NULL) return NULL;
 
     for (unsigned i = 0; i < env->symbol_count; i++) {

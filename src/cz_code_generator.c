@@ -89,23 +89,20 @@ const LLVMValueRef cz_environment_backend_lookup_val(const CZ_Environment_Backen
     return NULL;
 }
 
-const LLVMTypeRef cz_environment_backend_lookup_type(const CZ_Environment_Backend *env_b, const CZ_Type* type, bool cascade) {
-    if (env_b == NULL || type == NULL) return NULL;
+const LLVMTypeRef cz_environment_backend_lookup_type(const CZ_CodeGenerator* cg, const CZ_Type* type) {
+    if (cg == NULL || type == NULL) return NULL;
 
     // Const unwrapping (Avoid recursion by loop)
     while (type->kind == CZ_TYPE_KIND_CONST) {
         type = type->const_of;
     }
 
-    // Search the backend's type map for a matching entry.
+    // Search the global environment's type map for a matching entry.
+    CZ_Environment_Backend* env_b = cg->global_env_b;
     for (unsigned int i = 0; i < env_b->type_count; ++i) {
         if (env_b->type_map[i].type_name == type) {
             return env_b->type_map[i].ref;
         }
-    }
-
-    if (env_b->parent != NULL && cascade) {
-        return cz_environment_backend_lookup_type(env_b->parent, type, cascade);
     }
 
     return NULL;
@@ -317,7 +314,7 @@ static int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenera
         }
 
         // Lookup base type
-        if (cz_environment_backend_lookup_type(cg->global_env_b, type, false) != NULL) {
+        if (cz_environment_backend_lookup_type(cg, type) != NULL) {
             continue;
         }
 
@@ -346,7 +343,7 @@ static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
         switch (type->kind) {
             // Structs Members
             case CZ_TYPE_KIND_STRUCT: {
-                LLVMTypeRef llvm_struct_type = cz_environment_backend_lookup_type(cg->global_env_b, type, false);
+                LLVMTypeRef llvm_struct_type = cz_environment_backend_lookup_type(cg, type);
                 NULL_POINTER_TO_GOTO(llvm_struct_type, error_cleanup);
 
                 unsigned int field_count = type->structure.layout->field_count;
@@ -358,7 +355,7 @@ static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
                         const CZ_Type* member_type = type->structure.layout->fields[j].type;
 
                         // Lookup automatically unwraps const and handles references
-                        LLVMTypeRef llvm_member_type = cz_environment_backend_lookup_type(cg->global_env_b, member_type, false);
+                        LLVMTypeRef llvm_member_type = cz_environment_backend_lookup_type(cg, member_type);
                         
                         if (llvm_member_type == NULL) {
                             cz_error_list_push_error(cg->error_list, cg->filename, 0, 0, 
@@ -379,7 +376,7 @@ static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
 
             case CZ_TYPE_KIND_FUNCTION: {
                 // Return Type
-                LLVMTypeRef llvm_ret_type = cz_environment_backend_lookup_type(cg->global_env_b, type->function.return_type, false);
+                LLVMTypeRef llvm_ret_type = cz_environment_backend_lookup_type(cg, type->function.return_type);
                 NULL_POINTER_TO_GOTO(llvm_ret_type, error_cleanup);
 
                 // Parameters
@@ -390,7 +387,7 @@ static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
 
                     for (unsigned int j = 0; j < param_count; j++) {
                         const CZ_Type* param_type = type->function.param_types[j];
-                        LLVMTypeRef llvm_param_type = cz_environment_backend_lookup_type(cg->global_env_b, param_type, false);
+                        LLVMTypeRef llvm_param_type = cz_environment_backend_lookup_type(cg, param_type);
                         NULL_POINTER_TO_GOTO(llvm_param_type, error_cleanup);
                         
                         llvm_types[j] = llvm_param_type;
@@ -442,7 +439,7 @@ static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ
     NULL_POINTER_TO_GOTO(var_symbol, error_cleanup);
 
     const CZ_Type* var_type = var_symbol->data.value.type;
-    LLVMTypeRef llvm_var_type = cz_environment_backend_lookup_type(env_b, var_type, false);
+    LLVMTypeRef llvm_var_type = cz_environment_backend_lookup_type(cg, var_type);
 
     LLVMValueRef llvm_global_var = LLVMAddGlobal(cg->mod, llvm_var_type, var_name);
 
@@ -480,7 +477,7 @@ static LLVMValueRef cz_code_generate_generate_expr_const(CZ_CodeGenerator* cg, c
         case CZ_AST_UnaryExpressionNodeType:
             {
                 LLVMValueRef llvm_operand = cz_code_generate_generate_expr_const(cg, env, env_b, node->unary_expression.operand);
-                LLVMTypeRef llvm_operand_type = cz_environment_backend_lookup_type(env_b, node->unary_expression.operand->decoration->resolved_type, true);
+                LLVMTypeRef llvm_operand_type = cz_environment_backend_lookup_type(cg, node->unary_expression.operand->decoration->resolved_type);
                 LLVMTypeKind llvm_operand_type_kind = LLVMGetTypeKind(llvm_operand_type);
                 switch (node->unary_expression.op) {
                     case CZ_TT_MINUS:
