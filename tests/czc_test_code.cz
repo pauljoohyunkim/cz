@@ -3,6 +3,11 @@ struct Vector {
     y :: float;
 }
 
+typedef int32 int;
+
+n :: int = 1;
+k :: float = 0.2;
+
 i :: Vector = Vector {
     .x = 1.0
 };

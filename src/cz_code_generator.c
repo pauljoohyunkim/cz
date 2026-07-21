@@ -203,6 +203,12 @@ static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg);
 static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
 static LLVMValueRef cz_code_generator_generate_expr_const(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 
+static LLVMValueRef cz_code_generator_generate_expr_const_binary(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
+static LLVMValueRef cz_code_generator_generate_expr_const_unary(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
+static LLVMValueRef cz_code_generator_generate_expr_const_cast(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
+static LLVMValueRef cz_code_generator_generate_expr_const_literal(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
+static LLVMValueRef cz_code_generator_generate_expr_const_struct_init(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
+
 int cz_code_generator_generate(CZ_CodeGenerator* cg) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
     NULL_POINTER_TO_GOTO(cg->program, error_cleanup);
@@ -427,7 +433,6 @@ error_cleanup:
     return 0;
 }
 
-static LLVMValueRef cz_code_generator_generate_expr_const(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
     NULL_POINTER_TO_GOTO(env, error_cleanup);
@@ -476,202 +481,128 @@ static LLVMValueRef cz_code_generator_generate_expr_const(CZ_CodeGenerator* cg, 
 
     switch (node->node_type) {
         case CZ_AST_BinaryExpressionNodeType:
-            {
-                LLVMValueRef llvm_lhs = cz_code_generator_generate_expr_const(cg, env, env_b, node->binary_expression.left);
-                LLVMValueRef llvm_rhs = cz_code_generator_generate_expr_const(cg, env, env_b, node->binary_expression.right);
-                LLVMTypeRef llvm_lhs_type = cz_environment_backend_lookup_type(cg, node->binary_expression.left->decoration->resolved_type);
-                LLVMTypeRef llvm_rhs_type = cz_environment_backend_lookup_type(cg, node->binary_expression.right->decoration->resolved_type);
-                LLVMTypeKind llvm_lhs_type_kind = LLVMGetTypeKind(llvm_lhs_type);
-                LLVMTypeKind llvm_rhs_type_kind = LLVMGetTypeKind(llvm_rhs_type);
-                switch (node->binary_expression.op) {
-                    case CZ_TT_PLUS:
-                        if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
-                            llvm_val = LLVMBuildFAdd(cg->builder, llvm_lhs, llvm_rhs, "faddtmp");
-                        } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                            llvm_val = LLVMBuildAdd(cg->builder, llvm_lhs, llvm_rhs, "addtmp");
-                        }
-                        break;
-                    case CZ_TT_MINUS:
-                        if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
-                            llvm_val = LLVMBuildFSub(cg->builder, llvm_lhs, llvm_rhs, "fsubtmp");
-                        } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                            llvm_val = LLVMBuildSub(cg->builder, llvm_lhs, llvm_rhs, "subtmp");
-                        }
-                        break;
-                    case CZ_TT_STAR:
-                        if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
-                            llvm_val = LLVMBuildFMul(cg->builder, llvm_lhs, llvm_rhs, "fmultmp");
-                        } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                            llvm_val = LLVMBuildMul(cg->builder, llvm_lhs, llvm_rhs, "multmp");
-                        }
-                        break;
-                    case CZ_TT_SLASH:
-                        if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
-                            llvm_val = LLVMBuildFDiv(cg->builder, llvm_lhs, llvm_rhs, "fdivtmp");
-                        } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                            llvm_val = LLVMBuildSDiv(cg->builder, llvm_lhs, llvm_rhs, "divtmp");
-                        }
-                        break;
-                    case CZ_TT_PERCENT:
-                        if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                            llvm_val = LLVMBuildSRem(cg->builder, llvm_lhs, llvm_rhs, "remtmp");
-                        }
-                        break;
-                    case CZ_TT_AMPERSAND:
-                        if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                            llvm_val = LLVMBuildAnd(cg->builder, llvm_lhs, llvm_rhs, "andtmp");
-                        }
-                        break;
-                    case CZ_TT_BAR:
-                        if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                            llvm_val = LLVMBuildOr(cg->builder, llvm_lhs, llvm_rhs, "ortmp");
-                        }
-                        break;
-                    case CZ_TT_CARET:
-                        if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                            llvm_val = LLVMBuildXor(cg->builder, llvm_lhs, llvm_rhs, "xortmp");
-                        }
-                        break;
-                    case CZ_TT_GREATER:
-                        if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
-                            llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOGT, llvm_lhs, llvm_rhs, "fgttmp");
-                        } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                            llvm_val = LLVMBuildICmp(cg->builder, LLVMIntSGT, llvm_lhs, llvm_rhs, "gttmp");
-                        }
-                        break;
-                    case CZ_TT_LESS:
-                        if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
-                            llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOLT, llvm_lhs, llvm_rhs, "flttmp");
-                        } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                            llvm_val = LLVMBuildICmp(cg->builder, LLVMIntSLT, llvm_lhs, llvm_rhs, "lttmp");
-                        }
-                        break;
-                    case CZ_TT_GREATER_EQUAL:
-                        if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
-                            llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOGE, llvm_lhs, llvm_rhs, "fgetmp");
-                        } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                            llvm_val = LLVMBuildICmp(cg->builder, LLVMIntSGE, llvm_lhs, llvm_rhs, "getmp");
-                        }
-                        break;
-                    case CZ_TT_LESS_EQUAL:
-                        if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
-                            llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOLE, llvm_lhs, llvm_rhs, "fletmp");
-                        } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                            llvm_val = LLVMBuildICmp(cg->builder, LLVMIntSLE, llvm_lhs, llvm_rhs, "letmp");
-                        }
-                        break;
-                    case CZ_TT_EQUAL_EQUAL:
-                        if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
-                            llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOEQ, llvm_lhs, llvm_rhs, "feqtmp");
-                        } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                            llvm_val = LLVMBuildICmp(cg->builder, LLVMIntEQ, llvm_lhs, llvm_rhs, "eqtmp");
-                        }
-                        break;
-                    case CZ_TT_EXCLAMATION_EQUAL:
-                        if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
-                            llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealONE, llvm_lhs, llvm_rhs, "fneqtmp");
-                        } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                            llvm_val = LLVMBuildICmp(cg->builder, LLVMIntNE, llvm_lhs, llvm_rhs, "neqtmp");
-                        }
-                        break;
-                    default:
-                        goto error_cleanup;
-                }
-            }
+            llvm_val = cz_code_generator_generate_expr_const_binary(cg, env, env_b, node);
             break;
         case CZ_AST_UnaryExpressionNodeType:
-            {
-                LLVMValueRef llvm_operand = cz_code_generator_generate_expr_const(cg, env, env_b, node->unary_expression.operand);
-                LLVMTypeRef llvm_operand_type = cz_environment_backend_lookup_type(cg, node->unary_expression.operand->decoration->resolved_type);
-                LLVMTypeKind llvm_operand_type_kind = LLVMGetTypeKind(llvm_operand_type);
-                switch (node->unary_expression.op) {
-                    case CZ_TT_MINUS:
-                        switch (llvm_operand_type_kind) {
-                            case LLVMFloatTypeKind:
-                                {
-                                    const LLVMValueRef zero_const = LLVMConstReal(LLVMFloatTypeInContext(cg->ctx), 0);
-                                    llvm_val = LLVMBuildFSub(cg->builder, zero_const, llvm_operand, "fnegtmp");
-                                }
-                                break;
-                            case LLVMIntegerTypeKind:
-                                {
-                                    const LLVMValueRef zero_const = LLVMConstInt(LLVMInt32TypeInContext(cg->ctx), 0, true);
-                                    llvm_val = LLVMBuildSub(cg->builder, zero_const, llvm_operand, "negtmp");
-                                }
-                                break;
-                        }
-                        break;
-                    case CZ_TT_EXCLAMATION:
-                        {
-                            if (llvm_operand_type_kind == LLVMIntegerTypeKind) {
-                                const LLVMValueRef one_const = LLVMConstInt(LLVMInt1TypeInContext(cg->ctx), 1, true);
-                                llvm_val = LLVMBuildXor(cg->builder, one_const, llvm_operand, "nottmp");
-                            }
-                        }
-                        break;
-                    default:
-                        goto error_cleanup;
-                }
-            }
+            llvm_val = cz_code_generator_generate_expr_const_unary(cg, env, env_b, node);
             break;
         case CZ_AST_CastExpressionNodeType:
-            {
-                LLVMValueRef llvm_val_to_cast = cz_code_generator_generate_expr_const(cg, env, env_b, node->cast_expression.expression);
-                if (llvm_val_to_cast == NULL) {
-                    goto error_cleanup;
-                }
-
-                LLVMTypeRef llvm_src_type = cz_environment_backend_lookup_type(cg, node->cast_expression.expression->decoration->resolved_type);
-                LLVMTypeRef llvm_dest_type = cz_environment_backend_lookup_type(cg, node->decoration->resolved_type);
-
-                if (llvm_src_type == NULL || llvm_dest_type == NULL) {
-                    goto error_cleanup;
-                }
-
-                if (llvm_src_type == llvm_dest_type) {
-                    llvm_val = llvm_val_to_cast;
-                } else {
-                    LLVMTypeKind llvm_src_type_kind = LLVMGetTypeKind(llvm_src_type);
-                    LLVMTypeKind llvm_dest_type_kind = LLVMGetTypeKind(llvm_dest_type);
-
-                    if (llvm_src_type_kind == LLVMIntegerTypeKind && llvm_dest_type_kind == LLVMFloatTypeKind) {
-                        llvm_val = LLVMBuildSIToFP(cg->builder, llvm_val_to_cast, llvm_dest_type, "sitofp_tmp");
-                    } else if (llvm_src_type_kind == LLVMFloatTypeKind && llvm_dest_type_kind == LLVMIntegerTypeKind) {
-                        llvm_val = LLVMBuildFPToSI(cg->builder, llvm_val_to_cast, llvm_dest_type, "fptosi_tmp");
-                    } else {
-                        goto error_cleanup;
-                    }
-                }
-            }
+            llvm_val = cz_code_generator_generate_expr_const_cast(cg, env, env_b, node);
             break;
         case CZ_AST_LiteralNodeType:
-            switch (node->literal.literal_type) {
-                case CZ_TT_NUMERICAL_LITERAL:
-                    {
-                        if (strchr(node->literal.lexeme, '.') != NULL) {
-                            // Float
-                            float value = strtof(node->literal.lexeme, NULL);
-                            llvm_val = LLVMConstReal(LLVMFloatTypeInContext(cg->ctx), value);
-                        } else {
-                            // Integer
-                            int32_t value = strtol(node->literal.lexeme, NULL, 10);
-                            llvm_val = LLVMConstInt(LLVMInt32TypeInContext(cg->ctx), value, true);
-                        }
-                    }
-                    break;
-                case CZ_TT_TRUE:
-                    llvm_val = LLVMConstInt(LLVMInt1TypeInContext(cg->ctx), 1, false);
-                    break;
-                case CZ_TT_FALSE:
-                    llvm_val = LLVMConstInt(LLVMInt1TypeInContext(cg->ctx), 0, false);
-                    break;
-                default:
-                    goto error_cleanup;
-            }
+            llvm_val = cz_code_generator_generate_expr_const_literal(cg, env, env_b, node);
             break;
         case CZ_AST_StructInitNodeType:
-            {
-                
+            llvm_val = cz_code_generator_generate_expr_const_struct_init(cg, env, env_b, node);
+            break;
+        default:
+            goto error_cleanup;
+    }
+
+    return llvm_val;
+
+error_cleanup:
+    return NULL;
+}
+
+static LLVMValueRef cz_code_generator_generate_expr_const_binary(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
+    LLVMValueRef llvm_val = NULL;
+
+    LLVMValueRef llvm_lhs = cz_code_generator_generate_expr_const(cg, env, env_b, node->binary_expression.left);
+    LLVMValueRef llvm_rhs = cz_code_generator_generate_expr_const(cg, env, env_b, node->binary_expression.right);
+    LLVMTypeRef llvm_lhs_type = cz_environment_backend_lookup_type(cg, node->binary_expression.left->decoration->resolved_type);
+    LLVMTypeRef llvm_rhs_type = cz_environment_backend_lookup_type(cg, node->binary_expression.right->decoration->resolved_type);
+    LLVMTypeKind llvm_lhs_type_kind = LLVMGetTypeKind(llvm_lhs_type);
+    LLVMTypeKind llvm_rhs_type_kind = LLVMGetTypeKind(llvm_rhs_type);
+    switch (node->binary_expression.op) {
+        case CZ_TT_PLUS:
+            if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
+                llvm_val = LLVMBuildFAdd(cg->builder, llvm_lhs, llvm_rhs, "faddtmp");
+            } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
+                llvm_val = LLVMBuildAdd(cg->builder, llvm_lhs, llvm_rhs, "addtmp");
+            }
+            break;
+        case CZ_TT_MINUS:
+            if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
+                llvm_val = LLVMBuildFSub(cg->builder, llvm_lhs, llvm_rhs, "fsubtmp");
+            } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
+                llvm_val = LLVMBuildSub(cg->builder, llvm_lhs, llvm_rhs, "subtmp");
+            }
+            break;
+        case CZ_TT_STAR:
+            if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
+                llvm_val = LLVMBuildFMul(cg->builder, llvm_lhs, llvm_rhs, "fmultmp");
+            } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
+                llvm_val = LLVMBuildMul(cg->builder, llvm_lhs, llvm_rhs, "multmp");
+            }
+            break;
+        case CZ_TT_SLASH:
+            if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
+                llvm_val = LLVMBuildFDiv(cg->builder, llvm_lhs, llvm_rhs, "fdivtmp");
+            } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
+                llvm_val = LLVMBuildSDiv(cg->builder, llvm_lhs, llvm_rhs, "divtmp");
+            }
+            break;
+        case CZ_TT_PERCENT:
+            if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
+                llvm_val = LLVMBuildSRem(cg->builder, llvm_lhs, llvm_rhs, "remtmp");
+            }
+            break;
+        case CZ_TT_AMPERSAND:
+            if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
+                llvm_val = LLVMBuildAnd(cg->builder, llvm_lhs, llvm_rhs, "andtmp");
+            }
+            break;
+        case CZ_TT_BAR:
+            if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
+                llvm_val = LLVMBuildOr(cg->builder, llvm_lhs, llvm_rhs, "ortmp");
+            }
+            break;
+        case CZ_TT_CARET:
+            if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
+                llvm_val = LLVMBuildXor(cg->builder, llvm_lhs, llvm_rhs, "xortmp");
+            }
+            break;
+        case CZ_TT_GREATER:
+            if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
+                llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOGT, llvm_lhs, llvm_rhs, "fgttmp");
+            } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
+                llvm_val = LLVMBuildICmp(cg->builder, LLVMIntSGT, llvm_lhs, llvm_rhs, "gttmp");
+            }
+            break;
+        case CZ_TT_LESS:
+            if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
+                llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOLT, llvm_lhs, llvm_rhs, "flttmp");
+            } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
+                llvm_val = LLVMBuildICmp(cg->builder, LLVMIntSLT, llvm_lhs, llvm_rhs, "lttmp");
+            }
+            break;
+        case CZ_TT_GREATER_EQUAL:
+            if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
+                llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOGE, llvm_lhs, llvm_rhs, "fgetmp");
+            } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
+                llvm_val = LLVMBuildICmp(cg->builder, LLVMIntSGE, llvm_lhs, llvm_rhs, "getmp");
+            }
+            break;
+        case CZ_TT_LESS_EQUAL:
+            if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
+                llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOLE, llvm_lhs, llvm_rhs, "fletmp");
+            } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
+                llvm_val = LLVMBuildICmp(cg->builder, LLVMIntSLE, llvm_lhs, llvm_rhs, "letmp");
+            }
+            break;
+        case CZ_TT_EQUAL_EQUAL:
+            if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
+                llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOEQ, llvm_lhs, llvm_rhs, "feqtmp");
+            } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
+                llvm_val = LLVMBuildICmp(cg->builder, LLVMIntEQ, llvm_lhs, llvm_rhs, "eqtmp");
+            }
+            break;
+        case CZ_TT_EXCLAMATION_EQUAL:
+            if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
+                llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealONE, llvm_lhs, llvm_rhs, "fneqtmp");
+            } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
+                llvm_val = LLVMBuildICmp(cg->builder, LLVMIntNE, llvm_lhs, llvm_rhs, "neqtmp");
             }
             break;
         default:
@@ -682,6 +613,122 @@ static LLVMValueRef cz_code_generator_generate_expr_const(CZ_CodeGenerator* cg, 
 
 error_cleanup:
     return NULL;
+}
+
+static LLVMValueRef cz_code_generator_generate_expr_const_unary(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
+    LLVMValueRef llvm_val = NULL;
+
+    LLVMValueRef llvm_operand = cz_code_generator_generate_expr_const(cg, env, env_b, node->unary_expression.operand);
+    LLVMTypeRef llvm_operand_type = cz_environment_backend_lookup_type(cg, node->unary_expression.operand->decoration->resolved_type);
+    LLVMTypeKind llvm_operand_type_kind = LLVMGetTypeKind(llvm_operand_type);
+    switch (node->unary_expression.op) {
+        case CZ_TT_MINUS:
+            switch (llvm_operand_type_kind) {
+                case LLVMFloatTypeKind:
+                    {
+                        const LLVMValueRef zero_const = LLVMConstReal(LLVMFloatTypeInContext(cg->ctx), 0);
+                        llvm_val = LLVMBuildFSub(cg->builder, zero_const, llvm_operand, "fnegtmp");
+                    }
+                    break;
+                case LLVMIntegerTypeKind:
+                    {
+                        const LLVMValueRef zero_const = LLVMConstInt(LLVMInt32TypeInContext(cg->ctx), 0, true);
+                        llvm_val = LLVMBuildSub(cg->builder, zero_const, llvm_operand, "negtmp");
+                    }
+                    break;
+            }
+            break;
+        case CZ_TT_EXCLAMATION:
+            {
+                if (llvm_operand_type_kind == LLVMIntegerTypeKind) {
+                    const LLVMValueRef one_const = LLVMConstInt(LLVMInt1TypeInContext(cg->ctx), 1, true);
+                    llvm_val = LLVMBuildXor(cg->builder, one_const, llvm_operand, "nottmp");
+                }
+            }
+            break;
+        default:
+            goto error_cleanup;
+    }
+
+    return llvm_val;
+
+error_cleanup:
+    return NULL;
+}
+
+static LLVMValueRef cz_code_generator_generate_expr_const_cast(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
+    LLVMValueRef llvm_val = NULL;
+
+    LLVMValueRef llvm_val_to_cast = cz_code_generator_generate_expr_const(cg, env, env_b, node->cast_expression.expression);
+    if (llvm_val_to_cast == NULL) {
+        goto error_cleanup;
+    }
+
+    LLVMTypeRef llvm_src_type = cz_environment_backend_lookup_type(cg, node->cast_expression.expression->decoration->resolved_type);
+    LLVMTypeRef llvm_dest_type = cz_environment_backend_lookup_type(cg, node->decoration->resolved_type);
+
+    if (llvm_src_type == NULL || llvm_dest_type == NULL) {
+        goto error_cleanup;
+    }
+
+    if (llvm_src_type == llvm_dest_type) {
+        llvm_val = llvm_val_to_cast;
+    } else {
+        LLVMTypeKind llvm_src_type_kind = LLVMGetTypeKind(llvm_src_type);
+        LLVMTypeKind llvm_dest_type_kind = LLVMGetTypeKind(llvm_dest_type);
+
+        if (llvm_src_type_kind == LLVMIntegerTypeKind && llvm_dest_type_kind == LLVMFloatTypeKind) {
+            llvm_val = LLVMBuildSIToFP(cg->builder, llvm_val_to_cast, llvm_dest_type, "sitofp_tmp");
+        } else if (llvm_src_type_kind == LLVMFloatTypeKind && llvm_dest_type_kind == LLVMIntegerTypeKind) {
+            llvm_val = LLVMBuildFPToSI(cg->builder, llvm_val_to_cast, llvm_dest_type, "fptosi_tmp");
+        } else {
+            goto error_cleanup;
+        }
+    }
+
+    return llvm_val;
+
+error_cleanup:
+    return NULL;
+}
+
+static LLVMValueRef cz_code_generator_generate_expr_const_literal(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
+    LLVMValueRef llvm_val = NULL;
+
+    switch (node->literal.literal_type) {
+        case CZ_TT_NUMERICAL_LITERAL:
+            {
+                if (strchr(node->literal.lexeme, '.') != NULL) {
+                    // Float
+                    float value = strtof(node->literal.lexeme, NULL);
+                    llvm_val = LLVMConstReal(LLVMFloatTypeInContext(cg->ctx), value);
+                } else {
+                    // Integer
+                    int32_t value = strtol(node->literal.lexeme, NULL, 10);
+                    llvm_val = LLVMConstInt(LLVMInt32TypeInContext(cg->ctx), value, true);
+                }
+            }
+            break;
+        case CZ_TT_TRUE:
+            llvm_val = LLVMConstInt(LLVMInt1TypeInContext(cg->ctx), 1, false);
+            break;
+        case CZ_TT_FALSE:
+            llvm_val = LLVMConstInt(LLVMInt1TypeInContext(cg->ctx), 0, false);
+            break;
+        default:
+            goto error_cleanup;
+    }
+
+    return llvm_val;
+
+error_cleanup:
+    return NULL;
+}
+
+static LLVMValueRef cz_code_generator_generate_expr_const_struct_init(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
+    LLVMValueRef llvm_val = NULL;
+    // Not yet supported
+    return llvm_val;
 }
 
 int cz_code_generator_emit_object_file(LLVMModuleRef module, const char* output_filename) {
