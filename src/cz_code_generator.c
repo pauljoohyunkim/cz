@@ -204,6 +204,7 @@ static int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenera
 static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg);
 
 static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
+static LLVMValueRef cz_code_generate_generate_constexpr(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 
 int cz_code_generator_generate(CZ_CodeGenerator* cg) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
@@ -448,6 +449,12 @@ static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ
     // TODO: Add initializer from RHS if it exists.
     if (stmt->variable_declaration.expression == NULL) {
         LLVMSetInitializer(llvm_global_var, LLVMConstNull(llvm_var_type));
+    } else {
+        LLVMValueRef llvm_initializer = cz_code_generate_generate_constexpr(cg, env, env_b, stmt->variable_declaration.expression);
+        if (llvm_initializer == NULL) {
+            cz_error_list_push_error(cg->error_list, cg->filename, stmt->line, stmt->col, "Could not get constexpr initializer for %s", var_name);
+            goto error_cleanup;
+        }
     }
 
     if (cz_environment_backend_push_val_map(env_b, var_symbol, llvm_global_var) != 1) {
@@ -458,6 +465,18 @@ static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ
     return 1;
 error_cleanup:
     return 0;
+}
+
+static LLVMValueRef cz_code_generate_generate_constexpr(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
+    NULL_POINTER_TO_GOTO(cg, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(env_b, error_cleanup);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
+
+    return NULL;
+
+error_cleanup:
+    return NULL;
 }
 
 int cz_code_generator_emit_object_file(LLVMModuleRef module, const char* output_filename) {
