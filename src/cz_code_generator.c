@@ -474,6 +474,25 @@ static LLVMValueRef cz_code_generate_generate_expr_const(CZ_CodeGenerator* cg, c
     LLVMValueRef llvm_val = NULL;
 
     switch (node->node_type) {
+        case CZ_AST_BinaryExpressionNodeType:
+            {
+                LLVMValueRef llvm_lhs = cz_code_generate_generate_expr_const(cg, env, env_b, node->binary_expression.left);
+                LLVMValueRef llvm_rhs = cz_code_generate_generate_expr_const(cg, env, env_b, node->binary_expression.right);
+                LLVMTypeRef llvm_lhs_type = cz_environment_backend_lookup_type(cg, node->binary_expression.left->decoration->resolved_type);
+                LLVMTypeRef llvm_rhs_type = cz_environment_backend_lookup_type(cg, node->binary_expression.right->decoration->resolved_type);
+                LLVMTypeKind llvm_lhs_type_kind = LLVMGetTypeKind(llvm_lhs_type);
+                LLVMTypeKind llvm_rhs_type_kind = LLVMGetTypeKind(llvm_rhs_type);
+                switch (node->binary_expression.op) {
+                    case CZ_TT_PLUS:
+                        if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
+                            llvm_val = LLVMBuildFAdd(cg->builder, llvm_lhs, llvm_rhs, "faddtmp");
+                        } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
+                            llvm_val = LLVMBuildAdd(cg->builder, llvm_lhs, llvm_rhs, "addtmp");
+                        }
+                        break;
+                }
+            }
+            break;
         case CZ_AST_UnaryExpressionNodeType:
             {
                 LLVMValueRef llvm_operand = cz_code_generate_generate_expr_const(cg, env, env_b, node->unary_expression.operand);
