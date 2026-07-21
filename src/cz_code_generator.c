@@ -573,6 +573,8 @@ static LLVMValueRef cz_code_generate_generate_expr_const(CZ_CodeGenerator* cg, c
                             llvm_val = LLVMBuildICmp(cg->builder, LLVMIntNE, llvm_lhs, llvm_rhs, "neqtmp");
                         }
                         break;
+                    default:
+                        goto error_cleanup;
                 }
             }
             break;
@@ -608,6 +610,36 @@ static LLVMValueRef cz_code_generate_generate_expr_const(CZ_CodeGenerator* cg, c
                         break;
                     default:
                         goto error_cleanup;
+                }
+            }
+            break;
+        case CZ_AST_CastExpressionNodeType:
+            {
+                LLVMValueRef llvm_val_to_cast = cz_code_generate_generate_expr_const(cg, env, env_b, node->cast_expression.expression);
+                if (llvm_val_to_cast == NULL) {
+                    goto error_cleanup;
+                }
+
+                LLVMTypeRef llvm_src_type = cz_environment_backend_lookup_type(cg, node->cast_expression.expression->decoration->resolved_type);
+                LLVMTypeRef llvm_dest_type = cz_environment_backend_lookup_type(cg, node->decoration->resolved_type);
+
+                if (llvm_src_type == NULL || llvm_dest_type == NULL) {
+                    goto error_cleanup;
+                }
+
+                if (llvm_src_type == llvm_dest_type) {
+                    llvm_val = llvm_val_to_cast;
+                } else {
+                    LLVMTypeKind llvm_src_type_kind = LLVMGetTypeKind(llvm_src_type);
+                    LLVMTypeKind llvm_dest_type_kind = LLVMGetTypeKind(llvm_dest_type);
+
+                    if (llvm_src_type_kind == LLVMIntegerTypeKind && llvm_dest_type_kind == LLVMFloatTypeKind) {
+                        llvm_val = LLVMBuildSIToFP(cg->builder, llvm_val_to_cast, llvm_dest_type, "sitofp_tmp");
+                    } else if (llvm_src_type_kind == LLVMFloatTypeKind && llvm_dest_type_kind == LLVMIntegerTypeKind) {
+                        llvm_val = LLVMBuildFPToSI(cg->builder, llvm_val_to_cast, llvm_dest_type, "fptosi_tmp");
+                    } else {
+                        goto error_cleanup;
+                    }
                 }
             }
             break;
