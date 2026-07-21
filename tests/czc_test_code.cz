@@ -1,2 +1,3 @@
-x :: const int32 = 1 + 2;
+x :: const bool = 1 > 2;
+y :: const bool = x;
 

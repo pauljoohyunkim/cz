@@ -505,6 +505,13 @@ static int cz_semantic_analyzer_register_variable_decl(CZ_SemanticAnalyzer* sa, 
         goto error_cleanup;
     }
 
+    // 2.5 (TBD) Do not allow reference for now.
+    if (variable_type->kind == CZ_TYPE_KIND_REFERENCE) {
+        cz_error_list_push_error(sa->error_list, sa->filename, type_node->line, type_node->col,
+                                 "References not supported in global variables");
+        goto error_cleanup;
+    }
+
     // 3. Create symbol and add it to symbol table.
     variable_symbol = cz_symbol_create(CZ_SYMBOL_KIND_VALUE, variable_node->identifier.name, 0);
     if (variable_symbol == NULL) {
@@ -2323,7 +2330,8 @@ static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer*
         value_cat = CZ_VALUE_CATEGORY_LVALUE;
     }
 
-    decor = cz_ast_decoration_create(symbol->data.value.type, value_cat, symbol->data.value.is_constexpr, symbol->data.value.type->kind == CZ_TYPE_KIND_REFERENCE, symbol->scope_level);
+    //decor = cz_ast_decoration_create(symbol->data.value.type, value_cat, symbol->data.value.is_constexpr, symbol->data.value.type->kind == CZ_TYPE_KIND_REFERENCE, symbol->scope_level);
+    decor = cz_ast_decoration_create(symbol->data.value.type, value_cat, false, symbol->data.value.type->kind == CZ_TYPE_KIND_REFERENCE, symbol->scope_level);
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;
