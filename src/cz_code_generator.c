@@ -668,6 +668,8 @@ static LLVMValueRef cz_code_generate_generate_expr_const(CZ_CodeGenerator* cg, c
                     goto error_cleanup;
             }
             break;
+        default:
+            goto error_cleanup;
     }
 
     return llvm_val;
