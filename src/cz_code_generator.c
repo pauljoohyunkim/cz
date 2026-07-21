@@ -234,7 +234,7 @@ int cz_code_generator_generate(CZ_CodeGenerator* cg) {
         // TODO: error checking
         switch (statement->node_type) {
             case CZ_AST_FunctionDeclarationNodeType:
-                //cz_code_generator_declare_function(cg, cg->global_env, cg->global_env_b, statement);
+                cz_code_generator_emit_function(cg, cg->global_env, cg->global_env_b, statement);
                 break;
             case CZ_AST_StructDeclarationNodeType:
                 break;
@@ -441,6 +441,20 @@ static int cz_code_generator_emit_function(CZ_CodeGenerator* cg, const CZ_Enviro
     NULL_POINTER_TO_GOTO(env_b, error_cleanup);
     NULL_POINTER_TO_GOTO(stmt, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_FunctionDeclarationNodeType, error_cleanup);
+
+    const char* func_name = stmt->function_declaration.function_identifier->identifier.name;
+    const CZ_Symbol* func_symbol = cz_environment_lookup(env, func_name, true);
+
+    const CZ_Type* func_type = func_symbol->data.value.type;
+    LLVMTypeRef llvm_func_type = cz_environment_backend_lookup_type(cg, func_type);
+
+    LLVMValueRef llvm_func_val = LLVMAddFunction(cg->mod, func_name, llvm_func_type);
+
+    if (cz_environment_backend_push_val_map(env_b, func_symbol, llvm_func_val) != 1) {
+        goto error_cleanup;
+    }
+
+    return 1;
 
 error_cleanup:
     return 0;
