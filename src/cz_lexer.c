@@ -497,12 +497,12 @@ int cz_lexer_analyze(CZ_Lexer* lexer) {
                 {
                     const char peeked = peek(lexer, 1);
                     if (peeked == '=') {
-                        if (cz_lexer_push_token_helper(lexer, CZ_TT_CAROT_EQUAL, 2) != 1) {
+                        if (cz_lexer_push_token_helper(lexer, CZ_TT_CARET_EQUAL, 2) != 1) {
                             return 0;
                         }
                         advance(lexer, 2);
                     } else {
-                        if (cz_lexer_push_token_helper(lexer, CZ_TT_CAROT, 1) != 1) {
+                        if (cz_lexer_push_token_helper(lexer, CZ_TT_CARET, 1) != 1) {
                             return 0;
                         }
                         advance(lexer, 1);

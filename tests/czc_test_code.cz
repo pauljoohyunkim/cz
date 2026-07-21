@@ -1,4 +1,13 @@
 struct Vector {
-    x :: int32;
-    y :: int32;
+    x :: float;
+    y :: float;
 }
+
+typedef int32 int;
+
+n :: int = 1;
+k :: float = 0.2;
+
+j :: Vector = Vector {
+    .y = 1.0
+};

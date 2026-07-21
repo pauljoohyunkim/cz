@@ -103,12 +103,11 @@ const LLVMValueRef cz_environment_backend_lookup_val(const CZ_Environment_Backen
 /**
  * @brief Look up LLVMTypeRef from backend table.
  *
- * @param env_b Pointer to CZ_Environment_Backend
- * @param type Pointer to CZ_Type
- * @param cascade Flag for whether or not to look up parent chain.
- * @return const LLVMTypeRef LLVMTypeRef if found, NULL otherwise.
+ * @param cg Pointer to the CZ_CodeGenerator struct.
+ * @param type Pointer to the CZ_Type to look up.
+ * @return LLVMTypeRef The LLVM type if found, NULL otherwise.
  */
-const LLVMTypeRef cz_environment_backend_lookup_type(const CZ_Environment_Backend *env_b, const CZ_Type* type, bool cascade);
+const LLVMTypeRef cz_environment_backend_lookup_type(const CZ_CodeGenerator* cg, const CZ_Type* type);
 
 /**
  * @brief Create CZ_CodeGenerator struct dynamically

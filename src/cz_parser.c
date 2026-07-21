@@ -152,7 +152,7 @@ static CZ_Precedence cz_parser_get_binary_operation_precedence(CZ_TokenType toke
             return CZ_PRECEDENCE_RELATIONAL;
         case CZ_TT_BAR:
             return CZ_PRECEDENCE_BITWISE_OR;
-        case CZ_TT_CAROT:
+        case CZ_TT_CARET:
             return CZ_PRECEDENCE_BITWISE_XOR;
         case CZ_TT_AMPERSAND:
             return CZ_PRECEDENCE_BITWISE_AND;

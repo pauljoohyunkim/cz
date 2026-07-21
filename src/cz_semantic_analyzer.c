@@ -505,6 +505,13 @@ static int cz_semantic_analyzer_register_variable_decl(CZ_SemanticAnalyzer* sa, 
         goto error_cleanup;
     }
 
+    // 2.5 (TBD) Do not allow reference for now.
+    if (variable_type->kind == CZ_TYPE_KIND_REFERENCE) {
+        cz_error_list_push_error(sa->error_list, sa->filename, type_node->line, type_node->col,
+                                 "References not supported in global variables");
+        goto error_cleanup;
+    }
+
     // 3. Create symbol and add it to symbol table.
     variable_symbol = cz_symbol_create(CZ_SYMBOL_KIND_VALUE, variable_node->identifier.name, 0);
     if (variable_symbol == NULL) {
@@ -750,6 +757,8 @@ static int cz_semantic_analyzer_struct_cycle_detect(CZ_SemanticAnalyzer* sa, con
             }
         }
     }
+
+    states[struct_idx] = CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVED;
 
     return 1;
 
@@ -1025,7 +1034,7 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
             }
 
             // 3.2.1 Check if it is constexpr
-            const CZ_AST_Decoration* initializer_decor = member_node->decoration;
+            const CZ_AST_Decoration* initializer_decor = member_node->variable_declaration.expression->decoration;
             if (!initializer_decor->is_constexpr) {
                 cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Initializer for member idx %d is not constexpr.", i+1);
                 goto error_cleanup;
@@ -1567,7 +1576,7 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
             }
             break;
 
-        case CZ_TT_CAROT_EQUAL:
+        case CZ_TT_CARET_EQUAL:
             // int32 ^ int32 -> int32
             if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
                 // Valid
@@ -2095,7 +2104,7 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
                 goto error_cleanup;
             }
             break;
-        case CZ_TT_CAROT:
+        case CZ_TT_CARET:
             if (lhs_type->primitive == CZ_PRIMITIVE_INT32 && rhs_type->primitive == CZ_PRIMITIVE_INT32) {
                 result_type = int32_type;
             } else {
@@ -2321,7 +2330,8 @@ static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer*
         value_cat = CZ_VALUE_CATEGORY_LVALUE;
     }
 
-    decor = cz_ast_decoration_create(symbol->data.value.type, value_cat, symbol->data.value.is_constexpr, symbol->data.value.type->kind == CZ_TYPE_KIND_REFERENCE, symbol->scope_level);
+    //decor = cz_ast_decoration_create(symbol->data.value.type, value_cat, symbol->data.value.is_constexpr, symbol->data.value.type->kind == CZ_TYPE_KIND_REFERENCE, symbol->scope_level);
+    decor = cz_ast_decoration_create(symbol->data.value.type, value_cat, false, symbol->data.value.type->kind == CZ_TYPE_KIND_REFERENCE, symbol->scope_level);
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;
