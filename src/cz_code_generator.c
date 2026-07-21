@@ -207,6 +207,7 @@ static LLVMValueRef cz_code_generator_generate_expr_binary(CZ_CodeGenerator* cg,
 static LLVMValueRef cz_code_generator_generate_expr_unary(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 static LLVMValueRef cz_code_generator_generate_expr_cast(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 static LLVMValueRef cz_code_generator_generate_expr_literal(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
+static LLVMValueRef cz_code_generator_generate_expr_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 static LLVMValueRef cz_code_generator_generate_expr_struct_init(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 
 int cz_code_generator_generate(CZ_CodeGenerator* cg) {
@@ -492,6 +493,11 @@ static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const 
         case CZ_AST_LiteralNodeType:
             llvm_val = cz_code_generator_generate_expr_literal(cg, env, env_b, node, is_compile_time);
             break;
+        case CZ_AST_IdentifierNodeType:
+            if (is_compile_time) {
+                goto error_cleanup;
+            }
+            llvm_val = cz_code_generator_generate_expr_identifier(cg, env, env_b, node, is_compile_time);
         case CZ_AST_StructInitNodeType:
             llvm_val = cz_code_generator_generate_expr_struct_init(cg, env, env_b, node, is_compile_time);
             break;
@@ -725,6 +731,14 @@ error_cleanup:
     return NULL;
 }
 
+static LLVMValueRef cz_code_generator_generate_expr_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
+    LLVMValueRef llvm_val = NULL;
+
+    return llvm_val;
+error_cleanup:
+    return NULL;
+}
+
 static LLVMValueRef cz_code_generator_generate_expr_struct_init(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
     LLVMValueRef* llvm_field_vals = NULL;
     LLVMValueRef llvm_val = NULL;
@@ -781,7 +795,11 @@ static LLVMValueRef cz_code_generator_generate_expr_struct_init(CZ_CodeGenerator
     }
 
     //// 3. Construct the named constant struct
-    llvm_val = LLVMConstNamedStruct(struct_type, llvm_field_vals, (unsigned int)field_count);
+    if (is_compile_time) {
+        llvm_val = LLVMConstNamedStruct(struct_type, llvm_field_vals, (unsigned int)field_count);
+    } else {
+        // Runtime struct building.
+    }
 
     free(llvm_field_vals);
     return llvm_val;
