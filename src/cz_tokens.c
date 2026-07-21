@@ -12,7 +12,7 @@ bool cz_token_type_is_assignment(CZ_TokenType token_type) {
         case CZ_TT_PERCENT_EQUAL:
         case CZ_TT_AMPERSAND_EQUAL:
         case CZ_TT_BAR_EQUAL:
-        case CZ_TT_CAROT_EQUAL:
+        case CZ_TT_CARET_EQUAL:
             return true;
         default:
             return false;
@@ -50,7 +50,7 @@ const char* cz_token_to_human_name(CZ_TokenType token_type) {
             return "&";
         case CZ_TT_BAR:
             return "|";
-        case CZ_TT_CAROT:
+        case CZ_TT_CARET:
             return "^";
         case CZ_TT_SEMICOLON:
             return ";";
@@ -80,7 +80,7 @@ const char* cz_token_to_human_name(CZ_TokenType token_type) {
             return "&=";
         case CZ_TT_BAR_EQUAL:
             return "|=";
-        case CZ_TT_CAROT_EQUAL:
+        case CZ_TT_CARET_EQUAL:
             return "^=";
         case CZ_TT_EQUAL_EQUAL:
             return "==";

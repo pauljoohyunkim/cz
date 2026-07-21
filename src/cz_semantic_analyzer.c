@@ -1576,7 +1576,7 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
             }
             break;
 
-        case CZ_TT_CAROT_EQUAL:
+        case CZ_TT_CARET_EQUAL:
             // int32 ^ int32 -> int32
             if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
                 // Valid
@@ -2104,7 +2104,7 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
                 goto error_cleanup;
             }
             break;
-        case CZ_TT_CAROT:
+        case CZ_TT_CARET:
             if (lhs_type->primitive == CZ_PRIMITIVE_INT32 && rhs_type->primitive == CZ_PRIMITIVE_INT32) {
                 result_type = int32_type;
             } else {

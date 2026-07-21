@@ -527,7 +527,7 @@ static LLVMValueRef cz_code_generator_generate_expr_const(CZ_CodeGenerator* cg, 
                             llvm_val = LLVMBuildOr(cg->builder, llvm_lhs, llvm_rhs, "ortmp");
                         }
                         break;
-                    case CZ_TT_CAROT:
+                    case CZ_TT_CARET:
                         if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
                             llvm_val = LLVMBuildXor(cg->builder, llvm_lhs, llvm_rhs, "xortmp");
                         }
