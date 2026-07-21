@@ -202,6 +202,7 @@ static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg);
 
 static int cz_code_generator_emit_function(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
 static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
+static int cz_code_generator_generate_function_body(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 
 static LLVMValueRef cz_code_generator_generate_expr_binary(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
@@ -250,16 +251,20 @@ int cz_code_generator_generate(CZ_CodeGenerator* cg) {
         }
     }
 
-    //for (unsigned int i = 0; i < cg->program->program.declaration_count; i++) {
-    //    const CZ_AST_Node* statement = cg->program->program.global_declaration_list[i];
-    //    NULL_POINTER_TO_GOTO(statement, error_cleanup);
+    for (unsigned int i = 0; i < cg->program->program.declaration_count; i++) {
+        const CZ_AST_Node* statement = cg->program->program.global_declaration_list[i];
+        NULL_POINTER_TO_GOTO(statement, error_cleanup);
 
-    //    if (statement->node_type != CZ_AST_FunctionDeclarationNodeType) {
-    //        continue;
-    //    }
+        if (statement->node_type != CZ_AST_FunctionDeclarationNodeType) {
+            continue;
+        }
 
-    //    cz_code_generator_declare_function_body(cg, cg->global_env, cg->global_env_b, statement);
-    //}
+        const char* func_name = statement->function_declaration.function_identifier->identifier.name;
+
+        if (cz_code_generator_generate_function_body(cg, cg->global_env, cg->global_env_b, statement, false) != 1) {
+            cz_error_list_push_error(cg->error_list, cg->filename, statement->line, statement->col, "Function \"%s\" has a problem in body generation.", func_name);
+        }
+    }
 
     return 1;
 error_cleanup:
@@ -494,6 +499,19 @@ static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ
     }
 
     return 1;
+error_cleanup:
+    return 0;
+}
+
+static int cz_code_generator_generate_function_body(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
+    NULL_POINTER_TO_GOTO(cg, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(env_b, error_cleanup);
+    NULL_POINTER_TO_GOTO(node, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(node, CZ_AST_FunctionDeclarationNodeType, error_cleanup);
+
+    return 1;
+
 error_cleanup:
     return 0;
 }
