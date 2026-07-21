@@ -200,6 +200,7 @@ void cz_code_generator_free(CZ_CodeGenerator* cg) {
 static int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenerator* cg);
 static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg);
 
+static int cz_code_generator_emit_function(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
 static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
 static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 
@@ -431,6 +432,17 @@ static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
 
 error_cleanup:
     free(llvm_types);
+    return 0;
+}
+
+static int cz_code_generator_emit_function(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt) {
+    NULL_POINTER_TO_GOTO(cg, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(env_b, error_cleanup);
+    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_FunctionDeclarationNodeType, error_cleanup);
+
+error_cleanup:
     return 0;
 }
 
