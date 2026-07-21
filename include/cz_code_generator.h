@@ -98,7 +98,7 @@ int cz_environment_backend_push_type_map(CZ_Environment_Backend* env_b, const CZ
  * @param cascade Flag for whether or not to look up parent chain.
  * @return const LLVMValueRef LLVMValueRef if found, NULL otherwise.
  */
-const LLVMValueRef cz_environment_backend_lookup(const CZ_Environment_Backend *env_b, const CZ_Symbol* symbol, bool cascade);
+const LLVMValueRef cz_environment_backend_lookup_val(const CZ_Environment_Backend *env_b, const CZ_Symbol* symbol, bool cascade);
 
 /**
  * @brief Look up LLVMTypeRef from backend table.
