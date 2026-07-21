@@ -201,7 +201,7 @@ static int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenera
 static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg);
 
 static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
-static LLVMValueRef cz_code_generate_generate_expr_const(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
+static LLVMValueRef cz_code_generator_generate_expr_const(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 
 int cz_code_generator_generate(CZ_CodeGenerator* cg) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
@@ -427,6 +427,7 @@ error_cleanup:
     return 0;
 }
 
+static LLVMValueRef cz_code_generator_generate_expr_const(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
     NULL_POINTER_TO_GOTO(env, error_cleanup);
@@ -447,7 +448,7 @@ static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ
     if (stmt->variable_declaration.expression == NULL) {
         LLVMSetInitializer(llvm_global_var, LLVMConstNull(llvm_var_type));
     } else {
-        LLVMValueRef llvm_initializer = cz_code_generate_generate_expr_const(cg, env, env_b, stmt->variable_declaration.expression);
+        LLVMValueRef llvm_initializer = cz_code_generator_generate_expr_const(cg, env, env_b, stmt->variable_declaration.expression);
         if (llvm_initializer == NULL) {
             cz_error_list_push_error(cg->error_list, cg->filename, stmt->line, stmt->col, "Could not get initializer for %s", var_name);
             goto error_cleanup;
@@ -465,7 +466,7 @@ error_cleanup:
     return 0;
 }
 
-static LLVMValueRef cz_code_generate_generate_expr_const(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
+static LLVMValueRef cz_code_generator_generate_expr_const(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
     NULL_POINTER_TO_GOTO(env, error_cleanup);
     NULL_POINTER_TO_GOTO(env_b, error_cleanup);
@@ -476,8 +477,8 @@ static LLVMValueRef cz_code_generate_generate_expr_const(CZ_CodeGenerator* cg, c
     switch (node->node_type) {
         case CZ_AST_BinaryExpressionNodeType:
             {
-                LLVMValueRef llvm_lhs = cz_code_generate_generate_expr_const(cg, env, env_b, node->binary_expression.left);
-                LLVMValueRef llvm_rhs = cz_code_generate_generate_expr_const(cg, env, env_b, node->binary_expression.right);
+                LLVMValueRef llvm_lhs = cz_code_generator_generate_expr_const(cg, env, env_b, node->binary_expression.left);
+                LLVMValueRef llvm_rhs = cz_code_generator_generate_expr_const(cg, env, env_b, node->binary_expression.right);
                 LLVMTypeRef llvm_lhs_type = cz_environment_backend_lookup_type(cg, node->binary_expression.left->decoration->resolved_type);
                 LLVMTypeRef llvm_rhs_type = cz_environment_backend_lookup_type(cg, node->binary_expression.right->decoration->resolved_type);
                 LLVMTypeKind llvm_lhs_type_kind = LLVMGetTypeKind(llvm_lhs_type);
@@ -580,7 +581,7 @@ static LLVMValueRef cz_code_generate_generate_expr_const(CZ_CodeGenerator* cg, c
             break;
         case CZ_AST_UnaryExpressionNodeType:
             {
-                LLVMValueRef llvm_operand = cz_code_generate_generate_expr_const(cg, env, env_b, node->unary_expression.operand);
+                LLVMValueRef llvm_operand = cz_code_generator_generate_expr_const(cg, env, env_b, node->unary_expression.operand);
                 LLVMTypeRef llvm_operand_type = cz_environment_backend_lookup_type(cg, node->unary_expression.operand->decoration->resolved_type);
                 LLVMTypeKind llvm_operand_type_kind = LLVMGetTypeKind(llvm_operand_type);
                 switch (node->unary_expression.op) {
@@ -615,7 +616,7 @@ static LLVMValueRef cz_code_generate_generate_expr_const(CZ_CodeGenerator* cg, c
             break;
         case CZ_AST_CastExpressionNodeType:
             {
-                LLVMValueRef llvm_val_to_cast = cz_code_generate_generate_expr_const(cg, env, env_b, node->cast_expression.expression);
+                LLVMValueRef llvm_val_to_cast = cz_code_generator_generate_expr_const(cg, env, env_b, node->cast_expression.expression);
                 if (llvm_val_to_cast == NULL) {
                     goto error_cleanup;
                 }
@@ -666,6 +667,11 @@ static LLVMValueRef cz_code_generate_generate_expr_const(CZ_CodeGenerator* cg, c
                     break;
                 default:
                     goto error_cleanup;
+            }
+            break;
+        case CZ_AST_StructInitNodeType:
+            {
+                
             }
             break;
         default:

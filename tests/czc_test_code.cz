@@ -3,12 +3,6 @@ struct Vector {
     y :: float;
 }
 
-v :: Vector = Vector {
-    .x = 1 as float,
-    .y = 2 as float
+i :: Vector = Vector {
+    .x = 1.0
 };
-
-struct Matrix {
-    v1 :: Vector& = v;
-    v2 :: Vector& = v;
-}
