@@ -726,44 +726,46 @@ error_cleanup:
 }
 
 static LLVMValueRef cz_code_generator_generate_expr_struct_init(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
-    // TODO: Implement this function when needed.
-    // Commenting out the original implementation to avoid compilation errors.
-    /*
+    LLVMValueRef* llvm_field_vals = NULL;
     LLVMValueRef llvm_val = NULL;
+
     // 1. Fetch the LLVM struct type (e.g. %Vector or %Matrix)
     LLVMTypeRef struct_type = cz_environment_backend_lookup_type(
         cg, 
         node->decoration->resolved_type
     );
-    if (struct_type == NULL) goto error_cleanup;
+    NULL_POINTER_TO_GOTO(struct_type, error_cleanup);
 
-    size_t field_count = node->struct_literal.field_count;
-    LLVMValueRef* field_values = malloc(sizeof(LLVMValueRef) * field_count);
+    unsigned int field_count = node->decoration->resolved_type->structure.layout->field_count;
+    llvm_field_vals = (LLVMValueRef*) calloc(field_count, sizeof(LLVMValueRef));
 
-    // 2. Evaluate each field constant expression recursively
-    for (size_t i = 0; i < field_count; i++) {
-        field_values[i] = cz_code_generator_generate_expr(
-            cg, env, env_b, 
-            node->struct_literal.fields[i].expression,
-            is_compile_time
-        );
-
-        if (field_values[i] == NULL) {
-            free(field_values);
-            goto error_cleanup; // Evaluated field was not a valid constant
-        }
+    // For each member, evaluate the expression, noting that if initializer is not given, default one is to be used.
+    for (unsigned int i = 0; i < field_count; i++) {
+        
     }
 
-    // 3. Construct the named constant struct
-    llvm_val = LLVMConstNamedStruct(struct_type, field_values, (unsigned int)field_count);
+    //// 2. Evaluate each field constant expression recursively
+    //for (size_t i = 0; i < field_count; i++) {
+    //    field_values[i] = cz_code_generator_generate_expr(
+    //        cg, env, env_b, 
+    //        node->struct_literal.fields[i].expression,
+    //        is_compile_time
+    //    );
 
-    free(field_values);
+    //    if (field_values[i] == NULL) {
+    //        free(field_values);
+    //        goto error_cleanup; // Evaluated field was not a valid constant
+    //    }
+    //}
+
+    //// 3. Construct the named constant struct
+    //llvm_val = LLVMConstNamedStruct(struct_type, field_values, (unsigned int)field_count);
+
+    free(llvm_field_vals);
     return llvm_val;
 
 error_cleanup:
-    free(field_values);
-    return NULL;
-    */
+    free(llvm_field_vals);
     return NULL;
 }
 
