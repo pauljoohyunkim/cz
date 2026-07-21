@@ -10,6 +10,22 @@
 #define NULL_POINTER_TO_GOTO(ptr, label) do { if ((ptr) == NULL) goto label; } while (0)
 #define INVALID_NODE_TYPE_TO_GOTO(node, node_type_enum, label) do { if ((node)->node_type != (node_type_enum)) goto label; } while (0)
 
+static CZ_Environment_Backend* cz_environment_backend_enter_scope(const CZ_Environment_Backend* current_env_b) {
+    CZ_Environment_Backend* child_scope = NULL;
+    NULL_POINTER_TO_GOTO(current_env_b, error_cleanup);
+
+    child_scope = cz_environment_backend_create();
+    NULL_POINTER_TO_GOTO(child_scope, error_cleanup);
+
+    child_scope->parent = current_env_b;
+
+    return child_scope;
+
+error_cleanup:
+    cz_environment_backend_free(child_scope);
+    return NULL;
+}
+
 CZ_Environment_Backend* cz_environment_backend_create(void) {
     CZ_Environment_Backend* env_b = (CZ_Environment_Backend*) calloc(1, sizeof(CZ_Environment_Backend));
 
@@ -504,15 +520,47 @@ error_cleanup:
 }
 
 static int cz_code_generator_generate_function_body(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
+    CZ_Environment_Backend* body_env_b;
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
     NULL_POINTER_TO_GOTO(env, error_cleanup);
     NULL_POINTER_TO_GOTO(env_b, error_cleanup);
     NULL_POINTER_TO_GOTO(node, error_cleanup);
     INVALID_NODE_TYPE_TO_GOTO(node, CZ_AST_FunctionDeclarationNodeType, error_cleanup);
 
+    const char* func_name = node->function_declaration.function_identifier->identifier.name;
+    const CZ_Symbol* func_symbol = cz_environment_lookup(env, func_name, true);
+
+    LLVMValueRef llvm_func = cz_environment_backend_lookup_val(env_b, func_symbol, true);
+    
+    LLVMBasicBlockRef llvm_entry_block = LLVMAppendBasicBlockInContext(cg->ctx, llvm_func, "entry");
+    LLVMPositionBuilderAtEnd(cg->builder, llvm_entry_block);
+
+    body_env_b = cz_environment_backend_enter_scope(env_b);
+    NULL_POINTER_TO_GOTO(body_env_b, error_cleanup);
+
+    // Populating environment with parameters.
+    unsigned int param_count = func_symbol->data.value.type->function.param_count;
+    for (unsigned int i = 0; i < param_count; i++) {
+        LLVMValueRef llvm_param_val = LLVMGetParam(llvm_func, i);
+        const char* param_name = node->function_declaration.function.parameter_list->parameter_list.params[i]->variable_declaration.identifier->identifier.name;
+        const CZ_Symbol* param_symbol = cz_environment_lookup(node->function_declaration.function.parameter_list->parameter_list.scope, param_name, false);
+        const CZ_Type* param_type = func_symbol->data.value.type->function.param_types[i];
+        LLVMTypeRef llvm_param_type = cz_environment_backend_lookup_type(cg, param_type);
+
+        // TODO: Deal with references
+        LLVMValueRef llvm_alloca_slot = LLVMBuildAlloca(cg->builder, llvm_param_type, param_name);
+        LLVMBuildStore(cg->builder, llvm_param_val, llvm_alloca_slot);
+
+        if (cz_environment_backend_push_val_map(body_env_b, param_symbol, llvm_alloca_slot) != 1) {
+            goto error_cleanup;
+        }
+    }
+
+    cz_environment_backend_free(body_env_b);
     return 1;
 
 error_cleanup:
+    cz_environment_backend_free(body_env_b);
     return 0;
 }
 
