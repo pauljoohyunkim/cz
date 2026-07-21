@@ -200,8 +200,8 @@ void cz_code_generator_free(CZ_CodeGenerator* cg) {
     LLVMShutdown();
 }
 
-int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenerator* cg);
-int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg);
+static int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenerator* cg);
+static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg);
 
 int cz_code_generator_generate(CZ_CodeGenerator* cg) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
@@ -209,12 +209,15 @@ int cz_code_generator_generate(CZ_CodeGenerator* cg) {
     INVALID_NODE_TYPE_TO_GOTO(cg->program, CZ_AST_ProgramNodeType, error_cleanup);
     NULL_POINTER_TO_GOTO(cg->program->program.global_declaration_list, error_cleanup);
 
-    // Pass 1 to build type map. (Primitive & Opaque Struct)
+    // Pass 1 to build type map. (Primitive & Opaque Struct & Reference)
     if (cz_code_generator_fill_type_map_primitive_opaque_struct(cg) != 1) {
         goto error_cleanup;
     }
     
-    // Pass 2 to build type map. (Reference & Struct Body & Function)
+    // Pass 2 to build type map. (Struct Body & Function)
+    if (cz_code_generator_fill_type_map_complex(cg) != 1) {
+        goto error_cleanup;
+    }
 
     for (unsigned int i = 0; i < cg->program->program.declaration_count; i++) {
         const CZ_AST_Node* statement = cg->program->program.global_declaration_list[i];
@@ -296,7 +299,7 @@ error_cleanup:
  * @param cg 
  * @return int 
  */
-int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenerator* cg) {
+static int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenerator* cg) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
     NULL_POINTER_TO_GOTO(cg->gtt, error_cleanup);
     NULL_POINTER_TO_GOTO(cg->global_env_b, error_cleanup);
@@ -329,7 +332,7 @@ error_cleanup:
     return 0;
 }
 
-int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
+static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
     LLVMTypeRef* llvm_types = NULL;
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
     NULL_POINTER_TO_GOTO(cg->gtt, error_cleanup);
