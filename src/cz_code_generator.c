@@ -203,6 +203,8 @@ void cz_code_generator_free(CZ_CodeGenerator* cg) {
 static int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenerator* cg);
 static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg);
 
+static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
+
 int cz_code_generator_generate(CZ_CodeGenerator* cg) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
     NULL_POINTER_TO_GOTO(cg->program, error_cleanup);
@@ -231,7 +233,7 @@ int cz_code_generator_generate(CZ_CodeGenerator* cg) {
             case CZ_AST_StructDeclarationNodeType:
                 break;
             case CZ_AST_VariableDeclarationNodeType:
-                //cz_code_generator_declare_global_variable(cg, cg->global_env, cg->global_env_b, statement);
+                cz_code_generator_emit_global_variable(cg, cg->global_env, cg->global_env_b, statement);
                 break;
             case CZ_AST_TypedefDeclarationNodeType:
             case CZ_AST_NewtypeDeclarationNodeType:
@@ -424,6 +426,37 @@ static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
 
 error_cleanup:
     free(llvm_types);
+    return 0;
+}
+
+static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt) {
+    NULL_POINTER_TO_GOTO(cg, error_cleanup);
+    NULL_POINTER_TO_GOTO(env, error_cleanup);
+    NULL_POINTER_TO_GOTO(env_b, error_cleanup);
+    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
+    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_VariableDeclarationNodeType, error_cleanup);
+
+    const char* var_name = stmt->variable_declaration.identifier->identifier.name;
+    const CZ_Symbol* var_symbol = cz_environment_lookup(env, var_name, false);
+    NULL_POINTER_TO_GOTO(var_symbol, error_cleanup);
+
+    const CZ_Type* var_type = var_symbol->data.value.type;
+    LLVMTypeRef llvm_var_type = cz_environment_backend_lookup_type(env_b, var_type, false);
+
+    LLVMValueRef llvm_global_var = LLVMAddGlobal(cg->mod, llvm_var_type, var_name);
+
+    // TODO: Add initializer from RHS if it exists.
+    if (stmt->variable_declaration.expression == NULL) {
+        LLVMSetInitializer(llvm_global_var, LLVMConstNull(llvm_var_type));
+    }
+
+    if (cz_environment_backend_push_val_map(env_b, var_symbol, llvm_global_var) != 1) {
+        cz_error_list_push_error(cg->error_list, cg->filename, stmt->line, stmt->col, "Could not create map.");
+        goto error_cleanup;
+    }
+
+    return 1;
+error_cleanup:
     return 0;
 }
 
