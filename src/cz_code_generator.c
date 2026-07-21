@@ -51,6 +51,11 @@ int cz_environment_backend_push_type_map(CZ_Environment_Backend *env_b, const CZ
 
     if (env_b == NULL || type == NULL) return 0;
 
+    // Const unwrapping (avoid recursion by loop)
+    while (type->kind == CZ_TYPE_KIND_CONST) {
+        type = type->const_of;
+    }
+
     new_map = (CZ_Type_To_LLVMTypeRef *)realloc(env_b->type_map, sizeof(CZ_Type_To_LLVMTypeRef) * (env_b->type_count+1));
     if (new_map == NULL) goto error_cleanup;
 
@@ -86,6 +91,11 @@ const LLVMValueRef cz_environment_backend_lookup_val(const CZ_Environment_Backen
 
 const LLVMTypeRef cz_environment_backend_lookup_type(const CZ_Environment_Backend *env_b, const CZ_Type* type, bool cascade) {
     if (env_b == NULL || type == NULL) return NULL;
+
+    // Const unwrapping (Avoid recursion by loop)
+    while (type->kind == CZ_TYPE_KIND_CONST) {
+        type = type->const_of;
+    }
 
     // Search the backend's type map for a matching entry.
     for (unsigned int i = 0; i < env_b->type_count; ++i) {
@@ -265,10 +275,11 @@ static inline LLVMTypeRef cz_backend_lower_type(CZ_CodeGenerator* cg, const CZ_T
             break;
         case CZ_TYPE_KIND_NEWTYPE:
             return cz_backend_lower_type(cg, type->newtype.underlying);
+        case CZ_TYPE_KIND_CONST:
+            return cz_backend_lower_type(cg, type->const_of);
         case CZ_TYPE_KIND_STRUCT:
             return LLVMStructCreateNamed(cg->ctx, type->structure.name);
         case CZ_TYPE_KIND_REFERENCE:
-            // TODO: Opaque pointer 
             return LLVMPointerTypeInContext(cg->ctx, 0);
         default:
             break;
@@ -279,6 +290,12 @@ error_cleanup:
     return NULL;
 }
 
+/**
+ * @brief This creates full mapping for primitives
+ * 
+ * @param cg 
+ * @return int 
+ */
 int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenerator* cg) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
     NULL_POINTER_TO_GOTO(cg->gtt, error_cleanup);
@@ -286,56 +303,23 @@ int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenerator* cg
 
     for (unsigned int i = 0; i < cg->gtt->all_entry_count; i++) {
         const CZ_Type* type = cg->gtt->all_allocations[i];
-        // For each type,
-        // 1. First of all, skip references.
-        if (type->kind == CZ_TYPE_KIND_REFERENCE) {
-            continue;
-        }
-        
-        // 2. Then drop constness.
-        const CZ_Type* decayed_type = cz_type_decay_type(type);
 
-        // 3. Check if newtype, primitive, or struct.
-        if (decayed_type->kind != CZ_TYPE_KIND_PRIMITIVE &&
-            decayed_type->kind != CZ_TYPE_KIND_STRUCT &&
-            decayed_type->kind != CZ_TYPE_KIND_NEWTYPE) {
+        // Skip top-level const wrappers and functions in Pass 1
+        // Since GTT registers base types before const types, const types can be ignored.
+        if (type->kind == CZ_TYPE_KIND_CONST || type->kind == CZ_TYPE_KIND_FUNCTION) {
             continue;
         }
 
-        // 4. Look up if mapping exists, and if it exists, skip.
-        LLVMTypeRef llvm_type_lookup = cz_environment_backend_lookup_type(cg->global_env_b, decayed_type, false);
-        if (llvm_type_lookup != NULL) {
+        // Lookup base type
+        if (cz_environment_backend_lookup_type(cg->global_env_b, type, false) != NULL) {
             continue;
         }
 
-        // 5. If newtype, check if it is primitive or struct, then query again with inner type.
-        if (decayed_type->kind == CZ_TYPE_KIND_NEWTYPE) {
-            const CZ_Type* underlying = decayed_type->newtype.underlying;
-            // 5.1 If underlying primitive/struct is not in map, build it.
-            LLVMTypeRef llvm_underlying_type = cz_environment_backend_lookup_type(cg->global_env_b, underlying, false);
-            if (llvm_underlying_type == NULL) {
-                llvm_underlying_type = cz_backend_lower_type(cg, underlying);
-                NULL_POINTER_TO_GOTO(llvm_underlying_type, error_cleanup);
+        // Lower and insert
+        LLVMTypeRef llvm_type = cz_backend_lower_type(cg, type);
+        NULL_POINTER_TO_GOTO(llvm_type, error_cleanup);
 
-                if (cz_environment_backend_push_type_map(cg->global_env_b, underlying, llvm_underlying_type) != 1) {
-                    cz_error_list_push_error(cg->error_list, cg->filename, 0, 0, "Failed to register underlying type.");
-                    goto error_cleanup;
-                }
-            }
-            // Now safely map the newtype alias to that exact same machine type.
-            if (cz_environment_backend_push_type_map(cg->global_env_b, decayed_type, llvm_underlying_type) != 1) {
-                cz_error_list_push_error(cg->error_list, cg->filename, 0, 0, "Failed to register newtype alias.");
-                goto error_cleanup;
-            }
-            continue;
-        }
-
-        // 6. Handle Standard Primitives & Struct Shells.
-        const LLVMTypeRef llvm_machine_type = cz_backend_lower_type(cg, decayed_type);
-        NULL_POINTER_TO_GOTO(llvm_machine_type, error_cleanup);
-        
-        if (cz_environment_backend_push_type_map(cg->global_env_b, decayed_type, llvm_machine_type) != 1) {
-            cz_error_list_push_error(cg->error_list, cg->filename, 0, 0, "Could not register type to LLVM.");
+        if (cz_environment_backend_push_type_map(cg->global_env_b, type, llvm_type) != 1) {
             goto error_cleanup;
         }
     }
@@ -350,73 +334,43 @@ int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
     NULL_POINTER_TO_GOTO(cg, error_cleanup);
     NULL_POINTER_TO_GOTO(cg->gtt, error_cleanup);
 
-    // Fill reference, structs, and functions
     for (unsigned int i = 0; i < cg->gtt->all_entry_count; i++) {
         const CZ_Type* type = cg->gtt->all_allocations[i];
 
         switch (type->kind) {
+            // Structs Members
             case CZ_TYPE_KIND_STRUCT: {
-                // 1. For struct, fill the inner members.
                 LLVMTypeRef llvm_struct_type = cz_environment_backend_lookup_type(cg->global_env_b, type, false);
                 NULL_POINTER_TO_GOTO(llvm_struct_type, error_cleanup);
 
-                llvm_types = (LLVMTypeRef*) calloc(type->structure.layout->field_count, sizeof(LLVMTypeRef));
-                NULL_POINTER_TO_GOTO(llvm_types, error_cleanup);
+                unsigned int field_count = type->structure.layout->field_count;
+                if (field_count > 0) {
+                    llvm_types = (LLVMTypeRef*) calloc(field_count, sizeof(LLVMTypeRef));
+                    NULL_POINTER_TO_GOTO(llvm_types, error_cleanup);
 
-                for (unsigned int j = 0; j < type->structure.layout->field_count; j++) {
-                    const CZ_Type* member_type = type->structure.layout->fields[j].type;
+                    for (unsigned int j = 0; j < field_count; j++) {
+                        const CZ_Type* member_type = type->structure.layout->fields[j].type;
 
-                    // 1. Look up the raw type exactly as it is (e.g. look for "int32&")
-                    LLVMTypeRef llvm_member_type = cz_environment_backend_lookup_type(cg->global_env_b, member_type, false);
-
-                    if (llvm_member_type == NULL) {
-                        // Need to add to map
-
-                        bool is_reference = false;
-                        if (member_type->kind == CZ_TYPE_KIND_REFERENCE) {
-                            is_reference = true;
-                        } else if (member_type->kind == CZ_TYPE_KIND_CONST &&
-                                member_type->const_of->kind == CZ_TYPE_KIND_REFERENCE) {
-                            is_reference = true;
-                        }
-
-                        if (is_reference) {
-                            // 3. Lowering a reference *always* yields an LLVM opaque pointer (ptr)
-                            llvm_member_type = LLVMPointerTypeInContext(cg->ctx, 0);
-                            NULL_POINTER_TO_GOTO(llvm_member_type, error_cleanup);
-
-                            // 4. Register the EXACT GTT pointer that the struct field requested
-                            // (This preserves whether it was const int32& or int32&)
-                            if (cz_environment_backend_push_type_map(cg->global_env_b, member_type, llvm_member_type) != 1) {
-                                goto error_cleanup;
-                            }
-                        } else {
-                            cz_error_list_push_error(cg->error_list, cg->filename, 0, 0, "Developer Error: Struct member is not reference but it has not been accounted for in pass 1.");
+                        // Lookup automatically unwraps const and handles references
+                        LLVMTypeRef llvm_member_type = cz_environment_backend_lookup_type(cg->global_env_b, member_type, false);
+                        
+                        if (llvm_member_type == NULL) {
+                            cz_error_list_push_error(cg->error_list, cg->filename, 0, 0, 
+                                "Developer Error: Struct field type missing from backend map.");
                             goto error_cleanup;
                         }
-                    }
 
-                    llvm_types[j] = llvm_member_type;
+                        llvm_types[j] = llvm_member_type;
+                    }
                 }
-                LLVMStructSetBody(llvm_struct_type, llvm_types, type->structure.layout->field_count, 0);
+
+                LLVMStructSetBody(llvm_struct_type, llvm_types, field_count, 0);
+                
                 free(llvm_types);
                 llvm_types = NULL;
                 break;
             }
-            case CZ_TYPE_KIND_REFERENCE: {
-                // Similarly as it is done in struct member of which are references.
-                LLVMTypeRef llvm_type = cz_environment_backend_lookup_type(cg->global_env_b, type, false);
-                if (llvm_type == NULL) {
-                    // Register.
-                    llvm_type = LLVMPointerTypeInContext(cg->ctx, 0);
-                    NULL_POINTER_TO_GOTO(llvm_type, error_cleanup);
 
-                    if (cz_environment_backend_push_type_map(cg->global_env_b, type, llvm_type) != 1) {
-                        goto error_cleanup;
-                    }
-                }
-                break;
-            }
             case CZ_TYPE_KIND_FUNCTION: {
                 // Return Type
                 LLVMTypeRef llvm_ret_type = cz_environment_backend_lookup_type(cg->global_env_b, type->function.return_type, false);
@@ -424,14 +378,17 @@ int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
 
                 // Parameters
                 unsigned int param_count = type->function.param_count;
-                llvm_types = (LLVMTypeRef*) calloc(param_count, sizeof(LLVMTypeRef));
-                NULL_POINTER_TO_GOTO(llvm_types, error_cleanup);
+                if (param_count > 0) {
+                    llvm_types = (LLVMTypeRef*) calloc(param_count, sizeof(LLVMTypeRef));
+                    NULL_POINTER_TO_GOTO(llvm_types, error_cleanup);
 
-                for (unsigned int j = 0; j < param_count; j++) {
-                    const CZ_Type* param_type = type->function.param_types[j];
-                    LLVMTypeRef llvm_param_type = cz_environment_backend_lookup_type(cg->global_env_b, param_type, false);
-                    NULL_POINTER_TO_GOTO(llvm_param_type, error_cleanup);
-                    llvm_types[j] = llvm_param_type;
+                    for (unsigned int j = 0; j < param_count; j++) {
+                        const CZ_Type* param_type = type->function.param_types[j];
+                        LLVMTypeRef llvm_param_type = cz_environment_backend_lookup_type(cg->global_env_b, param_type, false);
+                        NULL_POINTER_TO_GOTO(llvm_param_type, error_cleanup);
+                        
+                        llvm_types[j] = llvm_param_type;
+                    }
                 }
 
                 LLVMTypeRef llvm_func_type = LLVMFunctionType(llvm_ret_type, llvm_types, param_count, 0);
@@ -440,24 +397,26 @@ int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
                 if (cz_environment_backend_push_type_map(cg->global_env_b, type, llvm_func_type) != 1) {
                     goto error_cleanup;
                 }
+
                 free(llvm_types);
                 llvm_types = NULL;
                 break;
             }
+
             case CZ_TYPE_KIND_PRIMITIVE:
+            case CZ_TYPE_KIND_REFERENCE:
             case CZ_TYPE_KIND_CONST:
             case CZ_TYPE_KIND_NEWTYPE:
-                // Nothing to do in this pass for these kinds.
+                // Nothing to do in Pass 2 for these kinds (already in map)
                 break;
+
             default:
-                // Unexpected type kind in fill_type_map_complex.
-                cz_error_list_push_error(cg->error_list, cg->filename, 0, 0, "Developer Error: Unexpected type kind in cz_code_generator_fill_type_map_complex.");
+                cz_error_list_push_error(cg->error_list, cg->filename, 0, 0, 
+                    "Developer Error: Unexpected type kind in cz_code_generator_fill_type_map_complex.");
                 goto error_cleanup;
         }
     }
 
-
-    free(llvm_types);
     return 1;
 
 error_cleanup:
