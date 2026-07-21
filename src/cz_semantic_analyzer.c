@@ -1034,7 +1034,7 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
             }
 
             // 3.2.1 Check if it is constexpr
-            const CZ_AST_Decoration* initializer_decor = member_node->decoration;
+            const CZ_AST_Decoration* initializer_decor = member_node->variable_declaration.expression->decoration;
             if (!initializer_decor->is_constexpr) {
                 cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Initializer for member idx %d is not constexpr.", i+1);
                 goto error_cleanup;

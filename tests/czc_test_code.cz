@@ -1,3 +1,14 @@
-x :: const float = 1 as float;
-y :: const bool = true;
+struct Vector {
+    x :: float;
+    y :: float;
+}
 
+v :: Vector = Vector {
+    .x = 1 as float,
+    .y = 2 as float
+};
+
+struct Matrix {
+    v1 :: Vector& = v;
+    v2 :: Vector& = v;
+}
