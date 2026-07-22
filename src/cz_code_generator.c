@@ -659,7 +659,6 @@ error_cleanup:
 }
 
 static LLVMValueRef cz_code_generator_generate_lvalue_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
-    LLVMValueRef llvm_val = NULL;
     NULL_POINTER_ERROR_HANDLE(cg);
     NULL_POINTER_ERROR_HANDLE(env);
     NULL_POINTER_ERROR_HANDLE(env_b);
@@ -667,8 +666,14 @@ static LLVMValueRef cz_code_generator_generate_lvalue_identifier(CZ_CodeGenerato
 
     const CZ_Symbol* sym = cz_environment_lookup(env, node->identifier.name, true);
     NULL_POINTER_ERROR_HANDLE(sym);
-    llvm_val = cz_environment_backend_lookup_val(env_b, sym, true);
+    
+    LLVMValueRef llvm_val = cz_environment_backend_lookup_val(env_b, sym, true);
     NULL_POINTER_ERROR_HANDLE(llvm_val);
+
+    if (sym->data.value.type->kind == CZ_TYPE_KIND_REFERENCE) {
+        LLVMTypeRef ptr_type = LLVMPointerTypeInContext(cg->ctx, 0);
+        llvm_val = LLVMBuildLoad2(cg->builder, ptr_type, llvm_val, "ref_deref");
+    }
 
     return llvm_val;
 
