@@ -225,6 +225,7 @@ static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_E
 static int cz_code_generator_generate_return_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 
 static LLVMValueRef cz_code_generator_generate_lvalue(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
+static LLVMValueRef cz_code_generator_generate_lvalue_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 
 static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 static LLVMValueRef cz_code_generator_generate_expr_binary(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
@@ -621,7 +622,8 @@ static int cz_code_generator_generate_return_statement(CZ_CodeGenerator* cg, con
     NULL_POINTER_ERROR_HANDLE(cg->current_function_return);
 
     if (cg->current_function_return->kind == CZ_TYPE_KIND_REFERENCE) {
-        // TODO: Generate l-value here.
+        LLVMValueRef llvm_return_val_ref = cz_code_generator_generate_lvalue(cg, env, env_b, node->return_statement.expression);
+        LLVMBuildRet(cg->builder, llvm_return_val_ref);
         goto error_cleanup;
     } else {
         LLVMValueRef llvm_return_val_ref = cz_code_generator_generate_expr(cg, env, env_b, node->return_statement.expression, is_compile_time);
@@ -642,11 +644,35 @@ static LLVMValueRef cz_code_generator_generate_lvalue(CZ_CodeGenerator* cg, cons
 
     switch (node->node_type) {
         case CZ_AST_IdentifierNodeType:
-            goto error_cleanup;
+            llvm_val = cz_code_generator_generate_lvalue_identifier(cg, env, env_b, node);
+            break;
         case CZ_AST_StructMemberAccessNodeType:
             goto error_cleanup;
         case CZ_AST_FunctionCallNodeType:
             goto error_cleanup;
+    }
+
+    return llvm_val;
+
+error_cleanup:
+    return NULL;
+}
+
+static LLVMValueRef cz_code_generator_generate_lvalue_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(env_b);
+    NULL_POINTER_ERROR_HANDLE(node);
+
+    const CZ_Symbol* sym = cz_environment_lookup(env, node->identifier.name, true);
+    NULL_POINTER_ERROR_HANDLE(sym);
+    
+    LLVMValueRef llvm_val = cz_environment_backend_lookup_val(env_b, sym, true);
+    NULL_POINTER_ERROR_HANDLE(llvm_val);
+
+    if (sym->data.value.type->kind == CZ_TYPE_KIND_REFERENCE) {
+        LLVMTypeRef ptr_type = LLVMPointerTypeInContext(cg->ctx, 0);
+        llvm_val = LLVMBuildLoad2(cg->builder, ptr_type, llvm_val, "ref_deref");
     }
 
     return llvm_val;
