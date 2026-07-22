@@ -232,7 +232,7 @@ static LLVMValueRef cz_code_generator_generate_expr_binary(CZ_CodeGenerator* cg,
 static LLVMValueRef cz_code_generator_generate_expr_unary(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 static LLVMValueRef cz_code_generator_generate_expr_cast(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 static LLVMValueRef cz_code_generator_generate_expr_literal(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
-static LLVMValueRef cz_code_generator_generate_expr_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
+//static LLVMValueRef cz_code_generator_generate_expr_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 static LLVMValueRef cz_code_generator_generate_expr_struct_init(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 
 int cz_code_generator_generate(CZ_CodeGenerator* cg) {
@@ -703,10 +703,15 @@ static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const 
             llvm_val = cz_code_generator_generate_expr_literal(cg, env, env_b, node, is_compile_time);
             break;
         case CZ_AST_IdentifierNodeType:
-            if (is_compile_time) {
-                goto error_cleanup;
+            {
+                if (is_compile_time) {
+                    goto error_cleanup;
+                }
+                // L-to-R value conversion for addressable nodes (Similarly for member access, array indexing, etc.)
+                LLVMValueRef llvm_identifier_ref = cz_code_generator_generate_lvalue(cg, env, env_b, node);
+                LLVMTypeRef llvm_type = cz_environment_backend_lookup_type(cg, node->decoration->resolved_type);
+                llvm_val = LLVMBuildLoad2(cg->builder, llvm_type, llvm_identifier_ref, "lval_to_rval");
             }
-            llvm_val = cz_code_generator_generate_expr_identifier(cg, env, env_b, node, is_compile_time);
             break;
         case CZ_AST_StructInitNodeType:
             llvm_val = cz_code_generator_generate_expr_struct_init(cg, env, env_b, node, is_compile_time);
@@ -941,6 +946,7 @@ error_cleanup:
     return NULL;
 }
 
+/*
 static LLVMValueRef cz_code_generator_generate_expr_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
     LLVMValueRef llvm_val = NULL;
 
@@ -961,6 +967,7 @@ static LLVMValueRef cz_code_generator_generate_expr_identifier(CZ_CodeGenerator*
 error_cleanup:
     return NULL;
 }
+*/
 
 static LLVMValueRef cz_code_generator_generate_expr_struct_init(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
     LLVMValueRef* llvm_field_vals = NULL;
