@@ -592,7 +592,7 @@ static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_E
 
     switch (node->node_type) {
         case CZ_AST_VariableDeclarationNodeType:
-            cz_code_generator_generate_variable_declaration_statement(cg, env, env_b, false);
+            cz_code_generator_generate_variable_declaration_statement(cg, env, env_b, node);
             break;
         case CZ_AST_AssignmentStatementNodeType:
             goto error_cleanup;
@@ -622,6 +622,37 @@ static int cz_code_generator_generate_variable_declaration_statement(CZ_CodeGene
     NULL_POINTER_ERROR_HANDLE(env);
     NULL_POINTER_ERROR_HANDLE(env_b);
     NULL_POINTER_ERROR_HANDLE(stmt);
+
+    const char* var_name = stmt->variable_declaration.identifier->identifier.name;
+    const CZ_Symbol* var_symbol = cz_environment_lookup(env, var_name, false);
+    const CZ_Type* var_type = var_symbol->data.value.type;
+    LLVMTypeRef llvm_var_type = cz_environment_backend_lookup_type(cg, var_type);
+    
+    LLVMValueRef llvm_var_alloca = LLVMBuildAlloca(cg->builder, llvm_var_type, var_name);
+    
+    const CZ_AST_Node* initializer_node = stmt->variable_declaration.expression;
+    if (var_type->kind == CZ_TYPE_KIND_REFERENCE) {
+        // Initializer must exist.
+        NULL_POINTER_ERROR_HANDLE(initializer_node);
+
+        LLVMValueRef var_initializer = cz_code_generator_generate_lvalue(cg, env, env_b, initializer_node);
+        NULL_POINTER_ERROR_HANDLE(var_initializer);
+        LLVMBuildStore(cg->builder, var_initializer, llvm_var_alloca);
+    } else {
+        if (initializer_node == NULL) {
+            LLVMBuildStore(cg->builder, LLVMConstNull(llvm_var_type), llvm_var_alloca);
+        } else {
+            LLVMValueRef var_initializer = cz_code_generator_generate_expr(cg, env, env_b, initializer_node, false);
+            LLVMBuildStore(cg->builder, var_initializer, llvm_var_alloca);
+        }
+    }
+
+    if (cz_environment_backend_push_val_map(env_b, var_symbol, llvm_var_alloca) != 1) {
+        cz_error_list_push_error(cg->error_list, cg->filename, stmt->line, stmt->col, "Could not allocate local variable %s", var_name);
+        goto error_cleanup;
+    }
+
+    return 1;
 
 error_cleanup:
     return 0;

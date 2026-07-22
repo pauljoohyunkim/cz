@@ -1,16 +1,4 @@
-typedef int32 int;
-
-struct Vector {
-    x :: float;
-    y :: float;
-}
-
-func ret_n :: (n :: int&) -> int& {
-    return n;
-}
-    
-v :: Vector;
-
-func ret_v :: () -> Vector {
-    return v;
+func addone :: (n :: int32&) -> int32 {
+    np1 :: int32 = n;
+    return np1 + 1;
 }
