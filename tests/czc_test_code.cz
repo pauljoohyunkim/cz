@@ -1,5 +1,5 @@
 typedef int32 int;
 
-func ret_one :: (n :: int) -> int {
-    return 1;
+func ret_n :: (n :: int) -> int {
+    return n;
 }

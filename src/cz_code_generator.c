@@ -224,6 +224,7 @@ static int cz_code_generator_generate_function_body(CZ_CodeGenerator* cg, const 
 static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 static int cz_code_generator_generate_return_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 
+static LLVMValueRef cz_code_generator_generate_lvalue(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 
 static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 static LLVMValueRef cz_code_generator_generate_expr_binary(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
@@ -621,6 +622,28 @@ static int cz_code_generator_generate_return_statement(CZ_CodeGenerator* cg, con
     return 1;
 error_cleanup:
     return 0;
+}
+
+static LLVMValueRef cz_code_generator_generate_lvalue(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(env_b);
+
+    LLVMValueRef llvm_val = NULL;
+
+    switch (node->node_type) {
+        case CZ_AST_IdentifierNodeType:
+            goto error_cleanup;
+        case CZ_AST_StructMemberAccessNodeType:
+            goto error_cleanup;
+        case CZ_AST_FunctionCallNodeType:
+            goto error_cleanup;
+    }
+
+    return llvm_val;
+
+error_cleanup:
+    return NULL;
 }
 
 static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
