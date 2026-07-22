@@ -227,6 +227,7 @@ static int cz_code_generator_generate_return_statement(CZ_CodeGenerator* cg, con
 
 static LLVMValueRef cz_code_generator_generate_lvalue(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 static LLVMValueRef cz_code_generator_generate_lvalue_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
+static LLVMValueRef cz_code_generator_generate_lvalue_struct_member_access(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 static LLVMValueRef cz_code_generator_l_to_r_convert(CZ_CodeGenerator* cg, const CZ_Type* resolved_type, LLVMValueRef lvalue);
 
 static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
@@ -691,7 +692,8 @@ static LLVMValueRef cz_code_generator_generate_lvalue(CZ_CodeGenerator* cg, cons
             llvm_val = cz_code_generator_generate_lvalue_identifier(cg, env, env_b, node);
             break;
         case CZ_AST_StructMemberAccessNodeType:
-            goto error_cleanup;
+            llvm_val = cz_code_generator_generate_lvalue_struct_member_access(cg, env, env_b, node);
+            break;
         case CZ_AST_FunctionCallNodeType:
             goto error_cleanup;
     }
@@ -743,6 +745,32 @@ static LLVMValueRef cz_code_generator_generate_lvalue_identifier(CZ_CodeGenerato
     }
 
     return llvm_val;
+
+error_cleanup:
+    return NULL;
+}
+
+static LLVMValueRef cz_code_generator_generate_lvalue_struct_member_access(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(env_b);
+    NULL_POINTER_ERROR_HANDLE(node);
+
+    const char* struct_name = node->struct_member_access.object->identifier.name;
+    const char* member_name = node->struct_member_access.member->identifier.name;
+    const CZ_Symbol* struct_symbol = cz_environment_lookup(env, struct_name, true);
+
+    // Find field index.
+    int field_idx = -1;
+    for (unsigned int i = 0; i < struct_symbol->data.value.type->structure.layout->field_count; i++) {
+        if (struct_symbol->data.value.type->structure.layout->fields[i].name == member_name) {
+            field_idx = (int) i;
+            break;
+        }
+    }
+
+    //LLVMTypeRef llvm_struct_type = cz_environment_backend_lookup_type(cg, struct_symbol->data.value.type);
+
 
 error_cleanup:
     return NULL;

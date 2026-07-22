@@ -1,5 +1,8 @@
-global_counter :: int32 = 42;
+struct Vector {
+    x :: float;
+    y :: float;
+}
 
-func get_counter :: () -> int32& {
-    return global_counter;
+func get_x :: (v :: Vector&) -> float& {
+    return v.x;
 }
