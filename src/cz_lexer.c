@@ -4,14 +4,14 @@
 #include <ctype.h>
 #include "cz_lexer.h"
 
-#define NULL_POINTER_TO_GOTO(ptr, label) do { if ((ptr) == NULL) goto label; } while (0)
+#define NULL_POINTER_ERROR_HANDLE(ptr) do { if ((ptr) == NULL) goto error_cleanup; } while (0)
 
 static inline char* create_null_terminated_string(const char* text, size_t length) {
     char* nt_str = NULL;
     if (text == NULL || length == 0) goto error_cleanup;
 
     nt_str = (char*) malloc(sizeof(char) * (length + 1));
-    NULL_POINTER_TO_GOTO(nt_str, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(nt_str);
 
     memcpy(nt_str, text, length);
     nt_str[length] = '\0';
@@ -28,11 +28,11 @@ CZ_StringPool* cz_string_pool_create(void) {
     CZ_StringPool* sp = NULL;
 
     sp = (CZ_StringPool*) calloc(1, sizeof(CZ_StringPool));
-    NULL_POINTER_TO_GOTO(sp, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sp);
 
     sp->capacity = 8;
     strings = (const char**) calloc(sp->capacity, sizeof(const char*));
-    NULL_POINTER_TO_GOTO(strings, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(strings);
 
     sp->strings = strings;
     strings = NULL;
@@ -58,8 +58,8 @@ void cz_string_pool_free(CZ_StringPool* sp) {
 const char* cz_string_pool_push(CZ_StringPool* sp, const char* text, size_t length) {
     const char* nt_str = NULL;
     const char** new_strings = NULL;
-    NULL_POINTER_TO_GOTO(sp, error_cleanup);
-    NULL_POINTER_TO_GOTO(text, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sp);
+    NULL_POINTER_ERROR_HANDLE(text);
     if (length == 0) goto error_cleanup;
 
     // Search pool
@@ -75,7 +75,7 @@ const char* cz_string_pool_push(CZ_StringPool* sp, const char* text, size_t leng
         if (sp->capacity == sp->count) {
             // Increase capacity.
             new_strings = (const char**) realloc(sp->strings, sizeof(const char*) * sp->capacity * 2);
-            NULL_POINTER_TO_GOTO(new_strings, error_cleanup);
+            NULL_POINTER_ERROR_HANDLE(new_strings);
 
             // Move ownership of newly allocated strings.
             sp->strings = new_strings;
@@ -85,7 +85,7 @@ const char* cz_string_pool_push(CZ_StringPool* sp, const char* text, size_t leng
 
         // Create string
         nt_str = create_null_terminated_string(text, length);
-        NULL_POINTER_TO_GOTO(nt_str, error_cleanup);
+        NULL_POINTER_ERROR_HANDLE(nt_str);
 
         // Transfer string (but keep the shallow copy)
         sp->strings[sp->count] = nt_str;
@@ -108,30 +108,30 @@ CZ_Lexer* cz_lexer_create(const char* code, const char* filename) {
     CZ_ErrorList* error_list = NULL;
     CZ_StringPool* sp = NULL;
 
-    NULL_POINTER_TO_GOTO(code, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(code);
 
     const size_t code_length = strlen(code);
 
     lexer = (CZ_Lexer*) calloc(1, sizeof(CZ_Lexer));
-    NULL_POINTER_TO_GOTO(lexer, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(lexer);
 
     // Token array allocation
     lexer->n_tokens_capacity = 8;
     lexer->n_tokens = 0;
     tokens = (CZ_Token*) calloc(lexer->n_tokens_capacity, sizeof(CZ_Token));
-    NULL_POINTER_TO_GOTO(tokens, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(tokens);
 
     // Code allocation
     code_copy = (char*) calloc(code_length + 1, sizeof(char));
-    NULL_POINTER_TO_GOTO(code_copy, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(code_copy);
     strncpy(code_copy, code, code_length);
 
     // Add error list
     error_list = cz_error_list_create();
-    NULL_POINTER_TO_GOTO(error_list, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(error_list);
 
     sp = cz_string_pool_create();
-    NULL_POINTER_TO_GOTO(sp, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sp);
 
     // Now we have all resources, assign to lexer
     lexer->tokens = tokens;

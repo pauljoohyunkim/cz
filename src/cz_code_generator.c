@@ -7,15 +7,15 @@
 #include <string.h>
 #include "cz_code_generator.h"
 
-#define NULL_POINTER_TO_GOTO(ptr, label) do { if ((ptr) == NULL) goto label; } while (0)
-#define INVALID_NODE_TYPE_TO_GOTO(node, node_type_enum, label) do { if ((node)->node_type != (node_type_enum)) goto label; } while (0)
+#define NULL_POINTER_ERROR_HANDLE(ptr) do { if ((ptr) == NULL) goto error_cleanup; } while (0)
+#define INVALID_NODE_TYPE_ERROR_HANDLE(node, node_type_enum) do { if ((node)->node_type != (node_type_enum)) goto error_cleanup; } while (0)
 
 static CZ_Environment_Backend* cz_environment_backend_enter_scope(const CZ_Environment_Backend* current_env_b) {
     CZ_Environment_Backend* child_scope = NULL;
-    NULL_POINTER_TO_GOTO(current_env_b, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(current_env_b);
 
     child_scope = cz_environment_backend_create();
-    NULL_POINTER_TO_GOTO(child_scope, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(child_scope);
 
     child_scope->parent = current_env_b;
 
@@ -219,6 +219,7 @@ static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg);
 static int cz_code_generator_emit_function(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
 static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
 static int cz_code_generator_generate_function_body(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
+static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 
 static LLVMValueRef cz_code_generator_generate_expr_binary(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
@@ -229,10 +230,10 @@ static LLVMValueRef cz_code_generator_generate_expr_identifier(CZ_CodeGenerator*
 static LLVMValueRef cz_code_generator_generate_expr_struct_init(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 
 int cz_code_generator_generate(CZ_CodeGenerator* cg) {
-    NULL_POINTER_TO_GOTO(cg, error_cleanup);
-    NULL_POINTER_TO_GOTO(cg->program, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(cg->program, CZ_AST_ProgramNodeType, error_cleanup);
-    NULL_POINTER_TO_GOTO(cg->program->program.global_declaration_list, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(cg->program);
+    INVALID_NODE_TYPE_ERROR_HANDLE(cg->program, CZ_AST_ProgramNodeType);
+    NULL_POINTER_ERROR_HANDLE(cg->program->program.global_declaration_list);
 
     // Pass 1 to build type map. (Primitive & Opaque Struct & Reference)
     if (cz_code_generator_fill_type_map_primitive_opaque_struct(cg) != 1) {
@@ -246,7 +247,7 @@ int cz_code_generator_generate(CZ_CodeGenerator* cg) {
 
     for (unsigned int i = 0; i < cg->program->program.declaration_count; i++) {
         const CZ_AST_Node* statement = cg->program->program.global_declaration_list[i];
-        NULL_POINTER_TO_GOTO(statement, error_cleanup);
+        NULL_POINTER_ERROR_HANDLE(statement);
 
         // TODO: error checking
         switch (statement->node_type) {
@@ -269,7 +270,7 @@ int cz_code_generator_generate(CZ_CodeGenerator* cg) {
 
     for (unsigned int i = 0; i < cg->program->program.declaration_count; i++) {
         const CZ_AST_Node* statement = cg->program->program.global_declaration_list[i];
-        NULL_POINTER_TO_GOTO(statement, error_cleanup);
+        NULL_POINTER_ERROR_HANDLE(statement);
 
         if (statement->node_type != CZ_AST_FunctionDeclarationNodeType) {
             continue;
@@ -288,8 +289,8 @@ error_cleanup:
 }
 
 static inline LLVMTypeRef cz_backend_lower_type(CZ_CodeGenerator* cg, const CZ_Type* type) {
-    NULL_POINTER_TO_GOTO(cg, error_cleanup);
-    NULL_POINTER_TO_GOTO(type, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(type);
     switch (type->kind) {
         case CZ_TYPE_KIND_PRIMITIVE:
             switch (type->primitive) {
@@ -329,9 +330,9 @@ error_cleanup:
  * @return int 
  */
 static int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenerator* cg) {
-    NULL_POINTER_TO_GOTO(cg, error_cleanup);
-    NULL_POINTER_TO_GOTO(cg->gtt, error_cleanup);
-    NULL_POINTER_TO_GOTO(cg->global_env_b, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(cg->gtt);
+    NULL_POINTER_ERROR_HANDLE(cg->global_env_b);
 
     for (unsigned int i = 0; i < cg->gtt->all_entry_count; i++) {
         const CZ_Type* type = cg->gtt->all_allocations[i];
@@ -349,7 +350,7 @@ static int cz_code_generator_fill_type_map_primitive_opaque_struct(CZ_CodeGenera
 
         // Lower and insert
         LLVMTypeRef llvm_type = cz_backend_lower_type(cg, type);
-        NULL_POINTER_TO_GOTO(llvm_type, error_cleanup);
+        NULL_POINTER_ERROR_HANDLE(llvm_type);
 
         if (cz_environment_backend_push_type_map(cg->global_env_b, type, llvm_type) != 1) {
             goto error_cleanup;
@@ -363,8 +364,8 @@ error_cleanup:
 
 static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
     LLVMTypeRef* llvm_types = NULL;
-    NULL_POINTER_TO_GOTO(cg, error_cleanup);
-    NULL_POINTER_TO_GOTO(cg->gtt, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(cg->gtt);
 
     for (unsigned int i = 0; i < cg->gtt->all_entry_count; i++) {
         const CZ_Type* type = cg->gtt->all_allocations[i];
@@ -373,12 +374,12 @@ static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
             // Structs Members
             case CZ_TYPE_KIND_STRUCT: {
                 LLVMTypeRef llvm_struct_type = cz_environment_backend_lookup_type(cg, type);
-                NULL_POINTER_TO_GOTO(llvm_struct_type, error_cleanup);
+                NULL_POINTER_ERROR_HANDLE(llvm_struct_type);
 
                 unsigned int field_count = type->structure.layout->field_count;
                 if (field_count > 0) {
                     llvm_types = (LLVMTypeRef*) calloc(field_count, sizeof(LLVMTypeRef));
-                    NULL_POINTER_TO_GOTO(llvm_types, error_cleanup);
+                    NULL_POINTER_ERROR_HANDLE(llvm_types);
 
                     for (unsigned int j = 0; j < field_count; j++) {
                         const CZ_Type* member_type = type->structure.layout->fields[j].type;
@@ -406,25 +407,25 @@ static int cz_code_generator_fill_type_map_complex(CZ_CodeGenerator* cg) {
             case CZ_TYPE_KIND_FUNCTION: {
                 // Return Type
                 LLVMTypeRef llvm_ret_type = cz_environment_backend_lookup_type(cg, type->function.return_type);
-                NULL_POINTER_TO_GOTO(llvm_ret_type, error_cleanup);
+                NULL_POINTER_ERROR_HANDLE(llvm_ret_type);
 
                 // Parameters
                 unsigned int param_count = type->function.param_count;
                 if (param_count > 0) {
                     llvm_types = (LLVMTypeRef*) calloc(param_count, sizeof(LLVMTypeRef));
-                    NULL_POINTER_TO_GOTO(llvm_types, error_cleanup);
+                    NULL_POINTER_ERROR_HANDLE(llvm_types);
 
                     for (unsigned int j = 0; j < param_count; j++) {
                         const CZ_Type* param_type = type->function.param_types[j];
                         LLVMTypeRef llvm_param_type = cz_environment_backend_lookup_type(cg, param_type);
-                        NULL_POINTER_TO_GOTO(llvm_param_type, error_cleanup);
+                        NULL_POINTER_ERROR_HANDLE(llvm_param_type);
                         
                         llvm_types[j] = llvm_param_type;
                     }
                 }
 
                 LLVMTypeRef llvm_func_type = LLVMFunctionType(llvm_ret_type, llvm_types, param_count, 0);
-                NULL_POINTER_TO_GOTO(llvm_func_type, error_cleanup);
+                NULL_POINTER_ERROR_HANDLE(llvm_func_type);
 
                 if (cz_environment_backend_push_type_map(cg->global_env_b, type, llvm_func_type) != 1) {
                     goto error_cleanup;
@@ -457,11 +458,11 @@ error_cleanup:
 }
 
 static int cz_code_generator_emit_function(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt) {
-    NULL_POINTER_TO_GOTO(cg, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(env_b, error_cleanup);
-    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_FunctionDeclarationNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(env_b);
+    NULL_POINTER_ERROR_HANDLE(stmt);
+    INVALID_NODE_TYPE_ERROR_HANDLE(stmt, CZ_AST_FunctionDeclarationNodeType);
 
     const char* func_name = stmt->function_declaration.function_identifier->identifier.name;
     const CZ_Symbol* func_symbol = cz_environment_lookup(env, func_name, true);
@@ -482,15 +483,15 @@ error_cleanup:
 }
 
 static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt) {
-    NULL_POINTER_TO_GOTO(cg, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(env_b, error_cleanup);
-    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_VariableDeclarationNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(env_b);
+    NULL_POINTER_ERROR_HANDLE(stmt);
+    INVALID_NODE_TYPE_ERROR_HANDLE(stmt, CZ_AST_VariableDeclarationNodeType);
 
     const char* var_name = stmt->variable_declaration.identifier->identifier.name;
     const CZ_Symbol* var_symbol = cz_environment_lookup(env, var_name, false);
-    NULL_POINTER_TO_GOTO(var_symbol, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(var_symbol);
 
     const CZ_Type* var_type = var_symbol->data.value.type;
     LLVMTypeRef llvm_var_type = cz_environment_backend_lookup_type(cg, var_type);
@@ -521,11 +522,11 @@ error_cleanup:
 
 static int cz_code_generator_generate_function_body(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
     CZ_Environment_Backend* body_env_b;
-    NULL_POINTER_TO_GOTO(cg, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(env_b, error_cleanup);
-    NULL_POINTER_TO_GOTO(node, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(node, CZ_AST_FunctionDeclarationNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(env_b);
+    NULL_POINTER_ERROR_HANDLE(node);
+    INVALID_NODE_TYPE_ERROR_HANDLE(node, CZ_AST_FunctionDeclarationNodeType);
 
     const char* func_name = node->function_declaration.function_identifier->identifier.name;
     const CZ_Symbol* func_symbol = cz_environment_lookup(env, func_name, true);
@@ -536,7 +537,7 @@ static int cz_code_generator_generate_function_body(CZ_CodeGenerator* cg, const 
     LLVMPositionBuilderAtEnd(cg->builder, llvm_entry_block);
 
     body_env_b = cz_environment_backend_enter_scope(env_b);
-    NULL_POINTER_TO_GOTO(body_env_b, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(body_env_b);
 
     // Populating environment with parameters.
     unsigned int param_count = func_symbol->data.value.type->function.param_count;
@@ -564,11 +565,22 @@ error_cleanup:
     return 0;
 }
 
+static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(env_b);
+
+    return 1;
+
+error_cleanup:
+    return 0;
+}
+
 static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
-    NULL_POINTER_TO_GOTO(cg, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(env_b, error_cleanup);
-    NULL_POINTER_TO_GOTO(node, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(env_b);
+    NULL_POINTER_ERROR_HANDLE(node);
 
     LLVMValueRef llvm_val = NULL;
 
@@ -840,7 +852,7 @@ static LLVMValueRef cz_code_generator_generate_expr_struct_init(CZ_CodeGenerator
         cg, 
         node->decoration->resolved_type
     );
-    NULL_POINTER_TO_GOTO(struct_type, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(struct_type);
 
     unsigned int field_count = node->decoration->resolved_type->structure.layout->field_count;
     llvm_field_vals = (LLVMValueRef*) calloc(field_count, sizeof(LLVMValueRef));
@@ -863,7 +875,7 @@ static LLVMValueRef cz_code_generator_generate_expr_struct_init(CZ_CodeGenerator
             goto error_cleanup;
         }
         LLVMValueRef llvm_initializer_val = cz_code_generator_generate_expr(cg, env, env_b, initializer_member_node->struct_init_member.expression, is_compile_time);
-        NULL_POINTER_TO_GOTO(llvm_initializer_val, error_cleanup);
+        NULL_POINTER_ERROR_HANDLE(llvm_initializer_val);
         llvm_field_vals[field_idx] = llvm_initializer_val;
     }
 

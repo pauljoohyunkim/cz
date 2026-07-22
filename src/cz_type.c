@@ -3,13 +3,13 @@
 #include <string.h>
 #include "cz_type.h"
 
-#define NULL_POINTER_TO_GOTO(ptr, label) do { if ((ptr) == NULL) goto label; } while (0)
+#define NULL_POINTER_ERROR_HANDLE(ptr) do { if ((ptr) == NULL) goto error_cleanup; } while (0)
 
 CZ_Type* cz_type_create(CZ_TypeKind type_kind) {
     CZ_Type* type = NULL;
     
     type = (CZ_Type*) calloc(1, sizeof(CZ_Type));
-    NULL_POINTER_TO_GOTO(type, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(type);
 
     type->kind = type_kind;
 
@@ -25,10 +25,10 @@ CZ_StructLayout* cz_struct_layout_create(unsigned int field_count) {
     CZ_StructField* fields = NULL;
 
     struct_layout = (CZ_StructLayout*) calloc(1, sizeof(CZ_StructLayout));
-    NULL_POINTER_TO_GOTO(struct_layout, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(struct_layout);
 
     fields = (CZ_StructField*) calloc(field_count, sizeof(CZ_StructField));
-    NULL_POINTER_TO_GOTO(fields, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(fields);
 
     struct_layout->fields = fields;
     fields = NULL;
@@ -96,16 +96,16 @@ CZ_GlobalTypeTable* cz_global_type_table_create(void) {
     const char** names = NULL;
 
     gtt = (CZ_GlobalTypeTable*) calloc(1, sizeof(CZ_GlobalTypeTable));
-    NULL_POINTER_TO_GOTO(gtt, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(gtt);
 
     gtt->all_allocations_capacity = 8;
     gtt->named_entry_capacity = 8;
 
     // Allocate
     named_types = (CZ_Type**) calloc(gtt->named_entry_capacity, sizeof(CZ_Type*));
-    NULL_POINTER_TO_GOTO(named_types, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(named_types);
     all_allocations = (CZ_Type**) calloc(gtt->all_allocations_capacity, sizeof(CZ_Type*));
-    NULL_POINTER_TO_GOTO(all_allocations, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(all_allocations);
     names = (const char**) calloc(gtt->named_entry_capacity, sizeof(const char*));
 
     // Link them
@@ -179,8 +179,8 @@ int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, co
     const char** new_names = NULL;
     const CZ_Type** new_named_types = NULL;
     const CZ_Type** new_all_allocations = NULL;
-    NULL_POINTER_TO_GOTO(gtt, error_cleanup);
-    NULL_POINTER_TO_GOTO(type, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(gtt);
+    NULL_POINTER_ERROR_HANDLE(type);
 
     // Check if type already exists.
     // If not, add.
@@ -190,7 +190,7 @@ int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, co
         // All allocation
         if (gtt->all_allocations_capacity == gtt->all_entry_count) {
             new_all_allocations = realloc(gtt->all_allocations, sizeof(const CZ_Type*) * (gtt->all_allocations_capacity) * 2);
-            NULL_POINTER_TO_GOTO(new_all_allocations, error_cleanup);
+            NULL_POINTER_ERROR_HANDLE(new_all_allocations);
 
             gtt->all_allocations = (const CZ_Type**) new_all_allocations;
             new_all_allocations = NULL;
@@ -207,10 +207,10 @@ int cz_global_type_table_push_type(CZ_GlobalTypeTable* gtt, const char* name, co
     if (name != NULL) {
         if (gtt->named_entry_count == gtt->named_entry_capacity) {
             new_names = (const char**) realloc(gtt->names, sizeof(const char*) * (gtt->named_entry_capacity) * 2);
-            NULL_POINTER_TO_GOTO(new_names, error_cleanup);
+            NULL_POINTER_ERROR_HANDLE(new_names);
 
             new_named_types = (const CZ_Type**) realloc(gtt->named_types, sizeof(const CZ_Type*) * (gtt->named_entry_capacity) * 2);
-            NULL_POINTER_TO_GOTO(new_named_types, error_cleanup);
+            NULL_POINTER_ERROR_HANDLE(new_named_types);
 
             gtt->names = new_names;
             new_names = NULL;
