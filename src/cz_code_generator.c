@@ -226,6 +226,7 @@ static int cz_code_generator_generate_return_statement(CZ_CodeGenerator* cg, con
 
 static LLVMValueRef cz_code_generator_generate_lvalue(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 static LLVMValueRef cz_code_generator_generate_lvalue_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
+static LLVMValueRef cz_code_generator_l_to_r_convert(CZ_CodeGenerator* cg, const CZ_Type* resolved_type, LLVMValueRef lvalue);
 
 static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 static LLVMValueRef cz_code_generator_generate_expr_binary(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
@@ -658,6 +659,22 @@ error_cleanup:
     return NULL;
 }
 
+static LLVMValueRef cz_code_generator_l_to_r_convert(CZ_CodeGenerator* cg, const CZ_Type* resolved_type, LLVMValueRef lvalue) {
+    LLVMValueRef llvm_val = NULL;
+
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(resolved_type);
+    NULL_POINTER_ERROR_HANDLE(lvalue);
+
+    LLVMTypeRef llvm_type = cz_environment_backend_lookup_type(cg, resolved_type);
+    NULL_POINTER_ERROR_HANDLE(llvm_type);
+
+    llvm_val = LLVMBuildLoad2(cg->builder, llvm_type, lvalue, "lval_to_rval");
+
+error_cleanup:
+    return llvm_val;
+}
+
 static LLVMValueRef cz_code_generator_generate_lvalue_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
     NULL_POINTER_ERROR_HANDLE(cg);
     NULL_POINTER_ERROR_HANDLE(env);
@@ -709,8 +726,7 @@ static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const 
                 }
                 // L-to-R value conversion for addressable nodes (Similarly for member access, array indexing, etc.)
                 LLVMValueRef llvm_identifier_ref = cz_code_generator_generate_lvalue(cg, env, env_b, node);
-                LLVMTypeRef llvm_type = cz_environment_backend_lookup_type(cg, node->decoration->resolved_type);
-                llvm_val = LLVMBuildLoad2(cg->builder, llvm_type, llvm_identifier_ref, "lval_to_rval");
+                llvm_val = cz_code_generator_l_to_r_convert(cg, node->decoration->resolved_type, llvm_identifier_ref);
             }
             break;
         case CZ_AST_StructInitNodeType:
