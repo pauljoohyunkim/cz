@@ -222,6 +222,7 @@ static int cz_code_generator_generate_function_body(CZ_CodeGenerator* cg, const 
 
 
 static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
+static int cz_code_generator_generate_variable_declaration_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
 static int cz_code_generator_generate_return_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 
 static LLVMValueRef cz_code_generator_generate_lvalue(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
@@ -591,12 +592,13 @@ static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_E
 
     switch (node->node_type) {
         case CZ_AST_VariableDeclarationNodeType:
-            goto error_cleanup;
+            cz_code_generator_generate_variable_declaration_statement(cg, env, env_b, false);
+            break;
         case CZ_AST_AssignmentStatementNodeType:
             goto error_cleanup;
         case CZ_AST_ReturnStatementNodeType:
             cz_code_generator_generate_return_statement(cg, env, env_b, node, false);
-            goto error_cleanup;
+            break;
         case CZ_AST_IfStatementNodeType:
             goto error_cleanup;
         case CZ_AST_ForStatementNodeType:
@@ -610,6 +612,16 @@ static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_E
     }
 
     return 1;
+
+error_cleanup:
+    return 0;
+}
+
+static int cz_code_generator_generate_variable_declaration_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt) {
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(env_b);
+    NULL_POINTER_ERROR_HANDLE(stmt);
 
 error_cleanup:
     return 0;
@@ -671,8 +683,10 @@ static LLVMValueRef cz_code_generator_l_to_r_convert(CZ_CodeGenerator* cg, const
 
     llvm_val = LLVMBuildLoad2(cg->builder, llvm_type, lvalue, "lval_to_rval");
 
-error_cleanup:
     return llvm_val;
+
+error_cleanup:
+    return NULL;
 }
 
 static LLVMValueRef cz_code_generator_generate_lvalue_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
