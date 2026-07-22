@@ -1,4 +1,4 @@
-func addone :: (n :: int32&) -> int32 {
+func addone :: (n :: int32) -> int32 {
     np1 :: int32 = n;
     return np1 + 1;
 }

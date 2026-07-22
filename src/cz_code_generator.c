@@ -709,11 +709,16 @@ static LLVMValueRef cz_code_generator_l_to_r_convert(CZ_CodeGenerator* cg, const
     NULL_POINTER_ERROR_HANDLE(resolved_type);
     NULL_POINTER_ERROR_HANDLE(lvalue);
 
-    LLVMTypeRef llvm_type = cz_environment_backend_lookup_type(cg, resolved_type);
+    // If the AST node type is a reference (e.g. int32&), unwrap it to get the target value type (int32)
+    const CZ_Type* underlying_type = resolved_type;
+    if (resolved_type->kind == CZ_TYPE_KIND_REFERENCE) {
+        underlying_type = resolved_type->reference_to;
+    }
+
+    LLVMTypeRef llvm_type = cz_environment_backend_lookup_type(cg, underlying_type);
     NULL_POINTER_ERROR_HANDLE(llvm_type);
 
     llvm_val = LLVMBuildLoad2(cg->builder, llvm_type, lvalue, "lval_to_rval");
-
     return llvm_val;
 
 error_cleanup:
