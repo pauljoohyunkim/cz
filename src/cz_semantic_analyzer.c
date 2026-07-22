@@ -1164,7 +1164,8 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
         }
 
         // 4.4 Flag if RHS is escapable.
-        var_symbol->data.value.is_escapable_ref = rhs_decoration->is_escapable_ref;
+        //var_symbol->data.value.is_escapable_ref = rhs_decoration->is_escapable_ref;
+        var_symbol->data.value.is_escapable_ref = true;
     }
 
 
@@ -1991,6 +1992,7 @@ static int cz_semantic_analyzer_check_function_call_expression(CZ_SemanticAnalyz
         return_type->kind == CZ_TYPE_KIND_REFERENCE, 
         env->scope_level
     );
+    decor->is_escapable_ref = return_type->kind == CZ_TYPE_KIND_REFERENCE;
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;
@@ -2430,6 +2432,7 @@ static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_
         member_type->kind == CZ_TYPE_KIND_REFERENCE,
         env->scope_level
     );
+    decor->is_escapable_ref = expr->struct_member_access.object->decoration->is_escapable_ref;
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, 
             "Allocating AST decorator failure.");
