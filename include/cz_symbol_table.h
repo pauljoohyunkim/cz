@@ -30,6 +30,7 @@ typedef struct {
         struct {
             const CZ_Type* type;
             bool is_constexpr;
+            bool is_escapable_ref;      // Relevant only if type is reference.
         } value;
 
         struct {

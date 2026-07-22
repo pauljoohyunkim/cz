@@ -1,22 +1,5 @@
-func identity_ref :: (x :: int32&) -> int32& {
-    return x;
+global_counter :: int32 = 42;
+
+func get_counter :: () -> int32& {
+    return global_counter;
 }
-
-func read_ref :: (x :: int32&) -> int32 {
-    y :: int32 = x;
-    return y;
-}
-
-//func alias_ref :: (x :: int32&) -> int32& {
-//    y :: int32& = x;
-//    return y;
-//}
-
-struct Point {
-    x :: int32;
-    y :: int32;
-}
-
-//func get_x :: (p :: Point&) -> int32 {
-//    return p.x;
-//}
