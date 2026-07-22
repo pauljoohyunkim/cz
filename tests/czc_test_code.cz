@@ -1,5 +1,16 @@
 typedef int32 int;
 
+struct Vector {
+    x :: float;
+    y :: float;
+}
+
 func ret_n :: (n :: int) -> int {
     return n;
+}
+    
+v :: Vector;
+
+func ret_v :: () -> Vector {
+    return v;
 }

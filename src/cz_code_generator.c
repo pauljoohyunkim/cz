@@ -535,6 +535,7 @@ static int cz_code_generator_generate_function_body(CZ_CodeGenerator* cg, const 
 
     const char* func_name = node->function_declaration.function_identifier->identifier.name;
     const CZ_Symbol* func_symbol = cz_environment_lookup(env, func_name, true);
+    cg->current_function_return = func_symbol->data.value.type->function.return_type;
 
     LLVMValueRef llvm_func = cz_environment_backend_lookup_val(env_b, func_symbol, true);
     
@@ -572,10 +573,12 @@ static int cz_code_generator_generate_function_body(CZ_CodeGenerator* cg, const 
     }
 
     cz_environment_backend_free(body_env_b);
+    cg->current_function_return = NULL;
     return 1;
 
 error_cleanup:
     cz_environment_backend_free(body_env_b);
+    cg->current_function_return = NULL;
     return 0;
 }
 
@@ -615,9 +618,15 @@ static int cz_code_generator_generate_return_statement(CZ_CodeGenerator* cg, con
     NULL_POINTER_ERROR_HANDLE(env);
     NULL_POINTER_ERROR_HANDLE(env_b);
     NULL_POINTER_ERROR_HANDLE(node);
+    NULL_POINTER_ERROR_HANDLE(cg->current_function_return);
 
-    LLVMValueRef llvm_return_val_ref = cz_code_generator_generate_expr(cg, env, env_b, node->return_statement.expression, is_compile_time);
-    LLVMBuildRet(cg->builder, llvm_return_val_ref);
+    if (cg->current_function_return->kind == CZ_TYPE_KIND_REFERENCE) {
+        // TODO: Generate l-value here.
+        goto error_cleanup;
+    } else {
+        LLVMValueRef llvm_return_val_ref = cz_code_generator_generate_expr(cg, env, env_b, node->return_statement.expression, is_compile_time);
+        LLVMBuildRet(cg->builder, llvm_return_val_ref);
+    }
 
     return 1;
 error_cleanup:
@@ -909,7 +918,18 @@ error_cleanup:
 static LLVMValueRef cz_code_generator_generate_expr_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
     LLVMValueRef llvm_val = NULL;
 
-    // TODO: Implement this.
+    const CZ_Symbol* sym = cz_environment_lookup(env, node->identifier.name, true);
+    NULL_POINTER_ERROR_HANDLE(sym);
+    if (sym->kind == CZ_TYPE_KIND_FUNCTION) {
+        cz_error_list_push_error(cg->error_list, cg->filename, node->line, node->col, "Function as identifier (r-value) generation not yet supported.");
+        goto error_cleanup;
+    } else {
+        LLVMValueRef llvm_var_loc = cz_environment_backend_lookup_val(env_b, sym, true);
+        NULL_POINTER_ERROR_HANDLE(llvm_var_loc);
+        LLVMTypeRef llvm_type = cz_environment_backend_lookup_type(cg, sym->data.value.type);
+        NULL_POINTER_ERROR_HANDLE(llvm_type);
+        llvm_val = LLVMBuildLoad2(cg->builder, llvm_type, llvm_var_loc, "load_tmp");
+    }
 
     return llvm_val;
 error_cleanup:
