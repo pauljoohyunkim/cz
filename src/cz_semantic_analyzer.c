@@ -906,7 +906,7 @@ static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_
             goto error_cleanup;
         }
         param_symbol->data.value.type = func_symbol->data.value.type->function.param_types[i];
-        param_symbol->data.value.is_escapable_ref = true;
+        param_symbol->data.value.is_escapable_ref = param_symbol->data.value.type->kind == CZ_TYPE_KIND_REFERENCE;
 
         if (cz_environment_push_symbol(func_param_env, param_symbol) != 1) {
             cz_symbol_free(param_symbol);
@@ -1385,7 +1385,7 @@ static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_Semantic
     symbol->data.value.is_constexpr = cz_type_is_const(var_type) &&
                                       stmt->variable_declaration.expression != NULL &&
                                       stmt->variable_declaration.expression->decoration->is_constexpr;
-    symbol->data.value.is_escapable_ref = stmt->variable_declaration.expression->decoration->is_escapable_ref;
+    symbol->data.value.is_escapable_ref = var_type->kind == CZ_TYPE_KIND_REFERENCE && stmt->variable_declaration.expression->decoration->is_escapable_ref;
 
     if (cz_environment_push_symbol(env, symbol) != 1) {
         cz_symbol_free(symbol);
@@ -2355,9 +2355,7 @@ static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer*
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;
     }
-    if (decor->resolved_type->kind == CZ_TYPE_KIND_REFERENCE) {
-        decor->is_escapable_ref = symbol->data.value.is_escapable_ref;
-    }
+    decor->is_escapable_ref = symbol->data.value.is_escapable_ref;
 
     // Transfer decoration
     expr->decoration = decor;
