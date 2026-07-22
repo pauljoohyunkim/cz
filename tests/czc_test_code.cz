@@ -11,3 +11,7 @@ k :: float = 0.2;
 j :: Vector = Vector {
     .y = 1.0
 };
+
+func addone :: (n :: int) -> int {
+    return n + 1;
+}
