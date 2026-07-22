@@ -23,6 +23,7 @@ typedef struct {
     bool is_constexpr;
     bool is_reference_source;
     unsigned int scope_level;
+    bool is_escapable_ref;      // Whether or not if it is a reference to a location outside of a local function scope.
 } CZ_AST_Decoration;
 
 typedef enum {

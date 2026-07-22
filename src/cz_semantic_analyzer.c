@@ -419,6 +419,7 @@ static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, 
     // 4. Add symbol.
     func_symbol = cz_symbol_create(CZ_SYMBOL_KIND_VALUE, decl->function_declaration.function_identifier->identifier.name, 0);
     func_symbol->data.value.type = func_type;
+    func_symbol->data.value.is_escapable_ref = true;
     if (cz_environment_push_symbol(env, func_symbol) != 1) {
         goto error_cleanup;
     }
@@ -520,6 +521,7 @@ static int cz_semantic_analyzer_register_variable_decl(CZ_SemanticAnalyzer* sa, 
         goto error_cleanup;
     }
     variable_symbol->data.value.type = variable_type;
+    variable_symbol->data.value.is_escapable_ref = true;
     if (cz_environment_push_symbol(env, variable_symbol) != 1) {
         cz_error_list_push_error(sa->error_list, sa->filename, type_node->line, type_node->col,
                                  "Symbol \"%s\" could not be added to symbol table", variable_node->identifier.name);
@@ -904,6 +906,7 @@ static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_
             goto error_cleanup;
         }
         param_symbol->data.value.type = func_symbol->data.value.type->function.param_types[i];
+        param_symbol->data.value.is_escapable_ref = true;
 
         if (cz_environment_push_symbol(func_param_env, param_symbol) != 1) {
             cz_symbol_free(param_symbol);
@@ -1153,13 +1156,15 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
         // 4.2 If RHS is const, then LHS cannot be const.
         const CZ_Type* referenced_type = var_decl_type->reference_to;
     
-        // Check if the underlying referenced type is non-const, but the RHS is const
+        // 4.3 Check if the underlying referenced type is non-const, but the RHS is const
         if (referenced_type->kind != CZ_TYPE_KIND_CONST && rhs_decoration->resolved_type->kind == CZ_TYPE_KIND_CONST) {
             cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
                 "Cannot bind non-const reference \"%s\" to a const value.", var_name);
             goto error_cleanup;
         }
 
+        // 4.4 Flag if RHS is escapable.
+        var_symbol->data.value.is_escapable_ref = rhs_decoration->is_escapable_ref;
     }
 
 
@@ -1380,6 +1385,7 @@ static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_Semantic
     symbol->data.value.is_constexpr = cz_type_is_const(var_type) &&
                                       stmt->variable_declaration.expression != NULL &&
                                       stmt->variable_declaration.expression->decoration->is_constexpr;
+    symbol->data.value.is_escapable_ref = stmt->variable_declaration.expression->decoration->is_escapable_ref;
 
     if (cz_environment_push_symbol(env, symbol) != 1) {
         cz_symbol_free(symbol);
@@ -1649,6 +1655,7 @@ static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, 
         }
 
 
+        /*
         // 3.1 & 3.2 Unified Scope and Lifetime validation via Decoration
         if (stmt->return_statement.expression->decoration->scope_level >= 2) {
             cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
@@ -1661,6 +1668,18 @@ static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, 
             !stmt->return_statement.expression->decoration->is_reference_source) {
             cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
                 "Cannot return a reference to data owned by a non-reference parameter.");
+            goto error_cleanup;
+        }
+        */
+
+        if (!stmt->return_statement.expression->decoration->is_escapable_ref) {
+            cz_error_list_push_error(
+                sa->error_list, 
+                sa->filename, 
+                stmt->line, 
+                stmt->col,
+                "Cannot return a reference to local stack memory."
+            );
             goto error_cleanup;
         }
 
@@ -2335,6 +2354,9 @@ static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer*
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;
+    }
+    if (decor->resolved_type->kind == CZ_TYPE_KIND_REFERENCE) {
+        decor->is_escapable_ref = symbol->data.value.is_escapable_ref;
     }
 
     // Transfer decoration
