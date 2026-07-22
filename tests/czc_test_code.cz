@@ -5,7 +5,7 @@ struct Vector {
     y :: float;
 }
 
-func ret_n :: (n :: int) -> int {
+func ret_n :: (n :: int&) -> int& {
     return n;
 }
     
