@@ -530,7 +530,7 @@ error_cleanup:
 }
 
 static int cz_code_generator_generate_function_body(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
-    CZ_Environment_Backend* body_env_b;
+    CZ_Environment_Backend* body_env_b = NULL;
     NULL_POINTER_ERROR_HANDLE(cg);
     NULL_POINTER_ERROR_HANDLE(env);
     NULL_POINTER_ERROR_HANDLE(env_b);
