@@ -823,6 +823,12 @@ static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const 
         case CZ_AST_StructInitNodeType:
             llvm_val = cz_code_generator_generate_expr_struct_init(cg, env, env_b, node, is_compile_time);
             break;
+        case CZ_AST_StructMemberAccessNodeType:
+            {
+                LLVMValueRef llvm_struct_access_ref = cz_code_generator_generate_lvalue(cg, env, env_b, node);
+                llvm_val = cz_code_generator_l_to_r_convert(cg, node->decoration->resolved_type, llvm_struct_access_ref);
+            }
+            break;
         default:
             goto error_cleanup;
     }

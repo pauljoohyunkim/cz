@@ -3,6 +3,6 @@ struct Vector {
     y :: float;
 }
 
-func get_x :: (v :: Vector&) -> float& {
+func get_x :: (v :: Vector&) -> float {
     return v.x;
 }
