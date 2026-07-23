@@ -227,6 +227,7 @@ static int cz_code_generator_generate_return_statement(CZ_CodeGenerator* cg, con
 
 static LLVMValueRef cz_code_generator_generate_lvalue(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 static LLVMValueRef cz_code_generator_generate_lvalue_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
+static LLVMValueRef cz_code_generator_generate_lvalue_struct_member_access(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 static LLVMValueRef cz_code_generator_l_to_r_convert(CZ_CodeGenerator* cg, const CZ_Type* resolved_type, LLVMValueRef lvalue);
 
 static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
@@ -691,7 +692,8 @@ static LLVMValueRef cz_code_generator_generate_lvalue(CZ_CodeGenerator* cg, cons
             llvm_val = cz_code_generator_generate_lvalue_identifier(cg, env, env_b, node);
             break;
         case CZ_AST_StructMemberAccessNodeType:
-            goto error_cleanup;
+            llvm_val = cz_code_generator_generate_lvalue_struct_member_access(cg, env, env_b, node);
+            break;
         case CZ_AST_FunctionCallNodeType:
             goto error_cleanup;
     }
@@ -748,6 +750,45 @@ error_cleanup:
     return NULL;
 }
 
+static LLVMValueRef cz_code_generator_generate_lvalue_struct_member_access(
+    CZ_CodeGenerator* cg, 
+    const CZ_Environment* env, 
+    const CZ_Environment_Backend* env_b, 
+    const CZ_AST_Node* node
+) {
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(env_b);
+    NULL_POINTER_ERROR_HANDLE(node);
+
+    const CZ_Type* struct_type = cz_type_decay_type(node->struct_member_access.object->decoration->resolved_type);
+    const char* member_name = node->struct_member_access.member->identifier.name;
+
+    int field_idx = -1;
+    for (unsigned int i = 0; i < struct_type->structure.layout->field_count; i++) {
+        if (struct_type->structure.layout->fields[i].name == member_name) {
+            field_idx = (int)i;
+            break;
+        }
+    }
+
+    if (field_idx < 0) goto error_cleanup;
+
+    // generate_lvalue already returns the ptr to %Vector (unwrapping ref if needed)
+    LLVMValueRef llvm_struct_ptr = cz_code_generator_generate_lvalue(
+        cg, env, env_b, node->struct_member_access.object
+    );
+    NULL_POINTER_ERROR_HANDLE(llvm_struct_ptr);
+
+    LLVMTypeRef llvm_struct_type = cz_environment_backend_lookup_type(cg, struct_type);
+    NULL_POINTER_ERROR_HANDLE(llvm_struct_type);
+
+    return LLVMBuildStructGEP2(cg->builder, llvm_struct_type, llvm_struct_ptr, field_idx, "field_gep");
+
+error_cleanup:
+    return NULL;
+}
+
 static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
     NULL_POINTER_ERROR_HANDLE(cg);
     NULL_POINTER_ERROR_HANDLE(env);
@@ -781,6 +822,12 @@ static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const 
             break;
         case CZ_AST_StructInitNodeType:
             llvm_val = cz_code_generator_generate_expr_struct_init(cg, env, env_b, node, is_compile_time);
+            break;
+        case CZ_AST_StructMemberAccessNodeType:
+            {
+                LLVMValueRef llvm_struct_access_ref = cz_code_generator_generate_lvalue(cg, env, env_b, node);
+                llvm_val = cz_code_generator_l_to_r_convert(cg, node->decoration->resolved_type, llvm_struct_access_ref);
+            }
             break;
         default:
             goto error_cleanup;
