@@ -750,27 +750,40 @@ error_cleanup:
     return NULL;
 }
 
-static LLVMValueRef cz_code_generator_generate_lvalue_struct_member_access(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
+static LLVMValueRef cz_code_generator_generate_lvalue_struct_member_access(
+    CZ_CodeGenerator* cg, 
+    const CZ_Environment* env, 
+    const CZ_Environment_Backend* env_b, 
+    const CZ_AST_Node* node
+) {
     NULL_POINTER_ERROR_HANDLE(cg);
     NULL_POINTER_ERROR_HANDLE(env);
     NULL_POINTER_ERROR_HANDLE(env_b);
     NULL_POINTER_ERROR_HANDLE(node);
 
-    const char* struct_name = node->struct_member_access.object->identifier.name;
+    const CZ_Type* struct_type = cz_type_decay_type(node->struct_member_access.object->decoration->resolved_type);
     const char* member_name = node->struct_member_access.member->identifier.name;
-    const CZ_Symbol* struct_symbol = cz_environment_lookup(env, struct_name, true);
 
-    // Find field index.
     int field_idx = -1;
-    for (unsigned int i = 0; i < struct_symbol->data.value.type->structure.layout->field_count; i++) {
-        if (struct_symbol->data.value.type->structure.layout->fields[i].name == member_name) {
-            field_idx = (int) i;
+    for (unsigned int i = 0; i < struct_type->structure.layout->field_count; i++) {
+        if (struct_type->structure.layout->fields[i].name == member_name) {
+            field_idx = (int)i;
             break;
         }
     }
 
-    //LLVMTypeRef llvm_struct_type = cz_environment_backend_lookup_type(cg, struct_symbol->data.value.type);
+    if (field_idx < 0) goto error_cleanup;
 
+    // generate_lvalue already returns the ptr to %Vector (unwrapping ref if needed)
+    LLVMValueRef llvm_struct_ptr = cz_code_generator_generate_lvalue(
+        cg, env, env_b, node->struct_member_access.object
+    );
+    NULL_POINTER_ERROR_HANDLE(llvm_struct_ptr);
+
+    LLVMTypeRef llvm_struct_type = cz_environment_backend_lookup_type(cg, struct_type);
+    NULL_POINTER_ERROR_HANDLE(llvm_struct_type);
+
+    return LLVMBuildStructGEP2(cg->builder, llvm_struct_type, llvm_struct_ptr, field_idx, "field_gep");
 
 error_cleanup:
     return NULL;
