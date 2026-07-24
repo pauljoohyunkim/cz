@@ -1,8 +1,8 @@
-struct Vector {
-    x :: float;
-    y :: float;
+func identity :: (x :: float&) -> float& {
+    return x;
 }
 
-func get_x :: (v :: Vector&) -> float {
-    return v.x;
+func main :: () {
+    x :: float = 1.0;
+    y :: float& = identity(x);
 }
