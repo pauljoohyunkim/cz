@@ -803,7 +803,7 @@ static LLVMValueRef cz_code_generator_generate_lvalue_function_call(CZ_CodeGener
     NULL_POINTER_ERROR_HANDLE(llvm_args);
 
     for (unsigned int i = 0; i < param_count; i++) {
-        const CZ_Type* param_type = node->function_call.arguments[i]->decoration->resolved_type;
+        const CZ_Type* param_type = node->function_call.callee->decoration->resolved_type->function.param_types[i];
 
         llvm_args[i] =
             param_type->kind == CZ_TYPE_KIND_REFERENCE ?
