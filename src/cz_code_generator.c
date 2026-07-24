@@ -866,6 +866,18 @@ static LLVMValueRef cz_code_generator_generate_expr(CZ_CodeGenerator* cg, const 
                 llvm_val = cz_code_generator_l_to_r_convert(cg, node->decoration->resolved_type, llvm_struct_access_ref);
             }
             break;
+        case CZ_AST_FunctionCallNodeType:
+            {
+                LLVMValueRef llvm_function_call = cz_code_generator_generate_lvalue(cg, env, env_b ,node);
+                const CZ_Type* ret_type = node->decoration->resolved_type;
+
+                if (ret_type->kind == CZ_TYPE_KIND_REFERENCE) {
+                    llvm_val = cz_code_generator_l_to_r_convert(cg, node->decoration->resolved_type, llvm_function_call);
+                } else {
+                    llvm_val =  llvm_function_call;
+                }
+            }
+            break;
         default:
             goto error_cleanup;
     }

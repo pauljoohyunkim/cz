@@ -1,8 +1,8 @@
-func identity :: (x :: float&) -> float& {
+func identity :: (x :: float) -> float {
     return x;
 }
 
 func main :: () {
     x :: float = 1.0;
-    y :: float& = identity(x);
+    y :: float = identity(x);
 }
