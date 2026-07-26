@@ -1,6 +1,6 @@
 struct Lattice {
     x :: int32;
-    y :: int32;
+    y :: int32&;
 }
 
 func get_x :: (L :: Lattice&) -> int32 {
@@ -8,9 +8,10 @@ func get_x :: (L :: Lattice&) -> int32 {
 }
 
 func main :: () {
+    real_y ::int32 = 1;
     L :: Lattice = Lattice {
         .x = 1,
-        .y = 2
+        .y = real_y
     };
 
     x :: int32 = get_x(L);
