@@ -1162,7 +1162,17 @@ static LLVMValueRef cz_code_generator_generate_expr_struct_init(CZ_CodeGenerator
             cz_error_list_push_error(cg->error_list, cg->filename, node->line, node->col, "Could not find %s in one of the members of the struct.", initializer_member_name);
             goto error_cleanup;
         }
-        LLVMValueRef llvm_initializer_val = cz_code_generator_generate_expr(cg, env, env_b, initializer_member_node->struct_init_member.expression, is_compile_time);
+        // Checking the struct declaration field if it is reference or not.
+        LLVMValueRef llvm_initializer_val =
+            node->decoration->resolved_type->structure.layout->fields[field_idx]
+                        .type->kind == CZ_TYPE_KIND_REFERENCE
+                ? cz_code_generator_generate_lvalue(
+                      cg, env, env_b,
+                      initializer_member_node->struct_init_member.expression)
+                : cz_code_generator_generate_expr(
+                      cg, env, env_b,
+                      initializer_member_node->struct_init_member.expression,
+                      is_compile_time);
         NULL_POINTER_ERROR_HANDLE(llvm_initializer_val);
         llvm_field_vals[field_idx] = llvm_initializer_val;
     }
