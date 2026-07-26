@@ -1191,6 +1191,12 @@ static LLVMValueRef cz_code_generator_generate_expr_struct_init(CZ_CodeGenerator
         llvm_val = LLVMConstNamedStruct(struct_type, llvm_field_vals, (unsigned int)field_count);
     } else {
         // Runtime struct building.
+        llvm_val = LLVMGetUndef(struct_type);
+
+        for (unsigned int i = 0; i < field_count; i++) {
+            llvm_val = LLVMBuildInsertValue(
+                cg->builder, llvm_val, llvm_field_vals[i], i, "struct_init");
+        }
     }
 
     free(llvm_field_vals);
