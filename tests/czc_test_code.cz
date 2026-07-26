@@ -1,8 +1,18 @@
-func identity :: (x :: float) -> float {
-    return x;
+struct Lattice {
+    x :: int32;
+    y :: int32&;
+}
+
+func get_x :: (L :: Lattice&) -> int32 {
+    return L.x;
 }
 
 func main :: () {
-    x :: float = 1.0;
-    y :: float = identity(x);
+    real_y ::int32 = 1;
+    L :: Lattice = Lattice {
+        .x = 1,
+        .y = real_y
+    };
+
+    x :: int32 = get_x(L);
 }
