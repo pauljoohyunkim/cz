@@ -223,6 +223,7 @@ static int cz_code_generator_generate_function_body(CZ_CodeGenerator* cg, const 
 
 static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 static int cz_code_generator_generate_variable_declaration_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
+static int cz_code_generator_generate_assignment_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
 static int cz_code_generator_generate_return_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 
 static LLVMValueRef cz_code_generator_generate_lvalue(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
@@ -597,6 +598,7 @@ static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_E
             cz_code_generator_generate_variable_declaration_statement(cg, env, env_b, node);
             break;
         case CZ_AST_AssignmentStatementNodeType:
+            cz_code_generator_generate_assignment_statement(cg, env, env_b, node);
             goto error_cleanup;
         case CZ_AST_ReturnStatementNodeType:
             cz_code_generator_generate_return_statement(cg, env, env_b, node, false);
@@ -655,6 +657,29 @@ static int cz_code_generator_generate_variable_declaration_statement(CZ_CodeGene
     }
 
     return 1;
+
+error_cleanup:
+    return 0;
+}
+
+static int cz_code_generator_generate_assignment_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt) {
+    NULL_POINTER_ERROR_HANDLE(cg);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(env_b);
+    NULL_POINTER_ERROR_HANDLE(stmt);
+    INVALID_NODE_TYPE_ERROR_HANDLE(stmt, CZ_AST_AssignmentStatementNodeType);
+
+    // LHS must be l-value
+    // RHS must be r-value
+    LLVMValueRef llvm_lhs = cz_code_generator_generate_lvalue(cg, env, env_b, stmt->binary_expression.left);
+    NULL_POINTER_ERROR_HANDLE(llvm_lhs);
+    LLVMValueRef llvm_rhs = cz_code_generator_generate_expr(cg, env, env_b, stmt->binary_expression.right, false);
+    NULL_POINTER_ERROR_HANDLE(llvm_rhs);
+
+    // TODO: Get pointer from LHS.
+    // If =, write the value from RHS.
+    // If (?)=, take the value from LHS, operate with RHS, then write.
+
 
 error_cleanup:
     return 0;
