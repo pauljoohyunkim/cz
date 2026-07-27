@@ -675,11 +675,45 @@ static int cz_code_generator_generate_assignment_statement(CZ_CodeGenerator* cg,
     NULL_POINTER_ERROR_HANDLE(llvm_lhs);
     LLVMValueRef llvm_rhs = cz_code_generator_generate_expr(cg, env, env_b, stmt->binary_expression.right, false);
     NULL_POINTER_ERROR_HANDLE(llvm_rhs);
+    LLVMTypeRef llvm_rhs_type = LLVMTypeOf(llvm_rhs);
+    LLVMTypeKind llvm_rhs_type_kind = LLVMGetTypeKind(llvm_rhs_type);
+
+    LLVMValueRef llvm_val = llvm_rhs;
 
     // TODO: Get pointer from LHS.
     // If =, write the value from RHS.
+    switch (stmt->binary_expression.op) {
+        case CZ_TT_EQUAL:
+            break;
+        case CZ_TT_PLUS_EQUAL:
+            {
+                const CZ_Type* lhs_type = cz_type_decay_type(stmt->binary_expression.left->decoration->resolved_type);
+                LLVMValueRef llvm_lhs_val = cz_code_generator_l_to_r_convert(cg, lhs_type, llvm_lhs);
+                switch (llvm_rhs_type_kind) {
+                    case LLVMFloatTypeKind:
+                        llvm_val = LLVMBuildFAdd(cg->builder, llvm_lhs_val, llvm_rhs, "faddtmp");
+                        break;
+                    case LLVMIntegerTypeKind:
+                        llvm_val = LLVMBuildAdd(cg->builder, llvm_lhs_val, llvm_rhs, "addtmp");
+                        break;
+                }
+            }
+            break;
+        case CZ_TT_MINUS_EQUAL:
+        case CZ_TT_STAR_EQUAL:
+        case CZ_TT_SLASH_EQUAL:
+        case CZ_TT_PERCENT_EQUAL:
+        case CZ_TT_AMPERSAND_EQUAL:
+        case CZ_TT_BAR_EQUAL:
+        case CZ_TT_CARET_EQUAL:
+            break;
+        default:
+            goto error_cleanup;
+    }
     // If (?)=, take the value from LHS, operate with RHS, then write.
 
+    LLVMBuildStore(cg->builder, llvm_val, llvm_lhs);
+    return 1;
 
 error_cleanup:
     return 0;
