@@ -207,6 +207,46 @@ error_cleanup:
     return NULL;
 }
 
+static bool cz_ast_node_returns_on_all_paths(const CZ_AST_Node* node) {
+    if (node == NULL) return false;
+
+    switch (node->node_type) {
+        case CZ_AST_ReturnStatementNodeType:
+            return true;
+        
+        case CZ_AST_BlockStatementNodeType:
+            // If any statement in sequence is guaranteed a return, the block statement is guaranteed to return.
+            for (unsigned int i = 0; i < node->statement_list.statement_count; i++) {
+                if (cz_ast_node_returns_on_all_paths(node->statement_list.statements[i])) {
+                    return true;
+                }
+            }
+            return false;
+        
+        case CZ_AST_IfStatementNodeType:
+            // If there is no "else" branch, it is not guaranteed at all.
+            if (node->if_statement.else_branch == NULL) {
+                return false;
+            }
+
+            // Both if-else and then must be guaranteed.
+            {
+                bool then_returns = cz_ast_node_returns_on_all_paths(node->if_statement.if_branch);
+                bool else_returns = cz_ast_node_returns_on_all_paths(node->if_statement.else_branch);
+                return then_returns && else_returns;
+            }
+            break;
+        
+        case CZ_AST_WhileStatementNodeType:
+        case CZ_AST_ForStatementNodeType:
+            return false;
+        default:
+            return false;
+    }
+
+    return false;
+}
+
 CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser) {
     CZ_SemanticAnalyzer* sa = NULL;
     CZ_Environment* global_env = NULL;
@@ -364,7 +404,6 @@ static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, 
 
     // 2. Build type for function.
     // 2.1 Build return type
-
     const CZ_Type* func_ret_type = cz_type_from_type_node(decl->function_declaration.function.return_type, sa->gtt);
     if (func_ret_type == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
@@ -873,6 +912,14 @@ static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_
 
     // Current function.
     sa->current_function_return = func_symbol->data.value.type->function.return_type;
+
+    // 1.5 If not void function, all exit path must return something.
+    if (!(sa->current_function_return->kind == CZ_TYPE_KIND_PRIMITIVE && sa->current_function_return->primitive == CZ_PRIMITIVE_VOID)) {
+        if (!cz_ast_node_returns_on_all_paths(decl->function_declaration.body)) {
+            cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Function \"%s\" returns non-void, but there may exist a path that it exits without returning something.", func_name);
+            goto error_cleanup;
+        }
+    }
 
     // 2. Create parameter environment (scope = 1)
     func_param_env = cz_environment_create();
