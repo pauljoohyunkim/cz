@@ -30,6 +30,7 @@ typedef struct {
         struct {
             const CZ_Type* type;
             bool is_constexpr;
+            bool is_escapable_ref;      // Relevant only if type is reference.
         } value;
 
         struct {
@@ -73,7 +74,7 @@ void cz_symbol_free(CZ_Symbol* symbol);
  * @param cascade Set to true to look up parent chain.
  * @return const CZ_Symbol* Pointer to symbol table entry on success, NULL on failure.
  */
-const CZ_Symbol* cz_environment_lookup(CZ_Environment* env, const char* name, bool cascade);
+const CZ_Symbol* cz_environment_lookup(const CZ_Environment* env, const char* name, bool cascade);
 
 /**
  * @brief Create CZ_Environment

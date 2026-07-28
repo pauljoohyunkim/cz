@@ -23,6 +23,7 @@ typedef struct {
     bool is_constexpr;
     bool is_reference_source;
     unsigned int scope_level;
+    bool is_escapable_ref;      // Whether or not if it is a reference to a location outside of a local function scope.
 } CZ_AST_Decoration;
 
 typedef enum {
@@ -68,9 +69,14 @@ struct CZ_AST_Node {
     CZ_AST_Decoration* decoration;
 
     union {
-        /** Used for node_type == CZ_AST_ProgramNodeType */
+        /** Used for node_type == CZ_AST_ProgramNodeType (top-level/program node)
+         *  Contains a list of globally-scoped declarations:
+         *   - CZ_AST_FunctionDeclarationNode
+         *   - CZ_AST_StructDeclarationNode  
+         *   - CZ_AST_VariableDeclarationNode (global variables only)
+         *   - CZ_AST_TypedefDeclarationNode / CZ_AST_NewtypeDeclarationNode */
         struct {
-            /** Array of CZ_AST_Node* (each being a global declaration) */
+            /** Array of global declaration nodes (each being one of the above types) */
             CZ_AST_Node** global_declaration_list;
             unsigned int declaration_count;
             unsigned int capacity;
@@ -78,25 +84,34 @@ struct CZ_AST_Node {
 
         /** Used for node_type == CZ_AST_StructDeclarationNodeType or CZ_AST_StructInitNodeType */
         struct {
-            /** Identifier node (CZ_AST_IdentifierNodeType) */
+            /** Identifier node (CZ_AST_IdentifierNodeType)
+             *  For StructDecl: the name of the struct being declared
+             *  For StructInit: the type name being initialized, or NULL for anonymous init */
             CZ_AST_Node* identifier;
-            /** [StructDeclaration] Array of CZ_AST_Node* (each being a variable_declaration) */
-            /** [StructInit] Array of CZ_AST_Node* (each being a struct_init_member) */
+            /** Array of CZ_AST_Node*
+             *  For StructDecl: each item is a variable_declaration (field type + field name)
+             *  For StructInit: each item is a struct_init_member (.field = value_expr) */
             CZ_AST_Node** members;
             unsigned int member_count;
         } struct_declaration;
 
+        /** Used for node_type == CZ_AST_StructInitMemberNodeType
+         * Represents a named field assignment in a struct initializer, e.g. `.field = value`
+         * Accessed as: `node->struct_init_member.identifier` and `node->struct_init_member.expression` */
         struct {
+            /** Field name: Identifier node (CZ_AST_IdentifierNodeType) */
             CZ_AST_Node* identifier;
-
+            /** Field initializer: expression node */
             CZ_AST_Node* expression;
         } struct_init_member;
 
         /** Used for node_type == CZ_AST_FunctionDeclarationNodeType */
         struct {
-            /** Identifier node (CZ_AST_IdentifierNodeType) */
+            /** Function name: Identifier node (CZ_AST_IdentifierNodeType) */
             CZ_AST_Node* function_identifier;
-            /** Function encapsulation: parameter list and return type */
+            /** Function encapsulation info
+             *  parameter_list -> CZ_AST_ParameterListNodeType
+             *  return_type   -> CZ_AST_TypeNodeType */
             CZ_AST_Function_Encapsulation function;
             /** Body: Block statement node (CZ_AST_BlockStatementNodeType) */
             CZ_AST_Node* body;
@@ -104,161 +119,192 @@ struct CZ_AST_Node {
 
         /** Used for node_type == CZ_AST_ParameterListNodeType */
         struct {
-            /** Array of CZ_AST_Node* (each being a parameter, likely VariableDeclaration node) */
+            /** Array of CZ_AST_Node* - each item is a parameter (CZ_AST_VariableDeclarationNodeType) */
             CZ_AST_Node** params;
             unsigned int param_count;
+            /** Semantic scope for this parameter list */
             CZ_Environment* scope;
         } parameter_list;
 
         /** Used for node_type == CZ_AST_BlockStatementNodeType */
         struct {
-            /** Array of CZ_AST_Node* (each being a statement) */
+            /** Array of CZ_AST_Node* - each item is a statement:
+             *  VariableDecl, AssignmentStmt, ReturnStmt, IfStmt, ForStmt, WhileStmt, BlockStmt, or Expression */
             CZ_AST_Node** statements;
             unsigned int statement_count;
-            /** Scope for this block */
+            /** Semantic scope for this block */
             CZ_Environment* scope;
         } statement_list;
 
         /** Used for node_type == CZ_AST_VariableDeclarationNodeType */
         struct {
-            /** Identifier node (CZ_AST_IdentifierNodeType) */
+            /** Variable name: Identifier node (CZ_AST_IdentifierNodeType) */
             CZ_AST_Node* identifier;
-            /** Type node (CZ_AST_TypeNodeType) */
+            /** Type annotation: type node (CZ_AST_TypeNodeType) specifying the declared type */
             CZ_AST_Node* type;
-            /** Initializer expression node (can be any expression) */
+            /** Optional initializer expression (can be any expr node, or NULL if no initializer) */
             CZ_AST_Node* expression;
         } variable_declaration;
 
         /** Used for node_type == CZ_AST_TypedefDeclarationNodeType or node_type == CZ_AST_NewtypeDeclarationNodeType */
         struct {
-            /** Existing type node (CZ_AST_TypeNodeType) */
+            /** Source type: type node (CZ_AST_TypeNodeType) - the existing/type being aliased/wrapped */
             CZ_AST_Node* type;
-            /** New type name: Identifier node (CZ_AST_IdentifierNodeType) */
+            /** New type name: Identifier node (CZ_AST_IdentifierNodeType) - alias or wrapper name */
             CZ_AST_Node* new_type;
         } typedef_declaration;
 
         /** Used for node_type == CZ_AST_ReturnStatementNodeType */
         struct {
-            /** Expression node (can be any expression) */
+            /** Return value expression (any expression node, or NULL if returning void) */
             CZ_AST_Node* expression;
         } return_statement;
 
         /** Used for node_type == CZ_AST_IfStatementNodeType */
         struct {
-            /** Condition expression node */
+            /** Condition: boolean-type expression node */
             CZ_AST_Node* condition;
-            /** If branch statement node */
+            /** "then" branch: Block statement node (CZ_AST_BlockStatementNodeType) */
             CZ_AST_Node* if_branch;
-            /** Else branch statement node (can be NULL) */
+            /** Optional else branch: can be BlockStatementNode, IfStatementNode (for else-if chain), or NULL */
             CZ_AST_Node* else_branch;
         } if_statement;
 
         /** Used for node_type == CZ_AST_ForStatementNodeType */
         struct {
-            /** Initialization node (expression or variable declaration) */
+            /** Loop initialization: VariableDeclarationNode or AssignmentStatementNode, or NULL */
             CZ_AST_Node* initialization;
-            /** Condition expression node */
+            /** Loop condition: expression node (or NULL if none) */
             CZ_AST_Node* condition;
-            /** Iteration step expression node */
+            /** Loop iteration step: typically AssignmentStatementNode or any expr node, or NULL */
             CZ_AST_Node* iteration_step;
-            /** Body statement node */
+            /** Loop body: Block statement node (CZ_AST_BlockStatementNodeType) */
             CZ_AST_Node* body;
 
+            /** Semantic scope for variables declared within this for-loop */
             CZ_Environment* scope;
         } for_statement;
 
         /** Used for node_type == CZ_AST_WhileStatementNodeType */
         struct {
-            /** Condition expression node */
+            /** Loop condition: expression node */
             CZ_AST_Node* condition;
-            /** Body statement node */
+            /** Loop body: Block statement node (CZ_AST_BlockStatementNodeType) */
             CZ_AST_Node* body;
         } while_statement;
 
         /** Used for node_type == CZ_AST_TypeNodeType */
         struct {
-            /** Whether this is a const declaration */
+            /* The following boolean flags describe type qualifiers */
+            /** Whether this is a const-declared lvalue (e.g. "const int") */
             bool is_const;
-            /** Whether this is a reference type */
+            /** Whether this is a reference type (e.g. "int&", compiled as pointer) */
             bool is_reference;
-            /** Whether this is a function type */
+            /** For function types: whether union member holds `function_signature` vs `primitive` */
             bool is_function_type;
 
             union {
-
+                /* -- For primitive/base types: VOID, INT32, BOOL, FLOAT, or user-defined identifier -- */
                 struct {
-                    // for is_function_type == false
-                    /** Type name (not a node) */
+                    /** Type name literal (stored from token lexeme, NOT an AST node). NULL for void type. */
                     const char* name;
 
+                    /** Type category/kind */
                     enum {
                         CZ_AST_TYPE_KIND_VOID,
                         CZ_AST_TYPE_KIND_INT32,
                         CZ_AST_TYPE_KIND_BOOL,
                         CZ_AST_TYPE_KIND_FLOAT,
+                        /** Named type (struct, newtype, typedef identifier) -- resolved later during semantic analysis */
                         CZ_AST_TYPE_KIND_IDENTIFIER
                     } kind;
                 } primitive;
 
-                /** Function signature: parameter list and return type */
+                /* -- For function types only: -- */
+                /** Function signature (parameter list + return type)
+                 *  Used when this node represents a function's type in the parameter or return type context. */
                 CZ_AST_Function_Encapsulation function_signature;
             };
         } type_expression;
 
-        /** Used for node_type == CZ_AST_BinaryExpressionNodeType and CZ_AST_AssignmentStatementNodeType */
+        /** Used for node_type == CZ_AST_BinaryExpressionNodeType
+         *     and node_type == CZ_AST_AssignmentStatementNodeType (shared structure).
+         *  The op field distinguishes them:
+         *    - For BinaryExpr: +, -, *, /, %, ==, !=, <, >, <=, >=, |, &, ^
+         *    - For AssignmentStmt: =, +=, -=, etc. (cz_token_type_is_assignment(op) returns true) */
         struct {
             /** Operator token type */
             CZ_TokenType op;
-            /** Left expression node */
+            /** Left-hand operand: any expression node */
             CZ_AST_Node* left;
-            /** Right expression node */
+            /** Right-hand operand: any expression node */
             CZ_AST_Node* right;
         } binary_expression;
 
-        /** Used for node_type == CZ_AST_UnaryExpressionNodeType */
+        /** Used for node_type == CZ_AST_UnaryExpressionNodeType
+         *  Created by parsing unary operators: -, ! (from parser_create_unary) */
         struct {
-            /** Operator token type */
+            /** Operator token type (- or !) */
             CZ_TokenType op;
-            /** Operand expression node */
+            /** Operand expression node (any expression) */
             CZ_AST_Node* operand;
         } unary_expression;
 
-        /** Used for node_type == CZ_AST_FunctionCallNodeType */
+        /** Used for node_type == CZ_AST_FunctionCallNodeType
+         *  Represents a function call: `callee(args...)`
+         *  The callee can be:
+         *   - An IdentifierNode (named function) 
+         *   - Or another expression yielding a callable */
         struct {
-            /** Callee expression node (Identifier or FunctionCall) */
+            /** Callee expression node (Identifier or other expression yielding a function) */
             CZ_AST_Node* callee;
-            /** Array of expression nodes (arguments) */
+            /** Array of argument expressions (all rvalues typically)
+             *  Argument types depend on the declared parameter types */
             CZ_AST_Node** arguments;
             unsigned int arg_count;
         } function_call;
 
-        /** Used for node_type == CZ_AST_LiteralNodeType */
+        /** Used for node_type == CZ_AST_LiteralNodeType
+         *  Literal value created during primary expression parsing. Types:
+         *   - CZ_TT_NUMERICAL_LITERAL (integers)
+         *   - CZ_TT_STRING_LITERAL (strings, TODO: not fully supported)
+         *   - CZ_TT_TRUE / CZ_TT_FALSE (bool literals) */
         struct {
-            /** Literal type token */
+            /** Literal kind token type */
             CZ_TokenType literal_type;
-            /** Lexeme text (not a node) */
+            /** Literal's lexeme text (from token, NOT a separate AST node). 
+             *  E.g. "42", "hello", "true" */
             const char* lexeme;
         } literal;
 
-        /** Used for node_type == CZ_AST_IdentifierNodeType */
+        /** Used for node_type == CZ_AST_IdentifierNodeType
+         *  Represents a bare identifier. Created for:
+         *   - Variable/function names in declarations
+         *   - References to variables/functions in expressions
+         *   - Type names (struct, typedef, newtype keywords)
+         *   - Struct member names after . operator */
         struct {
-            /** Identifier name (not a node) */
+            /** Identifier name string (from token lexeme, NOT a sibling AST node) */
             const char* name;
         } identifier;
 
-        /** Used for node_type == CZ_AST_CastExpressionNodeType */
+        /** Used for node_type == CZ_AST_CastExpressionNodeType
+         *  Represents explicit type casting using the `as` operator.
+         *  E.g. `(expr as target_type)` - parsed at CAST precedence level */
         struct {
-            /** Expression node to cast (can be any expression node type) */
+            /** Expression being cast (any expression node type) */
             CZ_AST_Node* expression;
-            /** Target type node (CZ_AST_TypeNodeType) */
+            /** Target type to cast to: TypeNode (primitive or named type) */
             CZ_AST_Node* type;
         } cast_expression;
 
-        /** Used for node_type == CZ_AST_StructMemberAccessNodeType */
+        /** Used for node_type == CZ_AST_StructMemberAccessNodeType
+         *  Represents dot-access: `object.member`
+         *  The object can be any expression; the member MUST be an IdentifierNode. */
         struct {
-            /** Object expression node (struct instance, can be any expression node type) */
+            /** Object being accessed (any expr yielding a struct or reference) */
             CZ_AST_Node* object;
-            /** Member identifier node (CZ_AST_IdentifierNodeType) */
+            /** Member field name: IdentifierNode -- which field to access */
             CZ_AST_Node* member;
         } struct_member_access;
     };

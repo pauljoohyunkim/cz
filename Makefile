@@ -15,7 +15,7 @@ UNITTEST_SRCS=$(wildcard $(TESTS)/*.cpp)
 UNITTEST_OBJS=$(patsubst $(TESTS)/%.cpp,$(OBJ)/unittest_%.o,$(UNITTEST_SRCS))
 UNITTEST_LDLIBS=$(shell pkg-config --libs gtest)
 UNITTEST_DEPS=$(UNITTEST_SRCS:.cpp=.d)
-#LDLIBS=$(shell llvm-config --libs)
+LDLIBS=$(shell llvm-config --libs)
 
 czc: $(BIN)/czc
 unittest: $(BIN)/unittest

@@ -7,16 +7,16 @@
 #define SCOPE_LEVEL_FUNCTION_PARAMETER (1)
 #define SCOPE_LEVEL_FUNCTION_BODY (2)
 
-#define NULL_POINTER_TO_GOTO(ptr, label) do { if ((ptr) == NULL) goto label; } while (0)
-#define INVALID_NODE_TYPE_TO_GOTO(node, node_type_enum, label) do { if ((node)->node_type != (node_type_enum)) goto label; } while (0)
+#define NULL_POINTER_ERROR_HANDLE(ptr) do { if ((ptr) == NULL) goto error_cleanup; } while (0)
+#define INVALID_NODE_TYPE_ERROR_HANDLE(node, node_type_enum) do { if ((node)->node_type != (node_type_enum)) goto error_cleanup; } while (0)
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
 
 const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTypeTable* gtt) {
     const CZ_Type* base_type = NULL;
     const char* query_name = NULL;
 
-    NULL_POINTER_TO_GOTO(type_node, error_cleanup);
-    NULL_POINTER_TO_GOTO(gtt, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(type_node);
+    NULL_POINTER_ERROR_HANDLE(gtt);
     if (type_node->node_type != CZ_AST_TypeNodeType) goto error_cleanup;
 
     if (type_node->type_expression.is_function_type) {
@@ -36,7 +36,7 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
             if (base_type == NULL) {
                 CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
                 new_type->primitive = CZ_PRIMITIVE_VOID;
-                NULL_POINTER_TO_GOTO(new_type, error_cleanup);
+                NULL_POINTER_ERROR_HANDLE(new_type);
                 if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
                     cz_type_free(new_type);
                     goto error_cleanup;
@@ -56,7 +56,7 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
             if (base_type == NULL) {
                 CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
                 new_type->primitive = CZ_PRIMITIVE_INT32;
-                NULL_POINTER_TO_GOTO(new_type, error_cleanup);
+                NULL_POINTER_ERROR_HANDLE(new_type);
                 if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
                     cz_type_free(new_type);
                     goto error_cleanup;
@@ -75,7 +75,7 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
             if (base_type == NULL) {
                 CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
                 new_type->primitive = CZ_PRIMITIVE_BOOL;
-                NULL_POINTER_TO_GOTO(new_type, error_cleanup);
+                NULL_POINTER_ERROR_HANDLE(new_type);
                 if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
                     cz_type_free(new_type);
                     goto error_cleanup;
@@ -94,7 +94,7 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
             if (base_type == NULL) {
                 CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
                 new_type->primitive = CZ_PRIMITIVE_FLOAT;
-                NULL_POINTER_TO_GOTO(new_type, error_cleanup);
+                NULL_POINTER_ERROR_HANDLE(new_type);
                 if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
                     cz_type_free(new_type);
                     goto error_cleanup;
@@ -106,11 +106,11 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
         case CZ_AST_TYPE_KIND_IDENTIFIER:
         {
             query_name = type_node->type_expression.primitive.name;
-            NULL_POINTER_TO_GOTO(query_name, error_cleanup);
+            NULL_POINTER_ERROR_HANDLE(query_name);
 
             // Lookup the named type (which is inherently non-const in the registry)
             base_type = cz_global_type_table_find_type_by_name(gtt, query_name);
-            NULL_POINTER_TO_GOTO(base_type, error_cleanup);
+            NULL_POINTER_ERROR_HANDLE(base_type);
             break;
         }
         default:
@@ -132,7 +132,7 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
             current_type = existing_const; // Update tracking pointer
         } else {
             CZ_Type* new_const_type = cz_type_create(CZ_TYPE_KIND_CONST);
-            NULL_POINTER_TO_GOTO(new_const_type, error_cleanup);
+            NULL_POINTER_ERROR_HANDLE(new_const_type);
             new_const_type->const_of = current_type;
 
             if (cz_global_type_table_push_type(gtt, NULL, new_const_type) != 1) {
@@ -155,7 +155,7 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
             current_type = existing_ref;
         } else {
             CZ_Type* new_ref_type = cz_type_create(CZ_TYPE_KIND_REFERENCE);
-            NULL_POINTER_TO_GOTO(new_ref_type, error_cleanup);
+            NULL_POINTER_ERROR_HANDLE(new_ref_type);
             new_ref_type->reference_to = (CZ_Type*)current_type;
 
             if (cz_global_type_table_push_type(gtt, NULL, new_ref_type) != 1) {
@@ -191,7 +191,7 @@ static const CZ_Type* cz_type_table_get_or_create_const(CZ_GlobalTypeTable* gtt,
 
     // 3. Allocate a new const.
     const_type = cz_type_create(CZ_TYPE_KIND_CONST);
-    NULL_POINTER_TO_GOTO(const_type, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(const_type);
 
     const_type->const_of = base_type;
 
@@ -215,16 +215,16 @@ CZ_SemanticAnalyzer* cz_semantic_analyzer_create(CZ_Parser* parser) {
     if (parser == NULL) return NULL;
 
     sa = (CZ_SemanticAnalyzer*) calloc(1, sizeof(CZ_SemanticAnalyzer));
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
 
     global_env = cz_environment_create();
-    NULL_POINTER_TO_GOTO(global_env, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(global_env);
 
     gtt = cz_global_type_table_create();
-    NULL_POINTER_TO_GOTO(gtt, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(gtt);
 
     error_list = cz_error_list_create();
-    NULL_POINTER_TO_GOTO(error_list, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(error_list);
 
     // Transfer global_env inside the semantic analyzer.
     sa->global_env = global_env;
@@ -265,7 +265,7 @@ error_cleanup:
 
 void cz_semantic_analyzer_free(CZ_SemanticAnalyzer* sa) {
     if (sa != NULL) {
-        free(sa->code);
+        free((char*)sa->code);
         free(sa->tokens);
         cz_ast_root_free(sa->program);
         cz_string_pool_free(sa->sp);
@@ -281,7 +281,7 @@ static int cz_semantic_analyzer_full_analyze(CZ_SemanticAnalyzer* sa);
 
 // Will be invoking pass 1 and pass 2.
 int cz_semantic_analyzer_analyze(CZ_SemanticAnalyzer* sa) {
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
 
     cz_semantic_analyzer_build_global_table(sa);
     cz_semantic_analyzer_full_analyze(sa);
@@ -307,10 +307,10 @@ static int cz_semantic_analyzer_register_newtypedef(CZ_SemanticAnalyzer* sa, CZ_
  * Type checking is not done at this stage.
  */
 static int cz_semantic_analyzer_build_global_table(CZ_SemanticAnalyzer* sa) {
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(sa->program, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(sa->program, CZ_AST_ProgramNodeType, error_cleanup);
-    NULL_POINTER_TO_GOTO(sa->program->program.global_declaration_list, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(sa->program);
+    INVALID_NODE_TYPE_ERROR_HANDLE(sa->program, CZ_AST_ProgramNodeType);
+    NULL_POINTER_ERROR_HANDLE(sa->program->program.global_declaration_list);
 
     for (unsigned int i = 0; i < sa->program->program.declaration_count; i++) {
         const CZ_AST_Node* statement = sa->program->program.global_declaration_list[i];
@@ -347,10 +347,10 @@ static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, 
     CZ_Type func_type_query;
     const CZ_Type** func_param_types = NULL;
     CZ_Symbol* func_symbol = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(decl, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_FunctionDeclarationNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(decl);
+    INVALID_NODE_TYPE_ERROR_HANDLE(decl, CZ_AST_FunctionDeclarationNodeType);
 
     // func addone :: (x :: int32, y :: int32) -> int
 
@@ -377,12 +377,12 @@ static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, 
     const CZ_AST_Node* func_param_list = decl->function_declaration.function.parameter_list;
     unsigned int func_param_count = func_param_list->parameter_list.param_count;
     func_param_types = (const CZ_Type**) calloc(func_param_count, sizeof(CZ_Type*));
-    NULL_POINTER_TO_GOTO(func_param_types, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(func_param_types);
 
     // 2.2.2 Populate the parameter types list.
     for (unsigned int i = 0; i < func_param_count; i++) {
         const CZ_Type* func_param_type = cz_type_from_type_node(func_param_list->parameter_list.params[i]->variable_declaration.type, sa->gtt);
-        NULL_POINTER_TO_GOTO(func_param_type, error_cleanup);
+        NULL_POINTER_ERROR_HANDLE(func_param_type);
         func_param_types[i] = func_param_type;
     }
 
@@ -419,6 +419,7 @@ static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, 
     // 4. Add symbol.
     func_symbol = cz_symbol_create(CZ_SYMBOL_KIND_VALUE, decl->function_declaration.function_identifier->identifier.name, 0);
     func_symbol->data.value.type = func_type;
+    func_symbol->data.value.is_escapable_ref = true;
     if (cz_environment_push_symbol(env, func_symbol) != 1) {
         goto error_cleanup;
     }
@@ -433,10 +434,10 @@ error_cleanup:
 
 static int cz_semantic_analyzer_register_struct_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl) {
     CZ_Type* struct_type = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(decl, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_StructDeclarationNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(decl);
+    INVALID_NODE_TYPE_ERROR_HANDLE(decl, CZ_AST_StructDeclarationNodeType);
 
     //struct Vector {
     //    x :: int32 = 1,
@@ -445,7 +446,7 @@ static int cz_semantic_analyzer_register_struct_decl(CZ_SemanticAnalyzer* sa, CZ
     //};
 
     const char* struct_name = decl->struct_declaration.identifier->identifier.name;
-    NULL_POINTER_TO_GOTO(struct_name, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(struct_name);
 
     // 1. Check if struct name exists in the global type table. If so, bad.
     const CZ_Type* struct_type_lookup = cz_global_type_table_find_type_by_name(sa->gtt, struct_name);
@@ -457,7 +458,7 @@ static int cz_semantic_analyzer_register_struct_decl(CZ_SemanticAnalyzer* sa, CZ
 
     // 2. Create struct type with NULL layout (to be populated in pass 2)
     struct_type = cz_type_create(CZ_TYPE_KIND_STRUCT);
-    NULL_POINTER_TO_GOTO(struct_type, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(struct_type);
 
     struct_type->structure.name = struct_name;
     struct_type->structure.layout = NULL;   // Layout will be created in pass 2
@@ -480,10 +481,10 @@ error_cleanup:
 
 static int cz_semantic_analyzer_register_variable_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl) {
     CZ_Symbol* variable_symbol = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(decl, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_VariableDeclarationNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(decl);
+    INVALID_NODE_TYPE_ERROR_HANDLE(decl, CZ_AST_VariableDeclarationNodeType);
 
     // x :: variable_type [ = 3 ];
     const CZ_AST_Node* variable_node = decl->variable_declaration.identifier;
@@ -505,6 +506,13 @@ static int cz_semantic_analyzer_register_variable_decl(CZ_SemanticAnalyzer* sa, 
         goto error_cleanup;
     }
 
+    // 2.5 (TBD) Do not allow reference for now.
+    if (variable_type->kind == CZ_TYPE_KIND_REFERENCE) {
+        cz_error_list_push_error(sa->error_list, sa->filename, type_node->line, type_node->col,
+                                 "References not supported in global variables");
+        goto error_cleanup;
+    }
+
     // 3. Create symbol and add it to symbol table.
     variable_symbol = cz_symbol_create(CZ_SYMBOL_KIND_VALUE, variable_node->identifier.name, 0);
     if (variable_symbol == NULL) {
@@ -513,6 +521,7 @@ static int cz_semantic_analyzer_register_variable_decl(CZ_SemanticAnalyzer* sa, 
         goto error_cleanup;
     }
     variable_symbol->data.value.type = variable_type;
+    variable_symbol->data.value.is_escapable_ref = true;
     if (cz_environment_push_symbol(env, variable_symbol) != 1) {
         cz_error_list_push_error(sa->error_list, sa->filename, type_node->line, type_node->col,
                                  "Symbol \"%s\" could not be added to symbol table", variable_node->identifier.name);
@@ -528,10 +537,10 @@ error_cleanup:
 }
 
 static int cz_semantic_analyzer_register_typedef(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl) {
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(decl, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_TypedefDeclarationNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(decl);
+    INVALID_NODE_TYPE_ERROR_HANDLE(decl, CZ_AST_TypedefDeclarationNodeType);
 
     // typedef x y;
     const CZ_AST_Node* base_type_node = decl->typedef_declaration.type;
@@ -567,8 +576,8 @@ error_cleanup:
 }
 
 static bool cz_semantic_analyzer_newtypedef_detect_cycle(const CZ_Type* type, const char* name) {
-    NULL_POINTER_TO_GOTO(type, error_cleanup);
-    NULL_POINTER_TO_GOTO(name, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(type);
+    NULL_POINTER_ERROR_HANDLE(name);
 
     switch (type->kind) {
         case CZ_TYPE_KIND_NEWTYPE:
@@ -614,10 +623,10 @@ error_cleanup:
 
 static int cz_semantic_analyzer_register_newtypedef(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl) {
     CZ_Type* new_type = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(decl, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_NewtypeDeclarationNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(decl);
+    INVALID_NODE_TYPE_ERROR_HANDLE(decl, CZ_AST_NewtypeDeclarationNodeType);
 
     // newtype x y;
     const CZ_AST_Node* base_type_node = decl->typedef_declaration.type;
@@ -668,21 +677,6 @@ error_cleanup:
 /* --- PASS 2 ---*/
 // Needs to check for constness, constexpr, and references.
 
-/**
- * @brief Simple helper for stripping const and reference.
- * 
- * @param type Pointer to CZ_Type
- * @return const CZ_Type* Pointer to unwrapped CZ_Type.
- */
-static const CZ_Type* cz_semantic_analyzer_decay_operand_type(const CZ_Type* type) {
-    if (type->kind == CZ_TYPE_KIND_REFERENCE) {
-        type = type->reference_to;
-    }
-    if (type->kind == CZ_TYPE_KIND_CONST) {
-        type = type->const_of;
-    }
-    return type;
-}
 static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
 static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
 static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
@@ -720,9 +714,9 @@ typedef enum {
  * @return int 1 if no cycle (safe), or 0 if error or there is cycle.
  */
 static int cz_semantic_analyzer_struct_cycle_detect(CZ_SemanticAnalyzer* sa, const CZ_Type* type, CZ_StructRecursiveCycleState* states) {
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(type, error_cleanup);
-    NULL_POINTER_TO_GOTO(states, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(type);
+    NULL_POINTER_ERROR_HANDLE(states);
 
     if (type->kind != CZ_TYPE_KIND_STRUCT) {
         // Not a struct. Primitive, references, etc. cannot form a struct cycle.
@@ -766,6 +760,8 @@ static int cz_semantic_analyzer_struct_cycle_detect(CZ_SemanticAnalyzer* sa, con
         }
     }
 
+    states[struct_idx] = CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVED;
+
     return 1;
 
 error_cleanup:
@@ -774,10 +770,10 @@ error_cleanup:
 
 static int cz_semantic_analyzer_full_analyze(CZ_SemanticAnalyzer* sa) {
     CZ_StructRecursiveCycleState* states = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(sa->program, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(sa->program, CZ_AST_ProgramNodeType, error_cleanup);
-    NULL_POINTER_TO_GOTO(sa->program->program.global_declaration_list, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(sa->program);
+    INVALID_NODE_TYPE_ERROR_HANDLE(sa->program, CZ_AST_ProgramNodeType);
+    NULL_POINTER_ERROR_HANDLE(sa->program->program.global_declaration_list);
 
     for (unsigned int i = 0; i < sa->program->program.declaration_count; i++) {
         CZ_AST_Node* statement = sa->program->program.global_declaration_list[i];
@@ -857,9 +853,9 @@ static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_
     CZ_Environment* func_param_env = NULL;
     CZ_Environment* func_body_env = NULL;
     CZ_Symbol* param_symbol = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(decl, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_FunctionDeclarationNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(decl);
+    INVALID_NODE_TYPE_ERROR_HANDLE(decl, CZ_AST_FunctionDeclarationNodeType);
 
     const char* func_name = decl->function_declaration.function_identifier->identifier.name;
     CZ_AST_Node* param_list_node = decl->function_declaration.function.parameter_list;
@@ -910,6 +906,7 @@ static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_
             goto error_cleanup;
         }
         param_symbol->data.value.type = func_symbol->data.value.type->function.param_types[i];
+        param_symbol->data.value.is_escapable_ref = param_symbol->data.value.type->kind == CZ_TYPE_KIND_REFERENCE;
 
         if (cz_environment_push_symbol(func_param_env, param_symbol) != 1) {
             cz_symbol_free(param_symbol);
@@ -956,9 +953,9 @@ error_cleanup:
 
 static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl) {
     CZ_StructLayout* struct_layout = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(decl, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_StructDeclarationNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(decl);
+    INVALID_NODE_TYPE_ERROR_HANDLE(decl, CZ_AST_StructDeclarationNodeType);
 
     const char* struct_name = decl->struct_declaration.identifier->identifier.name;
 
@@ -1040,15 +1037,15 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
             }
 
             // 3.2.1 Check if it is constexpr
-            const CZ_AST_Decoration* initializer_decor = member_node->decoration;
+            const CZ_AST_Decoration* initializer_decor = member_node->variable_declaration.expression->decoration;
             if (!initializer_decor->is_constexpr) {
                 cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Initializer for member idx %d is not constexpr.", i+1);
                 goto error_cleanup;
             }
 
             // 3.2.2 Decay type match
-            const CZ_Type* decay_member_type = cz_semantic_analyzer_decay_operand_type(field_type);
-            const CZ_Type* decay_expr_type = cz_semantic_analyzer_decay_operand_type(initializer_decor->resolved_type);
+            const CZ_Type* decay_member_type = cz_type_decay_type(field_type);
+            const CZ_Type* decay_expr_type = cz_type_decay_type(initializer_decor->resolved_type);
             if (!cz_type_equals(decay_member_type, decay_expr_type)) {
                 cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col, "Type for member and initializer for member idx %d does not match.", i+1);
                 goto error_cleanup;
@@ -1086,9 +1083,9 @@ error_cleanup:
 }
 
 static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl) {
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(decl, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(decl, CZ_AST_VariableDeclarationNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(decl);
+    INVALID_NODE_TYPE_ERROR_HANDLE(decl, CZ_AST_VariableDeclarationNodeType);
 
     // x :: int32 = 1 + 2;
     // y :: int32& = x;
@@ -1096,10 +1093,10 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
     // 1. Look up symbol for LHS.
     const char* var_name = decl->variable_declaration.identifier->identifier.name;
     CZ_Symbol* var_symbol = (CZ_Symbol*) cz_environment_lookup(sa->global_env, var_name, false);
-    NULL_POINTER_TO_GOTO(var_symbol, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(var_symbol);
     const CZ_Type* var_decl_type = var_symbol->data.value.type;
 
-    const CZ_Type* decayed_lhs_type = cz_semantic_analyzer_decay_operand_type(var_decl_type);
+    const CZ_Type* decayed_lhs_type = cz_type_decay_type(var_decl_type);
     // 2. Check if there is an initializer.
     // 2.1 If no initializer, check if variable is either const or reference. (If either is true, error)
     if (decl->variable_declaration.expression == NULL) {
@@ -1138,7 +1135,7 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
     }
 
     const CZ_AST_Decoration* rhs_decoration = decl->variable_declaration.expression->decoration;
-    NULL_POINTER_TO_GOTO(rhs_decoration, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(rhs_decoration);
     // 3.1. Global initializers must be compile-time constants (constexpr)
     if (!rhs_decoration->is_constexpr) {
         cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
@@ -1159,18 +1156,21 @@ static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, C
         // 4.2 If RHS is const, then LHS cannot be const.
         const CZ_Type* referenced_type = var_decl_type->reference_to;
     
-        // Check if the underlying referenced type is non-const, but the RHS is const
+        // 4.3 Check if the underlying referenced type is non-const, but the RHS is const
         if (referenced_type->kind != CZ_TYPE_KIND_CONST && rhs_decoration->resolved_type->kind == CZ_TYPE_KIND_CONST) {
             cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
                 "Cannot bind non-const reference \"%s\" to a const value.", var_name);
             goto error_cleanup;
         }
 
+        // 4.4 Flag if RHS is escapable.
+        //var_symbol->data.value.is_escapable_ref = rhs_decoration->is_escapable_ref;
+        var_symbol->data.value.is_escapable_ref = true;
     }
 
 
     // 6. If explicit type, do types match after decaying.
-    const CZ_Type* decayed_rhs_type = cz_semantic_analyzer_decay_operand_type(rhs_decoration->resolved_type);
+    const CZ_Type* decayed_rhs_type = cz_type_decay_type(rhs_decoration->resolved_type);
     if (!cz_type_equals(decayed_lhs_type, decayed_rhs_type)) {
         cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
             "Variable  \"%s\" type does not match the type of RHS.", var_name);
@@ -1187,10 +1187,10 @@ error_cleanup:
 }
 
 static int cz_semantic_analyzer_check_statement_list(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* block) {
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(block, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(block, CZ_AST_BlockStatementNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(block);
+    INVALID_NODE_TYPE_ERROR_HANDLE(block, CZ_AST_BlockStatementNodeType);
 
     for (unsigned int i = 0; i < block->statement_list.statement_count; i++) {
         CZ_AST_Node* stmt = block->statement_list.statements[i];
@@ -1214,9 +1214,9 @@ static int cz_semantic_analyzer_check_while_statement(CZ_SemanticAnalyzer* sa, C
 
 static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
     CZ_Environment* inner_env = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(stmt);
 
     switch (stmt->node_type) {
         case CZ_AST_VariableDeclarationNodeType:
@@ -1283,10 +1283,10 @@ error_cleanup:
 
 static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
     CZ_Symbol* symbol = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_VariableDeclarationNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(stmt);
+    INVALID_NODE_TYPE_ERROR_HANDLE(stmt, CZ_AST_VariableDeclarationNodeType);
 
     const char* var_name = stmt->variable_declaration.identifier->identifier.name;
 
@@ -1346,7 +1346,7 @@ static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_Semantic
         }
     }
 
-    const CZ_Type* decayed_var_type = cz_semantic_analyzer_decay_operand_type(var_type);
+    const CZ_Type* decayed_var_type = cz_type_decay_type(var_type);
 
     // 6. If variable is struct but it contains reference or const, RHS is required.
     if (decayed_var_type->kind == CZ_TYPE_KIND_STRUCT && stmt->variable_declaration.expression == NULL) {
@@ -1368,7 +1368,7 @@ static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_Semantic
 
     // 7. Decay type match
     if (stmt->variable_declaration.expression != NULL) {
-        const CZ_Type* decayed_expr_type = cz_semantic_analyzer_decay_operand_type(stmt->variable_declaration.expression->decoration->resolved_type);
+        const CZ_Type* decayed_expr_type = cz_type_decay_type(stmt->variable_declaration.expression->decoration->resolved_type);
         if (!cz_type_equals(decayed_var_type, decayed_expr_type)) {
             cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
                 "Declared type for \"%s\" does not match the decayed type of initializer.", var_name);
@@ -1386,6 +1386,7 @@ static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_Semantic
     symbol->data.value.is_constexpr = cz_type_is_const(var_type) &&
                                       stmt->variable_declaration.expression != NULL &&
                                       stmt->variable_declaration.expression->decoration->is_constexpr;
+    symbol->data.value.is_escapable_ref = var_type->kind == CZ_TYPE_KIND_REFERENCE && stmt->variable_declaration.expression->decoration->is_escapable_ref;
 
     if (cz_environment_push_symbol(env, symbol) != 1) {
         cz_symbol_free(symbol);
@@ -1404,10 +1405,10 @@ error_cleanup:
 }
 
 static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_AssignmentStatementNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(stmt);
+    INVALID_NODE_TYPE_ERROR_HANDLE(stmt, CZ_AST_AssignmentStatementNodeType);
 
     // 0. Operation Type
     if (!cz_token_type_is_assignment(stmt->binary_expression.op)) {
@@ -1441,8 +1442,8 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
     }
     const CZ_Type* lhs_type = stmt->binary_expression.left->decoration->resolved_type;
     const CZ_Type* rhs_type = stmt->binary_expression.right->decoration->resolved_type;
-    NULL_POINTER_TO_GOTO(lhs_type, error_cleanup);
-    NULL_POINTER_TO_GOTO(rhs_type, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(lhs_type);
+    NULL_POINTER_ERROR_HANDLE(rhs_type);
 
     // 2. LHS must be l-value.
     if (stmt->binary_expression.left->decoration->value_category != CZ_VALUE_CATEGORY_LVALUE) {
@@ -1463,15 +1464,15 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
     const CZ_Type* int32_type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
     const CZ_Type* float_type = cz_global_type_table_find_type_by_name(sa->gtt, "float");
     const CZ_Type* bool_type = cz_global_type_table_find_type_by_name(sa->gtt, "bool");
-    NULL_POINTER_TO_GOTO(int32_type, error_cleanup);
-    NULL_POINTER_TO_GOTO(float_type, error_cleanup);
-    NULL_POINTER_TO_GOTO(bool_type, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(int32_type);
+    NULL_POINTER_ERROR_HANDLE(float_type);
+    NULL_POINTER_ERROR_HANDLE(bool_type);
 
     // Decay and strip const for operation validation (same as binary expression checker)
-    const CZ_Type* decayed_lhs_type = cz_semantic_analyzer_decay_operand_type(lhs_type);
-    const CZ_Type* decayed_rhs_type = cz_semantic_analyzer_decay_operand_type(rhs_type);
-    NULL_POINTER_TO_GOTO(decayed_lhs_type, error_cleanup);
-    NULL_POINTER_TO_GOTO(decayed_rhs_type, error_cleanup);
+    const CZ_Type* decayed_lhs_type = cz_type_decay_type(lhs_type);
+    const CZ_Type* decayed_rhs_type = cz_type_decay_type(rhs_type);
+    NULL_POINTER_ERROR_HANDLE(decayed_lhs_type);
+    NULL_POINTER_ERROR_HANDLE(decayed_rhs_type);
 
     // Check that after decaying, we have primitive types (same validation as binary expressions)
     if (decayed_lhs_type->kind != CZ_TYPE_KIND_PRIMITIVE || decayed_rhs_type->kind != CZ_TYPE_KIND_PRIMITIVE) {
@@ -1582,7 +1583,7 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
             }
             break;
 
-        case CZ_TT_CAROT_EQUAL:
+        case CZ_TT_CARET_EQUAL:
             // int32 ^ int32 -> int32
             if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
                 // Valid
@@ -1606,11 +1607,11 @@ error_cleanup:
 }
 
 static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_ReturnStatementNodeType, error_cleanup);
-    NULL_POINTER_TO_GOTO(sa->current_function_return, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(stmt);
+    INVALID_NODE_TYPE_ERROR_HANDLE(stmt, CZ_AST_ReturnStatementNodeType);
+    NULL_POINTER_ERROR_HANDLE(sa->current_function_return);
 
     // 1. If void return, then expr must be empty. If not void return, then expression must not be empty.
     if (sa->current_function_return->kind == CZ_TYPE_KIND_PRIMITIVE && sa->current_function_return->primitive == CZ_PRIMITIVE_VOID) {
@@ -1635,10 +1636,10 @@ static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, 
     }
 
     // 2. Decay type match
-    const CZ_Type* decayed_return_type = cz_semantic_analyzer_decay_operand_type(sa->current_function_return);
-    NULL_POINTER_TO_GOTO(decayed_return_type, error_cleanup);
-    const CZ_Type* decayed_expr_type = cz_semantic_analyzer_decay_operand_type(stmt->return_statement.expression->decoration->resolved_type);
-    NULL_POINTER_TO_GOTO(decayed_expr_type, error_cleanup);
+    const CZ_Type* decayed_return_type = cz_type_decay_type(sa->current_function_return);
+    NULL_POINTER_ERROR_HANDLE(decayed_return_type);
+    const CZ_Type* decayed_expr_type = cz_type_decay_type(stmt->return_statement.expression->decoration->resolved_type);
+    NULL_POINTER_ERROR_HANDLE(decayed_expr_type);
     if (!cz_type_equals(decayed_return_type, decayed_expr_type)) {
         cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
             "Return type of function does not match the expression type of return statement.");
@@ -1655,6 +1656,7 @@ static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, 
         }
 
 
+        /*
         // 3.1 & 3.2 Unified Scope and Lifetime validation via Decoration
         if (stmt->return_statement.expression->decoration->scope_level >= 2) {
             cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
@@ -1667,6 +1669,18 @@ static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, 
             !stmt->return_statement.expression->decoration->is_reference_source) {
             cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
                 "Cannot return a reference to data owned by a non-reference parameter.");
+            goto error_cleanup;
+        }
+        */
+
+        if (!stmt->return_statement.expression->decoration->is_escapable_ref) {
+            cz_error_list_push_error(
+                sa->error_list, 
+                sa->filename, 
+                stmt->line, 
+                stmt->col,
+                "Cannot return a reference to local stack memory."
+            );
             goto error_cleanup;
         }
 
@@ -1687,10 +1701,10 @@ error_cleanup:
 }
 
 static int cz_semantic_analyzer_check_if_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_IfStatementNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(stmt);
+    INVALID_NODE_TYPE_ERROR_HANDLE(stmt, CZ_AST_IfStatementNodeType);
 
     // Check condition. See if it is boolean.
     if (cz_semantic_analyzer_check_expression(sa, env, stmt->if_statement.condition) != 1) {
@@ -1698,8 +1712,8 @@ static int cz_semantic_analyzer_check_if_statement(CZ_SemanticAnalyzer* sa, CZ_E
             "Could not check the type inside the if condition");
         goto error_cleanup;
     }
-    const CZ_Type* decayed_condition_type = cz_semantic_analyzer_decay_operand_type(stmt->if_statement.condition->decoration->resolved_type);
-    NULL_POINTER_TO_GOTO(decayed_condition_type, error_cleanup);
+    const CZ_Type* decayed_condition_type = cz_type_decay_type(stmt->if_statement.condition->decoration->resolved_type);
+    NULL_POINTER_ERROR_HANDLE(decayed_condition_type);
     if (decayed_condition_type->kind != CZ_TYPE_KIND_PRIMITIVE || decayed_condition_type->primitive != CZ_PRIMITIVE_BOOL) {
         cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
             "Condition for while is not a boolean.");
@@ -1730,10 +1744,10 @@ error_cleanup:
 
 static int cz_semantic_analyzer_check_for_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
     CZ_Environment* sub_env = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_ForStatementNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(stmt);
+    INVALID_NODE_TYPE_ERROR_HANDLE(stmt, CZ_AST_ForStatementNodeType);
 
     // 1. Create a sub-environment as there could be a declaration.
     sub_env = cz_environment_create();
@@ -1765,8 +1779,8 @@ static int cz_semantic_analyzer_check_for_statement(CZ_SemanticAnalyzer* sa, CZ_
                 "Could not check the type inside the for condition");
             goto error_cleanup;
         }
-        const CZ_Type* decayed_condition_type = cz_semantic_analyzer_decay_operand_type(stmt->for_statement.condition->decoration->resolved_type);
-        NULL_POINTER_TO_GOTO(decayed_condition_type, error_cleanup);
+        const CZ_Type* decayed_condition_type = cz_type_decay_type(stmt->for_statement.condition->decoration->resolved_type);
+        NULL_POINTER_ERROR_HANDLE(decayed_condition_type);
         if (decayed_condition_type->kind != CZ_TYPE_KIND_PRIMITIVE || decayed_condition_type->primitive != CZ_PRIMITIVE_BOOL) {
             cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
                 "Condition for for is not a boolean.");
@@ -1799,10 +1813,10 @@ error_cleanup:
 }
 
 static int cz_semantic_analyzer_check_while_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(stmt, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(stmt, CZ_AST_WhileStatementNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(stmt);
+    INVALID_NODE_TYPE_ERROR_HANDLE(stmt, CZ_AST_WhileStatementNodeType);
 
     // 1. Check condition. See if it is boolean.
     if (cz_semantic_analyzer_check_expression(sa, env, stmt->while_statement.condition) != 1) {
@@ -1810,8 +1824,8 @@ static int cz_semantic_analyzer_check_while_statement(CZ_SemanticAnalyzer* sa, C
             "Could not check the type inside the while condition");
         goto error_cleanup;
     }
-    const CZ_Type* decayed_condition_type = cz_semantic_analyzer_decay_operand_type(stmt->while_statement.condition->decoration->resolved_type);
-    NULL_POINTER_TO_GOTO(decayed_condition_type, error_cleanup);
+    const CZ_Type* decayed_condition_type = cz_type_decay_type(stmt->while_statement.condition->decoration->resolved_type);
+    NULL_POINTER_ERROR_HANDLE(decayed_condition_type);
     if (decayed_condition_type->kind != CZ_TYPE_KIND_PRIMITIVE || decayed_condition_type->primitive != CZ_PRIMITIVE_BOOL) {
         cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
             "Condition for while is not a boolean.");
@@ -1841,9 +1855,9 @@ static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_En
 static int cz_semantic_analyzer_cast_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 
 static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(expr, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(expr);
 
     switch (expr->node_type) {
         case CZ_AST_FunctionCallNodeType:
@@ -1900,10 +1914,10 @@ error_cleanup:
 
 static int cz_semantic_analyzer_check_function_call_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
     CZ_AST_Decoration* decor = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(expr, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_FunctionCallNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(expr);
+    INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_FunctionCallNodeType);
 
     // 1. Check callee and see if it is a function (supports higher-order expressions like (f(3))(2))
     if (cz_semantic_analyzer_check_expression(sa, env, expr->function_call.callee) != 1) {
@@ -1941,8 +1955,8 @@ static int cz_semantic_analyzer_check_function_call_expression(CZ_SemanticAnalyz
         // 4.1 Decayed type check
         const CZ_Type* param_type = expr->function_call.callee->decoration->resolved_type->function.param_types[i];
         const CZ_Type* arg_type = expr->function_call.arguments[i]->decoration->resolved_type;
-        const CZ_Type* decayed_param_type = cz_semantic_analyzer_decay_operand_type(param_type);
-        const CZ_Type* decayed_arg_type = cz_semantic_analyzer_decay_operand_type(arg_type);
+        const CZ_Type* decayed_param_type = cz_type_decay_type(param_type);
+        const CZ_Type* decayed_arg_type = cz_type_decay_type(arg_type);
         if (!cz_type_equals(decayed_param_type, decayed_arg_type)) {
             cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
                 "Function argument does not match parameter type.");
@@ -1978,6 +1992,7 @@ static int cz_semantic_analyzer_check_function_call_expression(CZ_SemanticAnalyz
         return_type->kind == CZ_TYPE_KIND_REFERENCE, 
         env->scope_level
     );
+    decor->is_escapable_ref = return_type->kind == CZ_TYPE_KIND_REFERENCE;
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;
@@ -1994,10 +2009,10 @@ error_cleanup:
 
 static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
     CZ_AST_Decoration* decor = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(expr, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_BinaryExpressionNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(expr);
+    INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_BinaryExpressionNodeType);
 
     if (cz_semantic_analyzer_check_expression(sa, env, expr->binary_expression.left) != 1) {
         goto error_cleanup;
@@ -2010,9 +2025,9 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
     const CZ_Type* int32_type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
     const CZ_Type* float_type = cz_global_type_table_find_type_by_name(sa->gtt, "float");
     const CZ_Type* bool_type = cz_global_type_table_find_type_by_name(sa->gtt, "bool");
-    NULL_POINTER_TO_GOTO(int32_type, error_cleanup);
-    NULL_POINTER_TO_GOTO(float_type, error_cleanup);
-    NULL_POINTER_TO_GOTO(bool_type, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(int32_type);
+    NULL_POINTER_ERROR_HANDLE(float_type);
+    NULL_POINTER_ERROR_HANDLE(bool_type);
 
     const CZ_AST_Node* lhs_node = expr->binary_expression.left;
     const CZ_Type* lhs_type = lhs_node->decoration->resolved_type;
@@ -2020,8 +2035,8 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
     const CZ_Type* rhs_type = rhs_node->decoration->resolved_type;
 
     // Strip away reference and const.
-    lhs_type = cz_semantic_analyzer_decay_operand_type(lhs_type);
-    rhs_type = cz_semantic_analyzer_decay_operand_type(rhs_type);
+    lhs_type = cz_type_decay_type(lhs_type);
+    rhs_type = cz_type_decay_type(rhs_type);
 
     if (lhs_type->kind != CZ_TYPE_KIND_PRIMITIVE || rhs_type->kind != CZ_TYPE_KIND_PRIMITIVE) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
@@ -2110,7 +2125,7 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
                 goto error_cleanup;
             }
             break;
-        case CZ_TT_CAROT:
+        case CZ_TT_CARET:
             if (lhs_type->primitive == CZ_PRIMITIVE_INT32 && rhs_type->primitive == CZ_PRIMITIVE_INT32) {
                 result_type = int32_type;
             } else {
@@ -2174,10 +2189,10 @@ error_cleanup:
 
 static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
     CZ_AST_Decoration* decor = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(expr, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_UnaryExpressionNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(expr);
+    INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_UnaryExpressionNodeType);
 
     if (cz_semantic_analyzer_check_expression(sa, env, expr->unary_expression.operand) != 1) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Could not check operand for unary operation.");
@@ -2188,15 +2203,15 @@ static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, 
     const CZ_Type* int32_type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
     const CZ_Type* float_type = cz_global_type_table_find_type_by_name(sa->gtt, "float");
     const CZ_Type* bool_type = cz_global_type_table_find_type_by_name(sa->gtt, "bool");
-    NULL_POINTER_TO_GOTO(int32_type, error_cleanup);
-    NULL_POINTER_TO_GOTO(float_type, error_cleanup);
-    NULL_POINTER_TO_GOTO(bool_type, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(int32_type);
+    NULL_POINTER_ERROR_HANDLE(float_type);
+    NULL_POINTER_ERROR_HANDLE(bool_type);
 
     const CZ_AST_Node* operand_node = expr->unary_expression.operand;
     const CZ_Type* operand_type = operand_node->decoration->resolved_type;
 
     // Decay and strip const
-    operand_type = cz_semantic_analyzer_decay_operand_type(operand_type);
+    operand_type = cz_type_decay_type(operand_type);
 
     if (operand_type->kind != CZ_TYPE_KIND_PRIMITIVE) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Invalid type. (Even after stripping reference and const, not a primitive)");
@@ -2251,10 +2266,10 @@ error_cleanup:
 
 static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
     CZ_AST_Decoration* decor = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(expr, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_LiteralNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(expr);
+    INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_LiteralNodeType);
 
     const CZ_Type* type = NULL;
 
@@ -2286,7 +2301,7 @@ static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa
             goto error_cleanup;
     }
 
-    NULL_POINTER_TO_GOTO(type, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(type);
 
     // Create decoration
     decor = cz_ast_decoration_create(type, CZ_VALUE_CATEGORY_RVALUE, true, false, 0);
@@ -2308,10 +2323,10 @@ error_cleanup:
 
 static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
     CZ_AST_Decoration* decor = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(expr, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_IdentifierNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(expr);
+    INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_IdentifierNodeType);
 
     // 1. Look up symbol.
     const CZ_Symbol* symbol = cz_environment_lookup(env, expr->identifier.name, true);
@@ -2336,11 +2351,13 @@ static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer*
         value_cat = CZ_VALUE_CATEGORY_LVALUE;
     }
 
-    decor = cz_ast_decoration_create(symbol->data.value.type, value_cat, symbol->data.value.is_constexpr, symbol->data.value.type->kind == CZ_TYPE_KIND_REFERENCE, symbol->scope_level);
+    //decor = cz_ast_decoration_create(symbol->data.value.type, value_cat, symbol->data.value.is_constexpr, symbol->data.value.type->kind == CZ_TYPE_KIND_REFERENCE, symbol->scope_level);
+    decor = cz_ast_decoration_create(symbol->data.value.type, value_cat, false, symbol->data.value.type->kind == CZ_TYPE_KIND_REFERENCE, symbol->scope_level);
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Allocating AST decorator failure.");
         goto error_cleanup;
     }
+    decor->is_escapable_ref = symbol->data.value.is_escapable_ref;
 
     // Transfer decoration
     expr->decoration = decor;
@@ -2354,10 +2371,10 @@ error_cleanup:
 
 static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
     CZ_AST_Decoration* decor = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(expr, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_StructMemberAccessNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(expr);
+    INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_StructMemberAccessNodeType);
 
     // 1. Check base expression
     if (cz_semantic_analyzer_check_expression(sa, env, expr->struct_member_access.object) != 1) {
@@ -2368,8 +2385,8 @@ static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_
 
     // 2. Decay check base expression to strip references safely
     const CZ_Type* struct_type = expr->struct_member_access.object->decoration->resolved_type;
-    const CZ_Type* decayed_struct_type = cz_semantic_analyzer_decay_operand_type(struct_type);
-    NULL_POINTER_TO_GOTO(decayed_struct_type, error_cleanup);
+    const CZ_Type* decayed_struct_type = cz_type_decay_type(struct_type);
+    NULL_POINTER_ERROR_HANDLE(decayed_struct_type);
     
     if (decayed_struct_type->kind != CZ_TYPE_KIND_STRUCT) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, 
@@ -2415,6 +2432,7 @@ static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_
         member_type->kind == CZ_TYPE_KIND_REFERENCE,
         env->scope_level
     );
+    decor->is_escapable_ref = expr->struct_member_access.object->decoration->is_escapable_ref;
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, 
             "Allocating AST decorator failure.");
@@ -2433,10 +2451,10 @@ error_cleanup:
 
 static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
     CZ_AST_Decoration* decor = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(expr, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_StructInitNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(expr);
+    INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_StructInitNodeType);
 
     // Reduce chain: expr->struct_declaration.identifier->identifier.name
     const CZ_AST_Node* struct_id_node = expr->struct_declaration.identifier;
@@ -2536,18 +2554,18 @@ static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_En
 
         // 3.3. Check and match type with the struct member definitions
         // Reduce chain: expr->struct_declaration.members[i]->struct_init_member.expression
-        const CZ_AST_Node* member_expr = expr->struct_declaration.members[i]->struct_init_member.expression;
+        CZ_AST_Node* member_expr = expr->struct_declaration.members[i]->struct_init_member.expression;
         if (cz_semantic_analyzer_check_expression(sa, env, member_expr) != 1) {
             goto error_cleanup;
         }
         // Reduce chain: expr->struct_declaration.members[i]->struct_init_member.expression->decoration
         const CZ_AST_Decoration* member_init_decor = member_expr->decoration;
-        NULL_POINTER_TO_GOTO(member_init_decor, error_cleanup);
+        NULL_POINTER_ERROR_HANDLE(member_init_decor);
         // 3.3.1 Fields should match in decay types.
-        const CZ_Type* decay_member_init_type = cz_semantic_analyzer_decay_operand_type(member_init_decor->resolved_type);
+        const CZ_Type* decay_member_init_type = cz_type_decay_type(member_init_decor->resolved_type);
         // Reduce chain: struct_lookup->structure.layout->fields[member_field_idx].type
         const CZ_Type* field_type = struct_lookup->structure.layout->fields[member_field_idx].type;
-        const CZ_Type* decay_field_type = cz_semantic_analyzer_decay_operand_type(field_type);
+        const CZ_Type* decay_field_type = cz_type_decay_type(field_type);
         if (!cz_type_equals(decay_member_init_type, decay_field_type)) {
             cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
             "Type for initializer of member \"%s\" does not match the declared type.", member_name);
@@ -2601,10 +2619,10 @@ error_cleanup:
 
 static int cz_semantic_analyzer_cast_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
     CZ_AST_Decoration* decor = NULL;
-    NULL_POINTER_TO_GOTO(sa, error_cleanup);
-    NULL_POINTER_TO_GOTO(env, error_cleanup);
-    NULL_POINTER_TO_GOTO(expr, error_cleanup);
-    INVALID_NODE_TYPE_TO_GOTO(expr, CZ_AST_CastExpressionNodeType, error_cleanup);
+    NULL_POINTER_ERROR_HANDLE(sa);
+    NULL_POINTER_ERROR_HANDLE(env);
+    NULL_POINTER_ERROR_HANDLE(expr);
+    INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_CastExpressionNodeType);
 
     // 1. Evaluate expression and type check
     if (cz_semantic_analyzer_check_expression(sa, env, expr->cast_expression.expression) != 1) {
@@ -2626,10 +2644,10 @@ static int cz_semantic_analyzer_cast_expression(CZ_SemanticAnalyzer* sa, CZ_Envi
     }
 
     // 2. Unwrap and check
-    const CZ_Type* decayed_expr_type = cz_semantic_analyzer_decay_operand_type(expr->cast_expression.expression->decoration->resolved_type);
-    const CZ_Type* decayed_target_type = cz_semantic_analyzer_decay_operand_type(target_type);
-    NULL_POINTER_TO_GOTO(decayed_expr_type, error_cleanup);
-    NULL_POINTER_TO_GOTO(decayed_target_type, error_cleanup);
+    const CZ_Type* decayed_expr_type = cz_type_decay_type(expr->cast_expression.expression->decoration->resolved_type);
+    const CZ_Type* decayed_target_type = cz_type_decay_type(target_type);
+    NULL_POINTER_ERROR_HANDLE(decayed_expr_type);
+    NULL_POINTER_ERROR_HANDLE(decayed_target_type);
     if ((decayed_expr_type->kind != CZ_TYPE_KIND_PRIMITIVE && decayed_expr_type->kind != CZ_TYPE_KIND_NEWTYPE) ||
     (decayed_target_type->kind != CZ_TYPE_KIND_PRIMITIVE && decayed_target_type->kind != CZ_TYPE_KIND_NEWTYPE)) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
