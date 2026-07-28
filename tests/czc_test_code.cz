@@ -1,17 +1,4 @@
-struct Vector {
-    x :: float;
-    y :: float;
-}
-
-typedef int32 int;
-
-n :: int = 1;
-k :: float = 0.2;
-
-j :: Vector = Vector {
-    .y = 1.0
-};
-
-func addone :: (n :: int) -> int {
-    return n + 1;
+func addone :: (n :: int32&) -> int32 {
+    n += 1;
+    return n;
 }

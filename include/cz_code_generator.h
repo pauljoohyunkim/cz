@@ -46,6 +46,8 @@ typedef struct {
     CZ_GlobalTypeTable* gtt;
     CZ_StringPool* sp;
 
+    const CZ_Type* current_function_return;
+
     const char* filename;
     const char* code;
     size_t code_length;
