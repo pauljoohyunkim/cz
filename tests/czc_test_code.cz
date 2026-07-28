@@ -1,7 +1,8 @@
 func test :: () -> int32 {
     if (true) {
-        // Empty block or statement that doesn't terminate
+        return 1;
     } else {
-        // Missing terminator instruction before falling into next block
+        1 + 1;
+        return 2;
     }
 }
