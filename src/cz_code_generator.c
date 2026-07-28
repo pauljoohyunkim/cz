@@ -599,7 +599,7 @@ static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_E
             break;
         case CZ_AST_AssignmentStatementNodeType:
             cz_code_generator_generate_assignment_statement(cg, env, env_b, node);
-            goto error_cleanup;
+            break;
         case CZ_AST_ReturnStatementNodeType:
             cz_code_generator_generate_return_statement(cg, env, env_b, node, false);
             break;
@@ -680,8 +680,8 @@ static int cz_code_generator_generate_assignment_statement(CZ_CodeGenerator* cg,
 
     LLVMValueRef llvm_val = llvm_rhs;
 
-    // TODO: Get pointer from LHS.
     // If =, write the value from RHS.
+    // If (?)=, take the value from LHS, operate with RHS, then write.
     switch (stmt->binary_expression.op) {
         case CZ_TT_EQUAL:
             break;
@@ -700,17 +700,103 @@ static int cz_code_generator_generate_assignment_statement(CZ_CodeGenerator* cg,
             }
             break;
         case CZ_TT_MINUS_EQUAL:
+            {
+                const CZ_Type* lhs_type = cz_type_decay_type(stmt->binary_expression.left->decoration->resolved_type);
+                LLVMValueRef llvm_lhs_val = cz_code_generator_l_to_r_convert(cg, lhs_type, llvm_lhs);
+                switch (llvm_rhs_type_kind) {
+                    case LLVMFloatTypeKind:
+                        llvm_val = LLVMBuildFSub(cg->builder, llvm_lhs_val, llvm_rhs, "fsubtmp");
+                        break;
+                    case LLVMIntegerTypeKind:
+                        llvm_val = LLVMBuildSub(cg->builder, llvm_lhs_val, llvm_rhs, "subtmp");
+                        break;
+                    default:
+                        cz_error_list_push_error(cg->error_list, cg->filename, stmt->line, stmt->col, "Invalid operand type for -= operator");
+                        goto error_cleanup;
+                }
+            }
+            break;
         case CZ_TT_STAR_EQUAL:
+            {
+                const CZ_Type* lhs_type = cz_type_decay_type(stmt->binary_expression.left->decoration->resolved_type);
+                LLVMValueRef llvm_lhs_val = cz_code_generator_l_to_r_convert(cg, lhs_type, llvm_lhs);
+                switch (llvm_rhs_type_kind) {
+                    case LLVMFloatTypeKind:
+                        llvm_val = LLVMBuildFMul(cg->builder, llvm_lhs_val, llvm_rhs, "fmultmp");
+                        break;
+                    case LLVMIntegerTypeKind:
+                        llvm_val = LLVMBuildMul(cg->builder, llvm_lhs_val, llvm_rhs, "multmp");
+                        break;
+                    default:
+                        cz_error_list_push_error(cg->error_list, cg->filename, stmt->line, stmt->col, "Invalid operand type for *= operator");
+                        goto error_cleanup;
+                }
+            }
+            break;
         case CZ_TT_SLASH_EQUAL:
+            {
+                const CZ_Type* lhs_type = cz_type_decay_type(stmt->binary_expression.left->decoration->resolved_type);
+                LLVMValueRef llvm_lhs_val = cz_code_generator_l_to_r_convert(cg, lhs_type, llvm_lhs);
+                switch (llvm_rhs_type_kind) {
+                    case LLVMFloatTypeKind:
+                        llvm_val = LLVMBuildFDiv(cg->builder, llvm_lhs_val, llvm_rhs, "fdivtmp");
+                        break;
+                    case LLVMIntegerTypeKind:
+                        llvm_val = LLVMBuildSDiv(cg->builder, llvm_lhs_val, llvm_rhs, "divtmp");
+                        break;
+                    default:
+                        cz_error_list_push_error(cg->error_list, cg->filename, stmt->line, stmt->col, "Invalid operand type for /= operator");
+                        goto error_cleanup;
+                }
+            }
+            break;
         case CZ_TT_PERCENT_EQUAL:
+            {
+                const CZ_Type* lhs_type = cz_type_decay_type(stmt->binary_expression.left->decoration->resolved_type);
+                LLVMValueRef llvm_lhs_val = cz_code_generator_l_to_r_convert(cg, lhs_type, llvm_lhs);
+                if (llvm_rhs_type_kind != LLVMIntegerTypeKind) {
+                    cz_error_list_push_error(cg->error_list, cg->filename, stmt->line, stmt->col, "Operand of %% must be integer");
+                    goto error_cleanup;
+                }
+                llvm_val = LLVMBuildSRem(cg->builder, llvm_lhs_val, llvm_rhs, "remtmp");
+            }
+            break;
         case CZ_TT_AMPERSAND_EQUAL:
+            {
+                const CZ_Type* lhs_type = cz_type_decay_type(stmt->binary_expression.left->decoration->resolved_type);
+                LLVMValueRef llvm_lhs_val = cz_code_generator_l_to_r_convert(cg, lhs_type, llvm_lhs);
+                if (llvm_rhs_type_kind != LLVMIntegerTypeKind) {
+                    cz_error_list_push_error(cg->error_list, cg->filename, stmt->line, stmt->col, "Operand of &= must be integer");
+                    goto error_cleanup;
+                }
+                llvm_val = LLVMBuildAnd(cg->builder, llvm_lhs_val, llvm_rhs, "andtmp");
+            }
+            break;
         case CZ_TT_BAR_EQUAL:
+            {
+                const CZ_Type* lhs_type = cz_type_decay_type(stmt->binary_expression.left->decoration->resolved_type);
+                LLVMValueRef llvm_lhs_val = cz_code_generator_l_to_r_convert(cg, lhs_type, llvm_lhs);
+                if (llvm_rhs_type_kind != LLVMIntegerTypeKind) {
+                    cz_error_list_push_error(cg->error_list, cg->filename, stmt->line, stmt->col, "Operand of |= must be integer");
+                    goto error_cleanup;
+                }
+                llvm_val = LLVMBuildOr(cg->builder, llvm_lhs_val, llvm_rhs, "ortmp");
+            }
+            break;
         case CZ_TT_CARET_EQUAL:
+            {
+                const CZ_Type* lhs_type = cz_type_decay_type(stmt->binary_expression.left->decoration->resolved_type);
+                LLVMValueRef llvm_lhs_val = cz_code_generator_l_to_r_convert(cg, lhs_type, llvm_lhs);
+                if (llvm_rhs_type_kind != LLVMIntegerTypeKind) {
+                    cz_error_list_push_error(cg->error_list, cg->filename, stmt->line, stmt->col, "Operand of ^= must be integer");
+                    goto error_cleanup;
+                }
+                llvm_val = LLVMBuildXor(cg->builder, llvm_lhs_val, llvm_rhs, "xortmp");
+            }
             break;
         default:
             goto error_cleanup;
     }
-    // If (?)=, take the value from LHS, operate with RHS, then write.
 
     LLVMBuildStore(cg->builder, llvm_val, llvm_lhs);
     return 1;
