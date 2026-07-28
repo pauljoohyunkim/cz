@@ -221,14 +221,14 @@ static int cz_code_generator_emit_global_variable(CZ_CodeGenerator* cg, const CZ
 static int cz_code_generator_generate_function_body(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
 
 
-static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
+static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 static int cz_code_generator_generate_variable_declaration_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
 static int cz_code_generator_generate_assignment_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, CZ_Environment_Backend* env_b, const CZ_AST_Node* stmt);
-static int cz_code_generator_generate_return_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
-static int cz_code_generator_generate_if_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
-static int cz_code_generator_generate_for_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
-static int cz_code_generator_generate_while_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
-static int cz_code_generator_generate_block_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time);
+static int cz_code_generator_generate_return_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
+static int cz_code_generator_generate_if_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
+static int cz_code_generator_generate_for_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
+static int cz_code_generator_generate_while_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
+static int cz_code_generator_generate_block_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 
 static LLVMValueRef cz_code_generator_generate_lvalue(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
 static LLVMValueRef cz_code_generator_generate_lvalue_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node);
@@ -576,7 +576,7 @@ static int cz_code_generator_generate_function_body(CZ_CodeGenerator* cg, const 
     unsigned int stmt_count = node->function_declaration.body->statement_list.statement_count;
     const CZ_AST_Node** stmt_list = node->function_declaration.body->statement_list.statements;
     for (unsigned int i = 0; i < stmt_count; i++) {
-        if (cz_code_generator_generate_statement(cg, node->function_declaration.body->statement_list.scope, body_env_b, stmt_list[i], false) != 1) {
+        if (cz_code_generator_generate_statement(cg, node->function_declaration.body->statement_list.scope, body_env_b, stmt_list[i]) != 1) {
             cz_error_list_push_error(cg->error_list, cg->filename, stmt_list[i]->line, stmt_list[i]->col, "Could not generate statement index %i for function \"%s\"", i, func_name);
             goto error_cleanup;
         }
@@ -592,7 +592,7 @@ error_cleanup:
     return 0;
 }
 
-static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
+static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
     NULL_POINTER_ERROR_HANDLE(cg);
     NULL_POINTER_ERROR_HANDLE(env);
     NULL_POINTER_ERROR_HANDLE(env_b);
@@ -605,19 +605,19 @@ static int cz_code_generator_generate_statement(CZ_CodeGenerator* cg, const CZ_E
             cz_code_generator_generate_assignment_statement(cg, env, env_b, node);
             break;
         case CZ_AST_ReturnStatementNodeType:
-            cz_code_generator_generate_return_statement(cg, env, env_b, node, false);
+            cz_code_generator_generate_return_statement(cg, env, env_b, node);
             break;
         case CZ_AST_IfStatementNodeType:
-            cz_code_generator_generate_if_statement(cg, env, env_b, node, false);
+            cz_code_generator_generate_if_statement(cg, env, env_b, node);
             break;
         case CZ_AST_ForStatementNodeType:
-            cz_code_generator_generate_for_statement(cg, env, env_b, node, false);
+            cz_code_generator_generate_for_statement(cg, env, env_b, node);
             break;
         case CZ_AST_WhileStatementNodeType:
-            cz_code_generator_generate_while_statement(cg, env, env_b, node, false);
+            cz_code_generator_generate_while_statement(cg, env, env_b, node);
             break;
         case CZ_AST_BlockStatementNodeType:
-            cz_code_generator_generate_block_statement(cg, env, env_b, node, false);
+            cz_code_generator_generate_block_statement(cg, env, env_b, node);
             break;
         default:
             goto error_cleanup;
@@ -813,7 +813,7 @@ error_cleanup:
     return 0;
 }
 
-static int cz_code_generator_generate_return_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
+static int cz_code_generator_generate_return_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
     NULL_POINTER_ERROR_HANDLE(cg);
     NULL_POINTER_ERROR_HANDLE(env);
     NULL_POINTER_ERROR_HANDLE(env_b);
@@ -825,7 +825,7 @@ static int cz_code_generator_generate_return_statement(CZ_CodeGenerator* cg, con
         LLVMBuildRet(cg->builder, llvm_return_val_ref);
         goto error_cleanup;
     } else {
-        LLVMValueRef llvm_return_val_ref = cz_code_generator_generate_expr(cg, env, env_b, node->return_statement.expression, is_compile_time);
+        LLVMValueRef llvm_return_val_ref = cz_code_generator_generate_expr(cg, env, env_b, node->return_statement.expression, false);
         LLVMBuildRet(cg->builder, llvm_return_val_ref);
     }
 
@@ -834,7 +834,7 @@ error_cleanup:
     return 0;
 }
 
-static int cz_code_generator_generate_if_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
+static int cz_code_generator_generate_if_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
     NULL_POINTER_ERROR_HANDLE(cg);
     NULL_POINTER_ERROR_HANDLE(env);
     NULL_POINTER_ERROR_HANDLE(env_b);
@@ -859,7 +859,7 @@ static int cz_code_generator_generate_if_statement(CZ_CodeGenerator* cg, const C
 
     // Then block
     LLVMPositionBuilderAtEnd(cg->builder, llvm_then_block);
-    if (cz_code_generator_generate_statement(cg, env, env_b, node->if_statement.if_branch, false) != 1) {
+    if (cz_code_generator_generate_statement(cg, env, env_b, node->if_statement.if_branch) != 1) {
         goto error_cleanup;
     }
     // If not terminated, branch to merge
@@ -870,7 +870,7 @@ static int cz_code_generator_generate_if_statement(CZ_CodeGenerator* cg, const C
     // Else block (if exists)
     if (node->if_statement.else_branch != NULL) {
         LLVMPositionBuilderAtEnd(cg->builder, llvm_else_block);
-        if (cz_code_generator_generate_statement(cg, env, env_b, node->if_statement.else_branch, false) != 1) {
+        if (cz_code_generator_generate_statement(cg, env, env_b, node->if_statement.else_branch) != 1) {
             goto error_cleanup;
         }
         // If not terminated, branch to merge
@@ -888,7 +888,7 @@ error_cleanup:
     return 0;
 }
 
-static int cz_code_generator_generate_for_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
+static int cz_code_generator_generate_for_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
     CZ_Environment_Backend* inner_env_b = NULL;
     NULL_POINTER_ERROR_HANDLE(cg);
     NULL_POINTER_ERROR_HANDLE(env);
@@ -902,7 +902,7 @@ static int cz_code_generator_generate_for_statement(CZ_CodeGenerator* cg, const 
     inner_env_b = cz_environment_backend_enter_scope(env_b);
     NULL_POINTER_ERROR_HANDLE(inner_env_b);
     if (node->for_statement.initialization != NULL) {
-        if (cz_code_generator_generate_statement(cg, node->for_statement.scope, inner_env_b, node->for_statement.initialization, is_compile_time) != 1) {
+        if (cz_code_generator_generate_statement(cg, node->for_statement.scope, inner_env_b, node->for_statement.initialization) != 1) {
             goto error_cleanup;
         }
     }
@@ -931,7 +931,7 @@ static int cz_code_generator_generate_for_statement(CZ_CodeGenerator* cg, const 
 
     // Body
     LLVMPositionBuilderAtEnd(cg->builder, llvm_body_block);
-    if (cz_code_generator_generate_statement(cg, node->for_statement.scope, inner_env_b, node->for_statement.body, is_compile_time) != 1) {
+    if (cz_code_generator_generate_statement(cg, node->for_statement.scope, inner_env_b, node->for_statement.body) != 1) {
         goto error_cleanup;
     }
     // Check return in body
@@ -942,7 +942,7 @@ static int cz_code_generator_generate_for_statement(CZ_CodeGenerator* cg, const 
     // Step
     LLVMPositionBuilderAtEnd(cg->builder, llvm_step_block);
     if (node->for_statement.iteration_step != NULL) {
-        if(cz_code_generator_generate_statement(cg, node->for_statement.scope, inner_env_b, node->for_statement.iteration_step, is_compile_time) != 1) {
+        if(cz_code_generator_generate_statement(cg, node->for_statement.scope, inner_env_b, node->for_statement.iteration_step) != 1) {
             goto error_cleanup;
         }
     }
@@ -959,7 +959,7 @@ error_cleanup:
     return 0;
 }
 
-static int cz_code_generator_generate_while_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
+static int cz_code_generator_generate_while_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
     NULL_POINTER_ERROR_HANDLE(cg);
     NULL_POINTER_ERROR_HANDLE(env);
     NULL_POINTER_ERROR_HANDLE(env_b);
@@ -986,7 +986,7 @@ static int cz_code_generator_generate_while_statement(CZ_CodeGenerator* cg, cons
 
     // Go to body and write instructions
     LLVMPositionBuilderAtEnd(cg->builder, llvm_body_block);
-    if (cz_code_generator_generate_statement(cg, env, env_b, node->while_statement.body, false) != 1) {
+    if (cz_code_generator_generate_statement(cg, env, env_b, node->while_statement.body) != 1) {
         goto error_cleanup;
     }
 
@@ -1003,7 +1003,7 @@ error_cleanup:
     return 0;
 }
 
-static int cz_code_generator_generate_block_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
+static int cz_code_generator_generate_block_statement(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node) {
     CZ_Environment_Backend* inner_env_b = NULL;
 
     NULL_POINTER_ERROR_HANDLE(cg);
@@ -1018,7 +1018,7 @@ static int cz_code_generator_generate_block_statement(CZ_CodeGenerator* cg, cons
     const CZ_AST_Node** inner_stmts = node->statement_list.statements;
     CZ_Environment* inner_scope = node->statement_list.scope;
     for (unsigned int i = 0; i < inner_stmt_count; i++) {
-        if (cz_code_generator_generate_statement(cg, inner_scope, inner_env_b, inner_stmts[i], is_compile_time) != 1) {
+        if (cz_code_generator_generate_statement(cg, inner_scope, inner_env_b, inner_stmts[i]) != 1) {
             goto error_cleanup;
         }
     }
