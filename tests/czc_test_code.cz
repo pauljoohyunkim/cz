@@ -1,10 +1,15 @@
-n :: int32 = 0;
-func increment :: (i :: int32) -> int32 {
-    j :: int32 = 0;
-    while (j < i) {
-        n += 1;
-        j += 1;
+func relu :: (x :: float) -> float {
+    if (x > 0.0) {
+        return x;
+    } else {
+        return 0.0;
     }
+}
 
-    return n;
+func sum :: (N :: int32) -> int32 {
+    s :: int32 = 0;
+    for (i :: int32 = 1; i <= N; i += 1) {
+        s += i;
+    }
+    return s;
 }
