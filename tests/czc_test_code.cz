@@ -1,4 +1,4 @@
-func test :: () {
+func test :: () -> int32 {
     if (true) {
         // Empty block or statement that doesn't terminate
     } else {

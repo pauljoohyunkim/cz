@@ -582,6 +582,22 @@ static int cz_code_generator_generate_function_body(CZ_CodeGenerator* cg, const 
         }
     }
 
+    for (LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(llvm_func); bb != NULL; bb = LLVMGetNextBasicBlock(bb)) {
+    // Check if this basic block lacks a terminator instruction
+    if (LLVMGetBasicBlockTerminator(bb) == NULL) {
+        LLVMPositionBuilderAtEnd(cg->builder, bb);
+        
+        LLVMTypeRef ret_type = LLVMGetReturnType(LLVMGlobalGetValueType(llvm_func));
+        
+        if (LLVMGetTypeKind(ret_type) == LLVMVoidTypeKind) {
+            LLVMBuildRetVoid(cg->builder);
+        } else {
+            // Emits LLVM unreachable for non-void control flow fallthrough
+            LLVMBuildUnreachable(cg->builder);
+        }
+    }
+}
+
     cz_environment_backend_free(body_env_b);
     cg->current_function_return = NULL;
     return 1;
