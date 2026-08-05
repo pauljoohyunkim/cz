@@ -314,6 +314,7 @@ static inline LLVMTypeRef cz_backend_lower_type(CZ_CodeGenerator* cg, const CZ_T
                 case CZ_PRIMITIVE_FLOAT:
                     return LLVMFloatTypeInContext(cg->ctx);
                 case CZ_PRIMITIVE_INT32:
+                case CZ_PRIMITIVE_UINT32:
                     return LLVMInt32TypeInContext(cg->ctx);
                 case CZ_PRIMITIVE_VOID:
                     return LLVMVoidTypeInContext(cg->ctx);
@@ -1288,12 +1289,16 @@ static LLVMValueRef cz_code_generator_generate_expr_binary(CZ_CodeGenerator* cg,
             if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
                 llvm_val = LLVMBuildFDiv(cg->builder, llvm_lhs, llvm_rhs, "fdivtmp");
             } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                llvm_val = LLVMBuildSDiv(cg->builder, llvm_lhs, llvm_rhs, "divtmp");
+                llvm_val =
+                    node->binary_expression.left->decoration->resolved_type->kind == CZ_AST_TYPE_KIND_UINT32 ? LLVMBuildUDiv(cg->builder, llvm_lhs, llvm_rhs, "udivtmp")
+                                                                                                             : LLVMBuildSDiv(cg->builder, llvm_lhs, llvm_rhs, "sdivtmp");
             }
             break;
         case CZ_TT_PERCENT:
             if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                llvm_val = LLVMBuildSRem(cg->builder, llvm_lhs, llvm_rhs, "remtmp");
+                llvm_val =
+                    node->binary_expression.left->decoration->resolved_type->kind == CZ_AST_TYPE_KIND_UINT32 ? LLVMBuildURem(cg->builder, llvm_lhs, llvm_rhs, "uremtmp")
+                                                                                                             : LLVMBuildSRem(cg->builder, llvm_lhs, llvm_rhs, "sremtmp");
             }
             break;
         case CZ_TT_AMPERSAND:
@@ -1315,28 +1320,44 @@ static LLVMValueRef cz_code_generator_generate_expr_binary(CZ_CodeGenerator* cg,
             if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
                 llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOGT, llvm_lhs, llvm_rhs, "fgttmp");
             } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                llvm_val = LLVMBuildICmp(cg->builder, LLVMIntSGT, llvm_lhs, llvm_rhs, "gttmp");
+                llvm_val = LLVMBuildICmp(cg->builder,
+                                         node->binary_expression.left->decoration->resolved_type->kind == CZ_AST_TYPE_KIND_UINT32 ? LLVMIntUGT : LLVMIntSGT,
+                                         llvm_lhs,
+                                         llvm_rhs,
+                                         "gttmp");
             }
             break;
         case CZ_TT_LESS:
             if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
                 llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOLT, llvm_lhs, llvm_rhs, "flttmp");
             } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                llvm_val = LLVMBuildICmp(cg->builder, LLVMIntSLT, llvm_lhs, llvm_rhs, "lttmp");
+                llvm_val = LLVMBuildICmp(cg->builder,
+                                         node->binary_expression.left->decoration->resolved_type->kind == CZ_AST_TYPE_KIND_UINT32 ? LLVMIntULT : LLVMIntSLT,
+                                         llvm_lhs,
+                                         llvm_rhs,
+                                         "lttmp");
             }
             break;
         case CZ_TT_GREATER_EQUAL:
             if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
                 llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOGE, llvm_lhs, llvm_rhs, "fgetmp");
             } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                llvm_val = LLVMBuildICmp(cg->builder, LLVMIntSGE, llvm_lhs, llvm_rhs, "getmp");
+                llvm_val = LLVMBuildICmp(cg->builder,
+                                         node->binary_expression.left->decoration->resolved_type->kind == CZ_AST_TYPE_KIND_UINT32 ? LLVMIntUGE : LLVMIntSGE,
+                                         llvm_lhs,
+                                         llvm_rhs,
+                                         "getmp");
             }
             break;
         case CZ_TT_LESS_EQUAL:
             if (llvm_lhs_type_kind == LLVMFloatTypeKind && llvm_rhs_type_kind == LLVMFloatTypeKind) {
                 llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOLE, llvm_lhs, llvm_rhs, "fletmp");
             } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
-                llvm_val = LLVMBuildICmp(cg->builder, LLVMIntSLE, llvm_lhs, llvm_rhs, "letmp");
+                llvm_val = LLVMBuildICmp(cg->builder,
+                                         node->binary_expression.left->decoration->resolved_type->kind == CZ_AST_TYPE_KIND_UINT32 ? LLVMIntULE : LLVMIntSLE,
+                                         llvm_lhs,
+                                         llvm_rhs,
+                                         "letmp");
             }
             break;
         case CZ_TT_EQUAL_EQUAL:
@@ -1380,6 +1401,7 @@ static LLVMValueRef cz_code_generator_generate_expr_unary(CZ_CodeGenerator* cg, 
                     break;
                 case LLVMIntegerTypeKind:
                     {
+                        // Only for signed integer
                         const LLVMValueRef zero_const = LLVMConstInt(LLVMInt32TypeInContext(cg->ctx), 0, true);
                         llvm_val = LLVMBuildSub(cg->builder, zero_const, llvm_operand, "negtmp");
                     }
@@ -1451,9 +1473,18 @@ static LLVMValueRef cz_code_generator_generate_expr_literal(CZ_CodeGenerator* cg
                     float value = strtof(node->literal.lexeme, NULL);
                     llvm_val = LLVMConstReal(LLVMFloatTypeInContext(cg->ctx), value);
                 } else {
-                    // Integer
-                    int32_t value = strtol(node->literal.lexeme, NULL, 10);
-                    llvm_val = LLVMConstInt(LLVMInt32TypeInContext(cg->ctx), value, true);
+                    // Determine sign and choose appropriate parsing function & sign extension flag
+                    bool is_unsigned = (strchr(node->literal.lexeme, 'u') != NULL);
+
+                    uint64_t value = is_unsigned
+                                         ? strtoul(node->literal.lexeme, NULL, 10)
+                                         : (uint64_t)strtol(node->literal.lexeme, NULL, 10);
+
+                    llvm_val = LLVMConstInt(
+                        LLVMInt32TypeInContext(cg->ctx),
+                        value,
+                        !is_unsigned  // true for signed, false for unsigned
+                    );
                 }
             }
             break;
@@ -1472,29 +1503,6 @@ static LLVMValueRef cz_code_generator_generate_expr_literal(CZ_CodeGenerator* cg
 error_cleanup:
     return NULL;
 }
-
-/*
-static LLVMValueRef cz_code_generator_generate_expr_identifier(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
-    LLVMValueRef llvm_val = NULL;
-
-    const CZ_Symbol* sym = cz_environment_lookup(env, node->identifier.name, true);
-    NULL_POINTER_ERROR_HANDLE(sym);
-    if (sym->kind == CZ_TYPE_KIND_FUNCTION) {
-        cz_error_list_push_error(cg->error_list, cg->filename, node->line, node->col, "Function as identifier (r-value) generation not yet supported.");
-        goto error_cleanup;
-    } else {
-        LLVMValueRef llvm_var_loc = cz_environment_backend_lookup_val(env_b, sym, true);
-        NULL_POINTER_ERROR_HANDLE(llvm_var_loc);
-        LLVMTypeRef llvm_type = cz_environment_backend_lookup_type(cg, sym->data.value.type);
-        NULL_POINTER_ERROR_HANDLE(llvm_type);
-        llvm_val = LLVMBuildLoad2(cg->builder, llvm_type, llvm_var_loc, "load_tmp");
-    }
-
-    return llvm_val;
-error_cleanup:
-    return NULL;
-}
-*/
 
 static LLVMValueRef cz_code_generator_generate_expr_struct_init(CZ_CodeGenerator* cg, const CZ_Environment* env, const CZ_Environment_Backend* env_b, const CZ_AST_Node* node, bool is_compile_time) {
     LLVMValueRef* llvm_field_vals = NULL;

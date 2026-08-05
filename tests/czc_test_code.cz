@@ -1,1 +1,1 @@
-i :: uint32 = 1u;
+i :: bool = 1u < 2u;
