@@ -628,6 +628,11 @@ int cz_lexer_analyze(CZ_Lexer* lexer) {
                         return 0;
                     }
                     advance(lexer, strlen("int32"));
+                } else if (cz_lexer_exactly_match_keyword(lexer, "uint32")) {
+                    if (cz_lexer_push_token_helper(lexer, CZ_TT_UINT32, strlen("uint32")) != 1) {
+                        return 0;
+                    }
+                    advance(lexer, strlen("uint32"));
                 } else if (cz_lexer_exactly_match_keyword(lexer, "float")) {
                     if (cz_lexer_push_token_helper(lexer, CZ_TT_FLOAT, strlen("float")) != 1) {
                         return 0;
@@ -687,6 +692,9 @@ int cz_lexer_analyze(CZ_Lexer* lexer) {
                             while (isdigit(peek(lexer, looper))) {
                                 looper++;
                             }
+                        } else if (peek(lexer, looper) == 'u') {
+                            // Suffix for unsigned.
+                            looper++;
                         }
 
                         if (cz_lexer_push_token_helper(lexer, CZ_TT_NUMERICAL_LITERAL, looper) != 1) {

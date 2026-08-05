@@ -150,6 +150,7 @@ void cz_symbol_print(const CZ_Symbol* symbol, unsigned int depth) {
                 switch (type->primitive) {
                     case CZ_PRIMITIVE_VOID: printf("void"); break;
                     case CZ_PRIMITIVE_INT32: printf("i32"); break;
+                    case CZ_PRIMITIVE_UINT32: printf("u32"); break;
                     case CZ_PRIMITIVE_BOOL: printf("bool"); break;
                     case CZ_PRIMITIVE_FLOAT: printf("float"); break;
                 }

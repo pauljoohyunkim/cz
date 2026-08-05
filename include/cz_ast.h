@@ -213,6 +213,7 @@ struct CZ_AST_Node {
                     enum {
                         CZ_AST_TYPE_KIND_VOID,
                         CZ_AST_TYPE_KIND_INT32,
+                        CZ_AST_TYPE_KIND_UINT32,
                         CZ_AST_TYPE_KIND_BOOL,
                         CZ_AST_TYPE_KIND_FLOAT,
                         /** Named type (struct, newtype, typedef identifier) -- resolved later during semantic analysis */

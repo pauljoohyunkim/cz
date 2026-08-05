@@ -60,6 +60,7 @@ typedef enum {
     CZ_TT_CONST,
     CZ_TT_BOOL,
     CZ_TT_INT32,
+    CZ_TT_UINT32,
     //CZ_TT_UINT,
     CZ_TT_FLOAT,
     //CZ_TT_STRING,

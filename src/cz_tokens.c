@@ -120,6 +120,8 @@ const char* cz_token_to_human_name(CZ_TokenType token_type) {
             return "bool";
         case CZ_TT_INT32:
             return "int32";
+        case CZ_TT_UINT32:
+            return "uint32";
         //case CZ_TT_UINT:
         //    break;
         case CZ_TT_FLOAT:
