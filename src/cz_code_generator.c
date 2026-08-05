@@ -767,7 +767,7 @@ static int cz_code_generator_generate_assignment_statement(CZ_CodeGenerator* cg,
                         llvm_val = LLVMBuildFDiv(cg->builder, llvm_lhs_val, llvm_rhs, "fdivtmp");
                         break;
                     case LLVMIntegerTypeKind:
-                        llvm_val = LLVMBuildSDiv(cg->builder, llvm_lhs_val, llvm_rhs, "divtmp");
+                        llvm_val = lhs_type->primitive == CZ_PRIMITIVE_UINT32 ? LLVMBuildUDiv(cg->builder, llvm_lhs_val, llvm_rhs, "udivtmp") : LLVMBuildSDiv(cg->builder, llvm_lhs_val, llvm_rhs, "sdivtmp");
                         break;
                     default:
                         cz_error_list_push_error(cg->error_list, cg->filename, stmt->line, stmt->col, "Invalid operand type for /= operator");
@@ -783,7 +783,7 @@ static int cz_code_generator_generate_assignment_statement(CZ_CodeGenerator* cg,
                     cz_error_list_push_error(cg->error_list, cg->filename, stmt->line, stmt->col, "Operand of %% must be integer");
                     goto error_cleanup;
                 }
-                llvm_val = LLVMBuildSRem(cg->builder, llvm_lhs_val, llvm_rhs, "remtmp");
+                llvm_val = lhs_type->primitive == CZ_PRIMITIVE_UINT32 ? LLVMBuildURem(cg->builder, llvm_lhs_val, llvm_rhs, "uremtmp") : LLVMBuildSRem(cg->builder, llvm_lhs_val, llvm_rhs, "sremtmp");
             }
             break;
         case CZ_TT_AMPERSAND_EQUAL:
@@ -1290,14 +1290,14 @@ static LLVMValueRef cz_code_generator_generate_expr_binary(CZ_CodeGenerator* cg,
                 llvm_val = LLVMBuildFDiv(cg->builder, llvm_lhs, llvm_rhs, "fdivtmp");
             } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
                 llvm_val =
-                    node->binary_expression.left->decoration->resolved_type->kind == CZ_AST_TYPE_KIND_UINT32 ? LLVMBuildUDiv(cg->builder, llvm_lhs, llvm_rhs, "udivtmp")
-                                                                                                             : LLVMBuildSDiv(cg->builder, llvm_lhs, llvm_rhs, "sdivtmp");
+                    node->binary_expression.left->decoration->resolved_type->primitive == CZ_PRIMITIVE_UINT32 ? LLVMBuildUDiv(cg->builder, llvm_lhs, llvm_rhs, "udivtmp")
+                                                                                                              : LLVMBuildSDiv(cg->builder, llvm_lhs, llvm_rhs, "sdivtmp");
             }
             break;
         case CZ_TT_PERCENT:
             if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
                 llvm_val =
-                    node->binary_expression.left->decoration->resolved_type->kind == CZ_AST_TYPE_KIND_UINT32 ? LLVMBuildURem(cg->builder, llvm_lhs, llvm_rhs, "uremtmp")
+                    node->binary_expression.left->decoration->resolved_type->primitive == CZ_PRIMITIVE_UINT32 ? LLVMBuildURem(cg->builder, llvm_lhs, llvm_rhs, "uremtmp")
                                                                                                              : LLVMBuildSRem(cg->builder, llvm_lhs, llvm_rhs, "sremtmp");
             }
             break;
@@ -1321,7 +1321,7 @@ static LLVMValueRef cz_code_generator_generate_expr_binary(CZ_CodeGenerator* cg,
                 llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOGT, llvm_lhs, llvm_rhs, "fgttmp");
             } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
                 llvm_val = LLVMBuildICmp(cg->builder,
-                                         node->binary_expression.left->decoration->resolved_type->kind == CZ_AST_TYPE_KIND_UINT32 ? LLVMIntUGT : LLVMIntSGT,
+                                         node->binary_expression.left->decoration->resolved_type->primitive == CZ_PRIMITIVE_UINT32 ? LLVMIntUGT : LLVMIntSGT,
                                          llvm_lhs,
                                          llvm_rhs,
                                          "gttmp");
@@ -1332,7 +1332,7 @@ static LLVMValueRef cz_code_generator_generate_expr_binary(CZ_CodeGenerator* cg,
                 llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOLT, llvm_lhs, llvm_rhs, "flttmp");
             } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
                 llvm_val = LLVMBuildICmp(cg->builder,
-                                         node->binary_expression.left->decoration->resolved_type->kind == CZ_AST_TYPE_KIND_UINT32 ? LLVMIntULT : LLVMIntSLT,
+                                         node->binary_expression.left->decoration->resolved_type->primitive == CZ_PRIMITIVE_UINT32 ? LLVMIntULT : LLVMIntSLT,
                                          llvm_lhs,
                                          llvm_rhs,
                                          "lttmp");
@@ -1343,7 +1343,7 @@ static LLVMValueRef cz_code_generator_generate_expr_binary(CZ_CodeGenerator* cg,
                 llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOGE, llvm_lhs, llvm_rhs, "fgetmp");
             } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
                 llvm_val = LLVMBuildICmp(cg->builder,
-                                         node->binary_expression.left->decoration->resolved_type->kind == CZ_AST_TYPE_KIND_UINT32 ? LLVMIntUGE : LLVMIntSGE,
+                                         node->binary_expression.left->decoration->resolved_type->primitive == CZ_PRIMITIVE_UINT32 ? LLVMIntUGE : LLVMIntSGE,
                                          llvm_lhs,
                                          llvm_rhs,
                                          "getmp");
@@ -1354,7 +1354,7 @@ static LLVMValueRef cz_code_generator_generate_expr_binary(CZ_CodeGenerator* cg,
                 llvm_val = LLVMBuildFCmp(cg->builder, LLVMRealOLE, llvm_lhs, llvm_rhs, "fletmp");
             } else if (llvm_lhs_type_kind == LLVMIntegerTypeKind && llvm_rhs_type_kind == LLVMIntegerTypeKind) {
                 llvm_val = LLVMBuildICmp(cg->builder,
-                                         node->binary_expression.left->decoration->resolved_type->kind == CZ_AST_TYPE_KIND_UINT32 ? LLVMIntULE : LLVMIntSLE,
+                                         node->binary_expression.left->decoration->resolved_type->primitive == CZ_PRIMITIVE_UINT32 ? LLVMIntULE : LLVMIntSLE,
                                          llvm_lhs,
                                          llvm_rhs,
                                          "letmp");
