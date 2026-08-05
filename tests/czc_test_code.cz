@@ -1,8 +1,1 @@
-func test :: () -> int32 {
-    if (true) {
-        return 1;
-    } else {
-        1 + 1;
-        return 2;
-    }
-}
+i :: uint32 = 1u;

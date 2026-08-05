@@ -65,6 +65,25 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
             }
             break;
         }
+        case CZ_AST_TYPE_KIND_UINT32:
+        {
+            CZ_Type query = {
+                .kind = CZ_TYPE_KIND_PRIMITIVE,
+                .primitive = CZ_PRIMITIVE_UINT32
+            };
+            base_type = cz_global_type_table_find_type(gtt, &query);
+            if (base_type == NULL) {
+                CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+                new_type->primitive = CZ_PRIMITIVE_UINT32;
+                NULL_POINTER_ERROR_HANDLE(new_type);
+                if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
+                    cz_type_free(new_type);
+                    goto error_cleanup;
+                }
+                base_type = new_type;
+            }
+            break;
+        }
         case CZ_AST_TYPE_KIND_BOOL:
         {
             CZ_Type query = {
@@ -1509,9 +1528,11 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
     // 4. For assignment operators, check that the underlying operation is valid
     // Pre-fetch basic types (same as in binary expression checker)
     const CZ_Type* int32_type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
+    const CZ_Type* uint32_type = cz_global_type_table_find_type_by_name(sa->gtt, "uint32");
     const CZ_Type* float_type = cz_global_type_table_find_type_by_name(sa->gtt, "float");
     const CZ_Type* bool_type = cz_global_type_table_find_type_by_name(sa->gtt, "bool");
     NULL_POINTER_ERROR_HANDLE(int32_type);
+    NULL_POINTER_ERROR_HANDLE(uint32_type);
     NULL_POINTER_ERROR_HANDLE(float_type);
     NULL_POINTER_ERROR_HANDLE(bool_type);
 
@@ -1543,36 +1564,45 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
 
         case CZ_TT_PLUS_EQUAL:
             // int32 + int32 -> int32
+            // uint32 + uint32 -> uint32
             // float + float -> float
             if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_UINT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
                 // Valid
             } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_FLOAT && decayed_rhs_type->primitive == CZ_PRIMITIVE_FLOAT) {
                 // Valid
             } else {
                 cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
-                    "+= only defined for int32 or float.");
+                    "+= only defined for int32, uint32, or float.");
                 goto error_cleanup;
             }
             break;
 
         case CZ_TT_MINUS_EQUAL:
             // int32 - int32 -> int32
+            // uint32 - uint32 -> uint32
             // float - float -> float
             if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_UINT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
                 // Valid
             } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_FLOAT && decayed_rhs_type->primitive == CZ_PRIMITIVE_FLOAT) {
                 // Valid
             } else {
                 cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
-                    "-= only defined for int32 or float.");
+                    "-= only defined for int32, uint32, or float.");
                 goto error_cleanup;
             }
             break;
 
         case CZ_TT_STAR_EQUAL:
             // int32 * int32 -> int32
+            // uint32 * uint32 -> uint32
             // float * float -> float
             if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_UINT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
                 // Valid
             } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_FLOAT && decayed_rhs_type->primitive == CZ_PRIMITIVE_FLOAT) {
                 // Valid
@@ -1585,8 +1615,11 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
 
         case CZ_TT_SLASH_EQUAL:
             // int32 / int32 -> int32
+            // uint32 / uint32 -> uint32
             // float / float -> float
             if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_UINT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
                 // Valid
             } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_FLOAT && decayed_rhs_type->primitive == CZ_PRIMITIVE_FLOAT) {
                 // Valid
@@ -1599,7 +1632,10 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
 
         case CZ_TT_PERCENT_EQUAL:
             // int32 % int32 -> int32
+            // uint32 % uint32 -> uint32
             if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_UINT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
                 // Valid
             } else {
                 cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
@@ -1610,7 +1646,10 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
 
         case CZ_TT_AMPERSAND_EQUAL:
             // int32 & int32 -> int32
+            // uint32 & uint32 -> uint32
             if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_UINT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
                 // Valid
             } else {
                 cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
@@ -1621,7 +1660,10 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
 
         case CZ_TT_BAR_EQUAL:
             // int32 | int32 -> int32
+            // uint32 | uint32 -> uint32
             if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_UINT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
                 // Valid
             } else {
                 cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
@@ -1632,7 +1674,10 @@ static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* 
 
         case CZ_TT_CARET_EQUAL:
             // int32 ^ int32 -> int32
+            // uint32 ^ uint32 -> uint32
             if (decayed_lhs_type->primitive == CZ_PRIMITIVE_INT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                // Valid
+            } else if (decayed_lhs_type->primitive == CZ_PRIMITIVE_UINT32 && decayed_rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
                 // Valid
             } else {
                 cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col,
@@ -2070,9 +2115,11 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
 
     // Pre-fetch basic types
     const CZ_Type* int32_type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
+    const CZ_Type* uint32_type = cz_global_type_table_find_type_by_name(sa->gtt, "uint32");
     const CZ_Type* float_type = cz_global_type_table_find_type_by_name(sa->gtt, "float");
     const CZ_Type* bool_type = cz_global_type_table_find_type_by_name(sa->gtt, "bool");
     NULL_POINTER_ERROR_HANDLE(int32_type);
+    NULL_POINTER_ERROR_HANDLE(uint32_type);
     NULL_POINTER_ERROR_HANDLE(float_type);
     NULL_POINTER_ERROR_HANDLE(bool_type);
 
@@ -2095,48 +2142,60 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
     switch (expr->binary_expression.op) {
         case CZ_TT_PLUS:
             // int32 + int32 -> int32
+            // uint32 + uint32 -> uint32
             // float + float -> float
             if (lhs_type->primitive == CZ_PRIMITIVE_INT32 && rhs_type->primitive == CZ_PRIMITIVE_INT32) {
                 result_type = int32_type;
+            } else if (lhs_type->primitive == CZ_PRIMITIVE_UINT32 && rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
+                result_type = uint32_type;
             } else if (lhs_type->primitive == CZ_PRIMITIVE_FLOAT && rhs_type->primitive == CZ_PRIMITIVE_FLOAT) {
                 result_type = float_type;
             } else {
                 cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
-                    "+ only defined for int32 or float.");
+                    "+ only defined for int32, uint32, or float.");
                 goto error_cleanup;
             }
             break;
         case CZ_TT_MINUS:
             // int32 - int32 -> int32
+            // uint32 - uint32 -> uint32
             // float - float -> float
             if (lhs_type->primitive == CZ_PRIMITIVE_INT32 && rhs_type->primitive == CZ_PRIMITIVE_INT32) {
                 result_type = int32_type;
+            } else if (lhs_type->primitive == CZ_PRIMITIVE_UINT32 && rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
+                result_type = uint32_type;
             } else if (lhs_type->primitive == CZ_PRIMITIVE_FLOAT && rhs_type->primitive == CZ_PRIMITIVE_FLOAT) {
                 result_type = float_type;
             } else {
                 cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
-                    "- only defined for int32 or float.");
+                    "- only defined for int32, uint32, or float.");
                 goto error_cleanup;
             }
             break;
         case CZ_TT_STAR:
             // int32 * int32 -> int32
+            // uint32 * uint32 -> uint32
             // float * float -> float
             if (lhs_type->primitive == CZ_PRIMITIVE_INT32 && rhs_type->primitive == CZ_PRIMITIVE_INT32) {
                 result_type = int32_type;
+            } else if (lhs_type->primitive == CZ_PRIMITIVE_UINT32 && rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
+                result_type = uint32_type;
             } else if (lhs_type->primitive == CZ_PRIMITIVE_FLOAT && rhs_type->primitive == CZ_PRIMITIVE_FLOAT) {
                 result_type = float_type;
             } else {
                 cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
-                    "* only defined for int32 or float.");
+                    "* only defined for int32, uint32, or float.");
                 goto error_cleanup;
             }
             break;
         case CZ_TT_SLASH:
             // int32 / int32 -> int32
+            // uint32 / uint32 -> uint32
             // float / float -> float
             if (lhs_type->primitive == CZ_PRIMITIVE_INT32 && rhs_type->primitive == CZ_PRIMITIVE_INT32) {
                 result_type = int32_type;
+            } else if (lhs_type->primitive == CZ_PRIMITIVE_UINT32 && rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
+                result_type = uint32_type;
             } else if (lhs_type->primitive == CZ_PRIMITIVE_FLOAT && rhs_type->primitive == CZ_PRIMITIVE_FLOAT) {
                 result_type = float_type;
             } else {
@@ -2146,38 +2205,54 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
             }
             break;
         case CZ_TT_PERCENT:
+            // int32 % int32 -> int32
+            // uint32 % uint32 -> uint32
             if (lhs_type->primitive == CZ_PRIMITIVE_INT32 && rhs_type->primitive == CZ_PRIMITIVE_INT32) {
                 result_type = int32_type;
+            } else if (lhs_type->primitive == CZ_PRIMITIVE_UINT32 && rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
+                result_type = uint32_type;
             } else {
                 cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
-                    "/ only defined for int32");
+                    "%% only defined for int32 or uint32");
                 goto error_cleanup;
             }
             break;
         case CZ_TT_AMPERSAND:
+            // int32 & int32 -> int32
+            // uint32 & uint32 -> uint32
             if (lhs_type->primitive == CZ_PRIMITIVE_INT32 && rhs_type->primitive == CZ_PRIMITIVE_INT32) {
                 result_type = int32_type;
+            } else if (lhs_type->primitive == CZ_PRIMITIVE_UINT32 && rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
+                result_type = uint32_type;
             } else {
                 cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
-                    "& only defined for int32");
+                    "& only defined for int32 or uint32");
                 goto error_cleanup;
             }
             break;
         case CZ_TT_BAR:
+            // int32 | int32 -> int32
+            // uint32 | uint32 -> uint32
             if (lhs_type->primitive == CZ_PRIMITIVE_INT32 && rhs_type->primitive == CZ_PRIMITIVE_INT32) {
                 result_type = int32_type;
+            } else if (lhs_type->primitive == CZ_PRIMITIVE_UINT32 && rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
+                result_type = uint32_type;
             } else {
                 cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
-                    "| only defined for int32");
+                    "| only defined for int32, uint32");
                 goto error_cleanup;
             }
             break;
         case CZ_TT_CARET:
+            // int32 ^ int32 -> int32
+            // uint32 ^ uint32 -> uint32
             if (lhs_type->primitive == CZ_PRIMITIVE_INT32 && rhs_type->primitive == CZ_PRIMITIVE_INT32) {
                 result_type = int32_type;
+            } else if (lhs_type->primitive == CZ_PRIMITIVE_UINT32 && rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
+                result_type = uint32_type;
             } else {
                 cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
-                    "^ only defined for int32");
+                    "^ only defined for int32, uint32");
                 goto error_cleanup;
             }
             break;
@@ -2186,21 +2261,30 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
         case CZ_TT_GREATER_EQUAL:
         case CZ_TT_LESS_EQUAL:
             // int32 >= int32 -> bool
+            // uint32 >= uint32 -> bool
             // float >= float -> bool
             // bool >= bool -> bool
             if (lhs_type->primitive == CZ_PRIMITIVE_INT32 && rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                result_type = bool_type;
+            } else if (lhs_type->primitive == CZ_PRIMITIVE_UINT32 && rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
                 result_type = bool_type;
             } else if (lhs_type->primitive == CZ_PRIMITIVE_FLOAT && rhs_type->primitive == CZ_PRIMITIVE_FLOAT) {
                 result_type = bool_type;
             } else {
                 cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
-                    "Unordered comparison only defined for int32 or float.");
+                    "Comparison only defined for int32, uint32, or float.");
                 goto error_cleanup;
             }
             break;
         case CZ_TT_EQUAL_EQUAL:
         case CZ_TT_EXCLAMATION_EQUAL:
+            // int32 == int32 -> bool
+            // uint32 == uint32 -> bool
+            // float == float -> bool
+            // bool == bool -> bool
             if (lhs_type->primitive == CZ_PRIMITIVE_INT32 && rhs_type->primitive == CZ_PRIMITIVE_INT32) {
+                result_type = bool_type;
+            } else if (lhs_type->primitive == CZ_PRIMITIVE_UINT32 && rhs_type->primitive == CZ_PRIMITIVE_UINT32) {
                 result_type = bool_type;
             } else if (lhs_type->primitive == CZ_PRIMITIVE_FLOAT && rhs_type->primitive == CZ_PRIMITIVE_FLOAT) {
                 result_type = bool_type;
@@ -2208,7 +2292,7 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
                 result_type = bool_type;
             } else {
                 cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
-                    "Unordered comparison only defined for int32 or float.");
+                    "Unordered comparison only defined for int32, uint32, or float.");
                 goto error_cleanup;
             }
             break;
@@ -2248,9 +2332,11 @@ static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, 
 
     // Pre-fetch basic types
     const CZ_Type* int32_type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
+    const CZ_Type* uint32_type = cz_global_type_table_find_type_by_name(sa->gtt, "uint32");
     const CZ_Type* float_type = cz_global_type_table_find_type_by_name(sa->gtt, "float");
     const CZ_Type* bool_type = cz_global_type_table_find_type_by_name(sa->gtt, "bool");
     NULL_POINTER_ERROR_HANDLE(int32_type);
+    NULL_POINTER_ERROR_HANDLE(uint32_type);
     NULL_POINTER_ERROR_HANDLE(float_type);
     NULL_POINTER_ERROR_HANDLE(bool_type);
 
@@ -2277,7 +2363,7 @@ static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, 
                     result_type = float_type;
                     break;
                 default:
-                    cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "- unary operator only operates on numerical data");
+                    cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "- unary operator only operates on signed numerical data");
                     goto error_cleanup;
             }
             break;
@@ -2327,7 +2413,13 @@ static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa
                 const char* decimal_point = strchr(literal, '.');
                 if (decimal_point == NULL) {
                     // Integer
-                    type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
+                    if (strchr(literal, 'u') == NULL) {
+                        // Signed
+                        type = cz_global_type_table_find_type_by_name(sa->gtt, "int32");
+                    } else {
+                        // Unsigned
+                        type = cz_global_type_table_find_type_by_name(sa->gtt, "uint32");
+                    }
                 } else {
                     // Float
                     type = cz_global_type_table_find_type_by_name(sa->gtt, "float");
