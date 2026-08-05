@@ -13,6 +13,7 @@ typedef struct CZ_AST_Node CZ_AST_Node;
 typedef enum {
     CZ_PRIMITIVE_VOID,
     CZ_PRIMITIVE_INT32,
+    CZ_PRIMITIVE_UINT32,
     CZ_PRIMITIVE_BOOL,
     CZ_PRIMITIVE_FLOAT
 } CZ_PrimitiveType;

@@ -1,8 +1,10 @@
-func test :: () -> int32 {
-    if (true) {
-        return 1;
-    } else {
-        1 + 1;
-        return 2;
-    }
+i :: bool = 1u < 2u;
+
+func uint_cast :: (n :: int32) -> uint32 {
+    return n as uint32;
+}
+
+func main :: () {
+    i :: int32 = 1;
+    j :: uint32 = uint_cast(i) / 2u;
 }

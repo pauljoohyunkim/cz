@@ -125,6 +125,15 @@ CZ_GlobalTypeTable* cz_global_type_table_create(void) {
         }
         primitive_type = NULL;
     }
+    // Create uint32
+    {
+        primitive_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+        primitive_type->primitive = CZ_PRIMITIVE_UINT32;
+        if (cz_global_type_table_push_type(gtt, "uint32", primitive_type) != 1) {
+            goto error_cleanup;
+        }
+        primitive_type = NULL;
+    }
     // Create bool
     {
         primitive_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
@@ -328,6 +337,7 @@ bool cz_primitive_type_is_numerical(CZ_PrimitiveType primitive_type) {
     switch (primitive_type) {
         case CZ_PRIMITIVE_FLOAT:
         case CZ_PRIMITIVE_INT32:
+        case CZ_PRIMITIVE_UINT32:
             return true;
         default:
             return false;

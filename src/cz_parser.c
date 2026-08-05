@@ -1295,6 +1295,7 @@ static CZ_AST_Node* cz_parser_create_base_type(CZ_Parser* parser) {
         // TODO: Add more types as more are added.
         case CZ_TT_BOOL:
         case CZ_TT_INT32:
+        case CZ_TT_UINT32:
         case CZ_TT_FLOAT:
         case CZ_TT_IDENTIFIER:
             {
@@ -1313,6 +1314,9 @@ static CZ_AST_Node* cz_parser_create_base_type(CZ_Parser* parser) {
                         break;
                     case CZ_TT_INT32:
                         node->type_expression.primitive.kind = CZ_AST_TYPE_KIND_INT32;
+                        break;
+                    case CZ_TT_UINT32:
+                        node->type_expression.primitive.kind = CZ_AST_TYPE_KIND_UINT32;
                         break;
                     case CZ_TT_FLOAT:
                         node->type_expression.primitive.kind = CZ_AST_TYPE_KIND_FLOAT;
