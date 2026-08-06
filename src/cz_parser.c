@@ -1256,6 +1256,8 @@ error_cleanup:
 
 static CZ_AST_Node* cz_parser_create_type(CZ_Parser* parser) {
     CZ_AST_Node* node = NULL;
+    CZ_AST_Node* subnode = NULL;
+    CZ_AST_Node* size_expr = NULL;
     bool is_const = false;
 
     NULL_POINTER_ERROR_HANDLE(parser);
@@ -1269,6 +1271,47 @@ static CZ_AST_Node* cz_parser_create_type(CZ_Parser* parser) {
     node = cz_parser_create_base_type(parser);
     NULL_POINTER_ERROR_HANDLE(node);
 
+    // "array specifier"
+    if (cz_parser_peek_token_type(parser, 0) == CZ_TT_LEFT_SQUARE_BRACKET) {
+        {
+            CZ_Token* left_square_token = cz_parser_consume_token(parser, CZ_TT_LEFT_SQUARE_BRACKET);
+            NULL_POINTER_ERROR_HANDLE(left_square_token);
+        }
+
+        // Array or list: Move to sub node.
+        subnode = node;
+        node = NULL;
+
+        // Create node
+        node = cz_ast_node_create(CZ_AST_TypeNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
+        NULL_POINTER_ERROR_HANDLE(node);
+
+        if (cz_parser_peek_token_type(parser, 0) != CZ_TT_RIGHT_SQUARE_BRACKET) {
+            // An expression is given. This is probably an array.
+            // One needs to check if size expression is compile-time in semantic analysis.
+            size_expr = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
+            NULL_POINTER_ERROR_HANDLE(size_expr);
+            
+            node->type_expression.is_array = true;
+            node->type_expression.array.element_type = subnode;
+            subnode = NULL;
+            node->type_expression.array.size_expr = size_expr;
+            size_expr = NULL;
+        } else {
+            // No expression given. This is a list.
+            node->type_expression.is_list = true;
+            node->type_expression.array.element_type = subnode;
+            subnode = NULL;
+        }
+
+        // ]
+        {
+            CZ_Token* right_square_token = cz_parser_consume_token(parser, CZ_TT_RIGHT_SQUARE_BRACKET);
+            NULL_POINTER_ERROR_HANDLE(right_square_token);
+        }
+    }
+    
+    // &
     if (cz_parser_peek_token_type(parser, 0) == CZ_TT_AMPERSAND) {
         CZ_Token* token = cz_parser_consume_token(parser, CZ_TT_AMPERSAND);
         NULL_POINTER_ERROR_HANDLE(token);
@@ -1281,6 +1324,8 @@ static CZ_AST_Node* cz_parser_create_type(CZ_Parser* parser) {
 
 error_cleanup:
     cz_ast_root_free(node);
+    cz_ast_root_free(subnode);
+    cz_ast_root_free(size_expr);
     return NULL;
 }
 
