@@ -21,6 +21,8 @@ typedef enum {
 typedef enum {
     CZ_TYPE_KIND_PRIMITIVE,
     CZ_TYPE_KIND_STRUCT,
+    CZ_TYPE_KIND_ARRAY,
+    CZ_TYPE_KIND_LIST,
     CZ_TYPE_KIND_CONST,
     CZ_TYPE_KIND_REFERENCE,
     CZ_TYPE_KIND_NEWTYPE,
@@ -49,6 +51,13 @@ struct CZ_Type {
             const char* name;
             const CZ_StructLayout* layout;
         } structure;
+
+        struct {
+            const CZ_Type* element_type;
+            unsigned int size;
+        } array_info;
+
+        const CZ_Type* list_of;
 
         const CZ_Type* const_of;
 

@@ -71,6 +71,10 @@ void cz_type_free(CZ_Type* type) {
                 cz_struct_layout_free((void*)type->structure.layout);
                 type->structure.layout = NULL;
                 break;
+            case CZ_TYPE_KIND_ARRAY:
+            case CZ_TYPE_KIND_LIST:
+                // Nothing to do
+                break;
             case CZ_TYPE_KIND_REFERENCE:
             case CZ_TYPE_KIND_CONST:
                 // Nothing to do
