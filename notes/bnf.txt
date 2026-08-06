@@ -56,8 +56,10 @@
 
 ;; --- Types (Supporting Explicit References) ---
 <mutability>       ::= "const" | ""
-<type>             ::= <mutability> <base_type> [ "&" ]
+<type>             ::= <mutability> <base_type> [ <array_specifier> ] [ "&" ]
 <base_type>        ::= "int32" | "uint32" | "bool" | "float" | <identifier> | | "(" <type> ")"
+<array_specifier>  ::= "[" [ <expression> ] "]"
+
 
 ;; --- Expressions & Precedence Hierarchy (Fixed Association) ---
 <expression>       ::= <equality>

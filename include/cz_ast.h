@@ -202,6 +202,10 @@ struct CZ_AST_Node {
             bool is_reference;
             /** For function types: whether union member holds `function_signature` vs `primitive` */
             bool is_function_type;
+            /** For compile-time (fixed-size) arrays (e.g. int32[10])*/
+            bool is_array;
+            /** For dynamic runtime lists (e.g. int32[]) */
+            bool is_list;
 
             union {
                 /* -- For primitive/base types: VOID, INT32, BOOL, FLOAT, or user-defined identifier -- */
@@ -225,6 +229,17 @@ struct CZ_AST_Node {
                 /** Function signature (parameter list + return type)
                  *  Used when this node represents a function's type in the parameter or return type context. */
                 CZ_AST_Function_Encapsulation function_signature;
+
+                struct {
+                    /** Element type node */
+                    CZ_AST_Node* element_type;
+
+                    /** Compile-time evaluated expression or constant size for arrays.
+                     * Arrays: Const size (e.g. 10)
+                     * Lists: NULL
+                     */
+                    CZ_AST_Node* size_expr;
+                } array;
             };
         } type_expression;
 

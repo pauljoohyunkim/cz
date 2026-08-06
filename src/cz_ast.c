@@ -110,6 +110,11 @@ void cz_ast_root_free(CZ_AST_Node* node) {
                     cz_ast_root_free(node->type_expression.function_signature.parameter_list);
                     cz_ast_root_free(node->type_expression.function_signature.return_type);
                 }
+                if (node->type_expression.is_array == true || node->type_expression.is_list == true) {
+                    // Element types and size expression
+                    cz_ast_root_free(node->type_expression.array.element_type);
+                    cz_ast_root_free(node->type_expression.array.size_expr);
+                }
                 break;
             case CZ_AST_BinaryExpressionNodeType:
             case CZ_AST_AssignmentStatementNodeType:
@@ -325,6 +330,13 @@ void cz_ast_root_print(const CZ_AST_Node* node, unsigned int depth) {
                 printf("TypeNode (function)\n");
                 cz_ast_root_print(node->type_expression.function_signature.parameter_list, depth+1);
                 cz_ast_root_print(node->type_expression.function_signature.return_type, depth+1);
+            } else if (node->type_expression.is_array) {
+                printf("TypeNode (array)\n");
+                cz_ast_root_print(node->type_expression.array.element_type, depth+1);
+                cz_ast_root_print(node->type_expression.array.size_expr, depth+1);
+            } else if (node->type_expression.is_list) {
+                printf("TypeNode (list)\n");
+                cz_ast_root_print(node->type_expression.array.element_type, depth+1);
             } else {
                 printf("TypeNode: %s %s\n", node->type_expression.is_const ? "(const)" : "", node->type_expression.primitive.name);
             }
