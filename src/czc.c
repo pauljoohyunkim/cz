@@ -75,6 +75,11 @@ int main(int argc, char** argv) {
         generate_code = false;
     }
 
+#ifdef STOP_AT_LEXER
+    printf("STOP_AT_LEXER: skipping parser, semantic analyzer, and code generator\n");
+    goto error_cleanup_exit;
+#endif
+
     // Parser
     parser = cz_parser_create(lexer);
     if (parser == NULL) {
@@ -99,6 +104,11 @@ int main(int argc, char** argv) {
     }
 
     cz_ast_root_print(parser->program, 0);
+
+#ifdef STOP_AT_PARSER
+    printf("STOP_AT_PARSER: skipping semantic analyzer and code generator\n");
+    goto error_cleanup_exit;
+#endif
 
     // Semantic Analyzer
     sa = cz_semantic_analyzer_create(parser);
@@ -147,6 +157,11 @@ int main(int argc, char** argv) {
         printf("Skipping code generation\n");
         goto error_cleanup_exit;
     }
+
+#ifdef STOP_AT_SEMANTIC_ANALYZER
+    printf("STOP_AT_SEMANTIC_ANALYZER: skipping code generator\n");
+    goto error_cleanup_exit;
+#endif
 
     cg = cz_code_generator_create(sa);
     if (cg == NULL) {

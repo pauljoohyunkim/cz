@@ -12,6 +12,21 @@
             "label": "Make czc",
             "type": "shell",
             "command": "make czc"
+        },
+        {
+            "label": "Make czc (Stop at Lexer)",
+            "type": "shell",
+            "command": "make czc CFLAGS_EXTRA=-DSTOP_AT_LEXER"
+        },
+        {
+            "label": "Make czc (Stop at Parser)",
+            "type": "shell",
+            "command": "make czc CFLAGS_EXTRA=-DSTOP_AT_PARSER"
+        },
+        {
+            "label": "Make czc (Stop at Semantic Analyzer)",
+            "type": "shell",
+            "command": "make czc CFLAGS_EXTRA=-DSTOP_AT_SEMANTIC_ANALYZER"
         }
     ]
 }

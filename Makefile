@@ -1,7 +1,7 @@
 INCLUDE=include
 CC=clang
 CXX=clang++
-CFLAGS=-g -Wall -O0 -I$(INCLUDE) -MMD -MP $(shell llvm-config --cflags)
+CFLAGS=-g -Wall -O0 -I$(INCLUDE) -MMD -MP $(shell llvm-config --cflags) $(CFLAGS_EXTRA)
 CXXFLAGS=$(CFLAGS)
 
 SRC=src
