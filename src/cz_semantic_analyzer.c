@@ -24,6 +24,11 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
         goto error_cleanup;
     }
 
+    if (type_node->type_expression.is_array) {
+        // Inspect internal first.
+        const CZ_Type* internal_type = cz_type_from_type_node(type_node->type_expression.array.element_type, gtt);
+    }
+
     // --- PHASE 1: Resolve the base, non-const canonical type ---
     switch (type_node->type_expression.primitive.kind) {
         case CZ_AST_TYPE_KIND_VOID:
