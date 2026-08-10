@@ -1,1 +1,5 @@
-i :: int32[10]&;
+arr :: int32[10];
+
+func is_ascending :: (array :: const int32[10]&) -> bool {
+    return false;
+}

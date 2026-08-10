@@ -26,141 +26,121 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
 
     if (type_node->type_expression.is_array) {
         // Inspect internal first.
-        const CZ_Type* internal_type = cz_type_from_type_node(type_node->type_expression.array.element_type, gtt);
-        NULL_POINTER_ERROR_HANDLE(internal_type);
+        base_type = cz_type_from_type_node(type_node->type_expression.array.element_type, gtt);
+        NULL_POINTER_ERROR_HANDLE(base_type);
 
-        // Query if it exists or not.
-        CZ_Type query = {
-            .kind = CZ_TYPE_KIND_ARRAY,
-            .array_info = {
-                .element_type = internal_type,
-                .size = 10                      // TODO: FIX THIS SO THAT IT PARSES.
+    } else {
+        // --- PHASE 1: Resolve the base, non-const canonical type ---
+        switch (type_node->type_expression.primitive.kind) {
+            case CZ_AST_TYPE_KIND_VOID:
+            {
+                CZ_Type query = {
+                    .kind = CZ_TYPE_KIND_PRIMITIVE,
+                    .primitive = CZ_PRIMITIVE_VOID
+                };
+                base_type = cz_global_type_table_find_type(gtt, &query);
+                if (base_type == NULL) {
+                    CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+                    new_type->primitive = CZ_PRIMITIVE_VOID;
+                    NULL_POINTER_ERROR_HANDLE(new_type);
+                    if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
+                        cz_type_free(new_type);
+                        goto error_cleanup;
+                    }
+                    base_type = new_type;
+                }
+                return base_type;
             }
-        };
-        const CZ_Type* array_type = cz_global_type_table_find_type(gtt, &query);
-        if (array_type == NULL) {
-            CZ_Type* new_array_type = cz_type_create(CZ_TYPE_KIND_ARRAY);
-            new_array_type->array_info.element_type = query.array_info.element_type;
-            new_array_type->array_info.size = query.array_info.size;
-            if (cz_global_type_table_push_type(gtt, NULL, new_array_type) != 1) {
-                cz_type_free(new_array_type);
+
+            case CZ_AST_TYPE_KIND_INT32:
+            {
+                CZ_Type query = {
+                    .kind = CZ_TYPE_KIND_PRIMITIVE,
+                    .primitive = CZ_PRIMITIVE_INT32
+                };
+                base_type = cz_global_type_table_find_type(gtt, &query);
+                if (base_type == NULL) {
+                    CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+                    new_type->primitive = CZ_PRIMITIVE_INT32;
+                    NULL_POINTER_ERROR_HANDLE(new_type);
+                    if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
+                        cz_type_free(new_type);
+                        goto error_cleanup;
+                    }
+                    base_type = new_type;
+                }
+                break;
+            }
+            case CZ_AST_TYPE_KIND_UINT32:
+            {
+                CZ_Type query = {
+                    .kind = CZ_TYPE_KIND_PRIMITIVE,
+                    .primitive = CZ_PRIMITIVE_UINT32
+                };
+                base_type = cz_global_type_table_find_type(gtt, &query);
+                if (base_type == NULL) {
+                    CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+                    new_type->primitive = CZ_PRIMITIVE_UINT32;
+                    NULL_POINTER_ERROR_HANDLE(new_type);
+                    if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
+                        cz_type_free(new_type);
+                        goto error_cleanup;
+                    }
+                    base_type = new_type;
+                }
+                break;
+            }
+            case CZ_AST_TYPE_KIND_BOOL:
+            {
+                CZ_Type query = {
+                    .kind = CZ_TYPE_KIND_PRIMITIVE,
+                    .primitive = CZ_PRIMITIVE_BOOL
+                };
+                base_type = cz_global_type_table_find_type(gtt, &query);
+                if (base_type == NULL) {
+                    CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+                    new_type->primitive = CZ_PRIMITIVE_BOOL;
+                    NULL_POINTER_ERROR_HANDLE(new_type);
+                    if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
+                        cz_type_free(new_type);
+                        goto error_cleanup;
+                    }
+                    base_type = new_type;
+                }
+                break;
+            }
+            case CZ_AST_TYPE_KIND_FLOAT:
+            {
+                CZ_Type query = {
+                    .kind = CZ_TYPE_KIND_PRIMITIVE,
+                    .primitive = CZ_PRIMITIVE_FLOAT
+                };
+                base_type = cz_global_type_table_find_type(gtt, &query);
+                if (base_type == NULL) {
+                    CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
+                    new_type->primitive = CZ_PRIMITIVE_FLOAT;
+                    NULL_POINTER_ERROR_HANDLE(new_type);
+                    if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
+                        cz_type_free(new_type);
+                        goto error_cleanup;
+                    }
+                    base_type = new_type;
+                }
+                break;
+            }
+            case CZ_AST_TYPE_KIND_IDENTIFIER:
+            {
+                query_name = type_node->type_expression.primitive.name;
+                NULL_POINTER_ERROR_HANDLE(query_name);
+
+                // Lookup the named type (which is inherently non-const in the registry)
+                base_type = cz_global_type_table_find_type_by_name(gtt, query_name);
+                NULL_POINTER_ERROR_HANDLE(base_type);
+                break;
+            }
+            default:
                 goto error_cleanup;
-            }
-            array_type = new_array_type;
         }
-        return array_type;
-    }
-
-    // --- PHASE 1: Resolve the base, non-const canonical type ---
-    switch (type_node->type_expression.primitive.kind) {
-        case CZ_AST_TYPE_KIND_VOID:
-        {
-            CZ_Type query = {
-                .kind = CZ_TYPE_KIND_PRIMITIVE,
-                .primitive = CZ_PRIMITIVE_VOID
-            };
-            base_type = cz_global_type_table_find_type(gtt, &query);
-            if (base_type == NULL) {
-                CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
-                new_type->primitive = CZ_PRIMITIVE_VOID;
-                NULL_POINTER_ERROR_HANDLE(new_type);
-                if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
-                    cz_type_free(new_type);
-                    goto error_cleanup;
-                }
-                base_type = new_type;
-            }
-            return base_type;
-        }
-
-        case CZ_AST_TYPE_KIND_INT32:
-        {
-            CZ_Type query = {
-                .kind = CZ_TYPE_KIND_PRIMITIVE,
-                .primitive = CZ_PRIMITIVE_INT32
-            };
-            base_type = cz_global_type_table_find_type(gtt, &query);
-            if (base_type == NULL) {
-                CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
-                new_type->primitive = CZ_PRIMITIVE_INT32;
-                NULL_POINTER_ERROR_HANDLE(new_type);
-                if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
-                    cz_type_free(new_type);
-                    goto error_cleanup;
-                }
-                base_type = new_type;
-            }
-            break;
-        }
-        case CZ_AST_TYPE_KIND_UINT32:
-        {
-            CZ_Type query = {
-                .kind = CZ_TYPE_KIND_PRIMITIVE,
-                .primitive = CZ_PRIMITIVE_UINT32
-            };
-            base_type = cz_global_type_table_find_type(gtt, &query);
-            if (base_type == NULL) {
-                CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
-                new_type->primitive = CZ_PRIMITIVE_UINT32;
-                NULL_POINTER_ERROR_HANDLE(new_type);
-                if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
-                    cz_type_free(new_type);
-                    goto error_cleanup;
-                }
-                base_type = new_type;
-            }
-            break;
-        }
-        case CZ_AST_TYPE_KIND_BOOL:
-        {
-            CZ_Type query = {
-                .kind = CZ_TYPE_KIND_PRIMITIVE,
-                .primitive = CZ_PRIMITIVE_BOOL
-            };
-            base_type = cz_global_type_table_find_type(gtt, &query);
-            if (base_type == NULL) {
-                CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
-                new_type->primitive = CZ_PRIMITIVE_BOOL;
-                NULL_POINTER_ERROR_HANDLE(new_type);
-                if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
-                    cz_type_free(new_type);
-                    goto error_cleanup;
-                }
-                base_type = new_type;
-            }
-            break;
-        }
-        case CZ_AST_TYPE_KIND_FLOAT:
-        {
-            CZ_Type query = {
-                .kind = CZ_TYPE_KIND_PRIMITIVE,
-                .primitive = CZ_PRIMITIVE_FLOAT
-            };
-            base_type = cz_global_type_table_find_type(gtt, &query);
-            if (base_type == NULL) {
-                CZ_Type* new_type = cz_type_create(CZ_TYPE_KIND_PRIMITIVE);
-                new_type->primitive = CZ_PRIMITIVE_FLOAT;
-                NULL_POINTER_ERROR_HANDLE(new_type);
-                if (cz_global_type_table_push_type(gtt, NULL, new_type) != 1) {
-                    cz_type_free(new_type);
-                    goto error_cleanup;
-                }
-                base_type = new_type;
-            }
-            break;
-        }
-        case CZ_AST_TYPE_KIND_IDENTIFIER:
-        {
-            query_name = type_node->type_expression.primitive.name;
-            NULL_POINTER_ERROR_HANDLE(query_name);
-
-            // Lookup the named type (which is inherently non-const in the registry)
-            base_type = cz_global_type_table_find_type_by_name(gtt, query_name);
-            NULL_POINTER_ERROR_HANDLE(base_type);
-            break;
-        }
-        default:
-            goto error_cleanup;
     }
 
     // Keep a tracking pointer for our working type state
@@ -189,7 +169,31 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
         }
     }
 
-    // --- PHASE 3: Apply the reference wrapper if requested by the AST ---
+    // --- PHASE 3: Apply the array/list wrapper if requested by the AST ---
+    if (type_node->type_expression.is_array) {
+        // Query if it exists or not.
+        CZ_Type query = {
+            .kind = CZ_TYPE_KIND_ARRAY,
+            .array_info = {
+                .element_type = current_type,
+                .size = 10                      // TODO: FIX THIS SO THAT IT PARSES.
+            }
+        };
+        const CZ_Type* array_type = cz_global_type_table_find_type(gtt, &query);
+        if (array_type == NULL) {
+            CZ_Type* new_array_type = cz_type_create(CZ_TYPE_KIND_ARRAY);
+            new_array_type->array_info.element_type = query.array_info.element_type;
+            new_array_type->array_info.size = query.array_info.size;
+            if (cz_global_type_table_push_type(gtt, NULL, new_array_type) != 1) {
+                cz_type_free(new_array_type);
+                goto error_cleanup;
+            }
+            array_type = new_array_type;
+        }
+        current_type = array_type;
+    }
+
+    // --- PHASE 4: Apply the reference wrapper if requested by the AST ---
     if (type_node->type_expression.is_reference) {
         CZ_Type ref_query = {
             .kind = CZ_TYPE_KIND_REFERENCE,
