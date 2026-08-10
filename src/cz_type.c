@@ -281,6 +281,11 @@ bool cz_type_equals(const CZ_Type* a, const CZ_Type* b) {
             }
             return true;
         }
+        case CZ_TYPE_KIND_ARRAY:
+            return a->array_info.size == b->array_info.size &&
+                   cz_type_equals(a->array_info.element_type, b->array_info.element_type);
+        case CZ_TYPE_KIND_LIST:
+            return cz_type_equals(a->list_of, b->list_of);
     }
     return false;
 }
@@ -328,12 +333,16 @@ void cz_global_type_table_print(const CZ_GlobalTypeTable* gtt) {
 bool cz_type_is_const(const CZ_Type* type) {
     if (type == NULL) return false;
     if (type->kind == CZ_TYPE_KIND_CONST) return true;
-    
+
     if (type->kind == CZ_TYPE_KIND_REFERENCE) {
         return cz_type_is_const(type->reference_to);
     }
-    // TODO: Const array type->array_of here too
-    
+    if (type->kind == CZ_TYPE_KIND_ARRAY) {
+        return cz_type_is_const(type->array_info.element_type);
+    }
+    if (type->kind == CZ_TYPE_KIND_LIST) {
+        return cz_type_is_const(type->list_of);
+    }
     return false;
 }
 

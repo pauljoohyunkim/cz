@@ -27,6 +27,28 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
     if (type_node->type_expression.is_array) {
         // Inspect internal first.
         const CZ_Type* internal_type = cz_type_from_type_node(type_node->type_expression.array.element_type, gtt);
+        NULL_POINTER_ERROR_HANDLE(internal_type);
+
+        // Query if it exists or not.
+        CZ_Type query = {
+            .kind = CZ_TYPE_KIND_ARRAY,
+            .array_info = {
+                .element_type = internal_type,
+                .size = 10                      // TODO: FIX THIS SO THAT IT PARSES.
+            }
+        };
+        const CZ_Type* array_type = cz_global_type_table_find_type(gtt, &query);
+        if (array_type == NULL) {
+            CZ_Type* new_array_type = cz_type_create(CZ_TYPE_KIND_ARRAY);
+            new_array_type->array_info.element_type = query.array_info.element_type;
+            new_array_type->array_info.size = query.array_info.size;
+            if (cz_global_type_table_push_type(gtt, NULL, new_array_type) != 1) {
+                cz_type_free(new_array_type);
+                goto error_cleanup;
+            }
+            array_type = new_array_type;
+        }
+        return array_type;
     }
 
     // --- PHASE 1: Resolve the base, non-const canonical type ---
