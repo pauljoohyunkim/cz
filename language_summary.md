@@ -105,7 +105,7 @@ var_decl ::= identifier "::" type [ "=" expression ] ";"
 
 ### Function Declaration
 ```
-func_decl ::= "func" identifier "::" "(" param_list ")" [ "->" type ] block ";"
+func_decl ::= "func" identifier "::" "(" param_list ")" [ "->" type ] block
 param_list ::= param_decl ( "," param_decl )* | ""
 param_decl ::= identifier "::" type
 ```
@@ -222,31 +222,29 @@ member_init_list ::= ( "." identifier "=" expression ) ( "," [ "." identifier "=
 
 ### Cast Expression
 ```
-expression "as" type
+unary_expression "as" type
 ```
 - Allowed casts: between primitives, between a newtype and its underlying primitive, or between two newtypes that share the same underlying primitive.
 - Casting away `const` via `as` is **not allowed**; constness is part of the type and cannot be removed by a cast.
 - The result is an rvalue.
+- Note: The left-hand side must be a unary expression. To cast an expression with lower precedence (e.g., an additive expression), parentheses are required: `(x + y) as int32
 
 ### Unary Operators
 - `- expr` – arithmetic negation (valid on `int32` and `float`).
 - `! expr` – logical negation (valid on `bool`).
 
 ### Binary Operators (Precedence & Associativity)
-
 | Level | Operator(s)                     | Associativity |
 |-------|---------------------------------|---------------|
 | 15    | `.` `(` `)`                     | Left          |
-| 14    | `as`                            | Right         |
-| 13    | unary `-` `!`                   | Right         |
+| 14    | unary `-` `!`                   | Right         |
+| 13    | `as`                            | Right         |
 | 12    | `*` `/` `%`                     | Left          |
 | 11    | `+` `-`                         | Left          |
 | 10    | `&` `|` `^`                     | Left          |
 | 9     | `==` `!=`                       | Left          |
 | 8     | `<` `>` `<=` `>=`               | Left          |
 | 2     | `=` `+=` `-=` `*=` `/=` `%=` `&=` `|=` `^=` | Right (assignment) |
-
-- Logical operators `&&` and `||` are **not** part of the language (only equality and relational operators, which return `bool`).
 
 ### Constant Expressions
 Certain contexts require **compile‑time constant expressions** (`constexpr`):
