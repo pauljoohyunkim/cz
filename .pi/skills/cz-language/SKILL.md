@@ -306,10 +306,10 @@ func calculate_speed :: (distance :: Meters, time :: Seconds) -> float {
 
 ### 6. Array Usage
 - ✅ **DO**: Initialize arrays at declaration: `arr :: int32[5] = [1, 2, 3, 4, 5];`
-- ❌ **DON'T**: Access arrays with out-of-bounds indices (compile-time error if detectable, otherwise undefined behavior)
+- ❌ **DON'T**: Access arrays with out-of-bounds indices (index must be in [0, length-1]; compile-time error if detectable, otherwise undefined behavior)
 - ❌ **DON'T**: Try to return arrays directly from functions (arrays decay to pointers in return context, which is not allowed)
 - ✅ **DO**: Pass arrays by reference when needed: `func process(arr :: int32[10]&) -> void`
-- ✅ **DO**: Use loops with explicit bounds for array iteration:
+- ✅ **DO**: Use loops with explicit bounds for array iteration (remember: zero-based indexing):
   ```cz
   func print_array :: (arr :: int32[5]) -> void {
       i :: int32;
