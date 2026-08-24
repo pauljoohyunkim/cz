@@ -54,6 +54,9 @@
 <struct_init_list>   ::= [ <struct_init_member> ( "," <struct_init_member> )* [ "," ] ]
 <struct_init_member> ::= "." <identifier> "=" <expression>
 
+<array_init>       ::= "[" <elem_list> "]"
+<elem_list>        ::= <primary> | <primary> "," <elem_list> | ""
+
 ;; --- Types (Supporting Explicit References) ---
 <mutability>       ::= "const" | ""
 <type>             ::= <mutability> <base_type> [ <array_specifier> ] [ "&" ]

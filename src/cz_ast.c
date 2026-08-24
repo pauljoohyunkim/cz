@@ -55,6 +55,12 @@ void cz_ast_root_free(CZ_AST_Node* node) {
                 cz_ast_root_free(node->struct_init_member.identifier);
                 cz_ast_root_free(node->struct_init_member.expression);
                 break;
+            case CZ_AST_ArrayInitNodeType:
+                for (unsigned int i = 0; i < node->array_init.element_count; i++) {
+                    cz_ast_root_free(node->array_init.elements[i]);
+                }
+                free(node->array_init.elements);
+                break;
             case CZ_AST_FunctionDeclarationNodeType:
                 cz_ast_root_free(node->function_declaration.function_identifier);
                 cz_ast_root_free(node->function_declaration.function.parameter_list);
@@ -182,6 +188,12 @@ void cz_ast_root_print(const CZ_AST_Node* node, unsigned int depth) {
             printf("StructInit\n");
             cz_ast_root_print(node->struct_init_member.identifier, depth+1);
             cz_ast_root_print(node->struct_init_member.expression, depth+1);
+            break;
+        case CZ_AST_ArrayInitNodeType:
+            printf("ArrayInit\n");
+            for (unsigned int i = 0; i < node->array_init.element_count; i++) {
+                cz_ast_root_print(node->array_init.elements[i], depth+1);
+            }
             break;
         case CZ_AST_FunctionDeclarationNodeType:
             printf("FunctionDeclaration\n");

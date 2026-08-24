@@ -29,10 +29,12 @@ static int cz_parser_push_function_param(CZ_AST_Node* parameter_list, CZ_AST_Nod
 static int cz_parser_push_statement_to_block(CZ_AST_Node* block, CZ_AST_Node* statement);
 static int cz_parser_push_struct_member_to_members(CZ_AST_Node* members, CZ_AST_Node* member);
 static int cz_parser_push_argument_to_function_call_argument_list(CZ_AST_Node* members, CZ_AST_Node* member);
+static int cz_parser_push_element_to_array_init(CZ_AST_Node* array_init, CZ_AST_Node* element);
 static CZ_AST_Node* cz_parser_create_program_node(CZ_Parser* parser);
 static CZ_AST_Node* cz_parser_create_struct_decl(CZ_Parser* parser);
 static CZ_AST_Node* cz_parser_create_struct_init(CZ_Parser* parser);
 static CZ_AST_Node* cz_parser_create_struct_init_member(CZ_Parser* parser);
+static CZ_AST_Node* cz_parser_create_array_init(CZ_Parser* parser);
 static CZ_AST_Node* cz_parser_create_variable_decl(CZ_Parser* parser);
 static CZ_AST_Node* cz_parser_create_type_decl(CZ_Parser* parser, bool is_strong);
 static CZ_AST_Node* cz_parser_create_assignment(CZ_Parser* parser);
@@ -288,6 +290,25 @@ static int cz_parser_push_argument_to_function_call_argument_list(CZ_AST_Node* f
 
 error_cleanup:
     return 0;
+}
+
+static int cz_parser_push_element_to_array_init(CZ_AST_Node* array_init, CZ_AST_Node* element) {
+    if (array_init == NULL || element == NULL) goto error_cleanup;
+    if (array_init->node_type != CZ_AST_ArrayInitNodeType) goto error_cleanup;
+
+    // Increment capacity.
+    CZ_AST_Node** new_list = (CZ_AST_Node**) realloc(array_init->array_init.elements, sizeof(CZ_AST_Node*) * (array_init->array_init.element_count+1));
+    NULL_POINTER_ERROR_HANDLE(new_list);
+
+    array_init->array_init.elements = new_list;
+    array_init->array_init.elements[array_init->array_init.element_count] = element;
+    array_init->array_init.element_count++;
+
+    return 1;
+
+error_cleanup:
+    return 0;
+
 }
 
 static CZ_AST_Node* cz_parser_create_program_node(CZ_Parser* parser) {
@@ -571,6 +592,64 @@ error_cleanup:
     cz_ast_root_free(node);
     cz_ast_root_free(identifier);
     cz_ast_root_free(expression);
+    return NULL;
+}
+
+static CZ_AST_Node* cz_parser_create_array_init(CZ_Parser* parser) {
+    CZ_AST_Node* node = NULL;
+    CZ_AST_Node* elem = NULL;
+
+    NULL_POINTER_ERROR_HANDLE(parser);
+
+    node = cz_ast_node_create(CZ_AST_ArrayInitNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
+    NULL_POINTER_ERROR_HANDLE(node);
+
+    // [
+    {
+        CZ_Token* left_square_paren = cz_parser_consume_token(parser, CZ_TT_LEFT_SQUARE_BRACKET);
+        NULL_POINTER_ERROR_HANDLE(left_square_paren);
+    }
+
+    if (cz_parser_peek_token_type(parser, 0) != CZ_TT_RIGHT_SQUARE_BRACKET) {
+        // First element
+        elem = cz_parser_create_primary(parser);
+        NULL_POINTER_ERROR_HANDLE(elem);
+
+        if (cz_parser_push_element_to_array_init(node, elem) != 1) {
+            goto error_cleanup;
+        }
+        elem = NULL;
+
+
+        // Add other elements.
+        while (cz_parser_peek_token_type(parser, 0) == CZ_TT_COMMA) {
+            // ,
+            {
+                CZ_Token* comma = cz_parser_consume_token(parser, CZ_TT_COMMA);
+                NULL_POINTER_ERROR_HANDLE(comma);
+            }
+
+            elem = cz_parser_create_primary(parser);
+            NULL_POINTER_ERROR_HANDLE(elem);
+
+            if (cz_parser_push_element_to_array_init(node, elem) != 1) {
+                goto error_cleanup;
+            }
+            elem = NULL;
+        }
+    }
+
+    // ]
+    {
+        CZ_Token* right_square_paren = cz_parser_consume_token(parser, CZ_TT_RIGHT_SQUARE_BRACKET);
+        NULL_POINTER_ERROR_HANDLE(right_square_paren);
+    }
+
+    return node;
+
+error_cleanup:
+    cz_ast_root_free(node);
+    cz_ast_root_free(elem);
     return NULL;
 }
 
@@ -1645,6 +1724,10 @@ static CZ_AST_Node* cz_parser_create_primary(CZ_Parser* parser) {
                 node = NULL;
                 goto error_cleanup;
             }
+            break;
+        case CZ_TT_LEFT_SQUARE_BRACKET:
+            node = cz_parser_create_array_init(parser);
+            NULL_POINTER_ERROR_HANDLE(node);
             break;
         default:
             cz_error_list_push_error(parser->error_list, parser->filename, parser->tokens[parser->idx].line, parser->tokens[parser->idx].column, "Unexpected token for primary value.");

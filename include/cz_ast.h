@@ -31,6 +31,7 @@ typedef enum {
     CZ_AST_StructDeclarationNodeType,
     CZ_AST_StructInitNodeType,
     CZ_AST_StructInitMemberNodeType,
+    CZ_AST_ArrayInitNodeType,
     CZ_AST_FunctionDeclarationNodeType,
     CZ_AST_ParameterListNodeType,
 
@@ -94,6 +95,12 @@ struct CZ_AST_Node {
             CZ_AST_Node** members;
             unsigned int member_count;
         } struct_declaration;
+
+        /** Used for node_type == CZ_AST_ArrayInitNodeType */
+        struct {
+            CZ_AST_Node** elements;
+            unsigned int element_count;
+        } array_init;
 
         /** Used for node_type == CZ_AST_StructInitMemberNodeType
          * Represents a named field assignment in a struct initializer, e.g. `.field = value`
