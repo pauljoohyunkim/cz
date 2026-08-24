@@ -1126,8 +1126,8 @@ static LLVMValueRef cz_code_generator_generate_lvalue_struct_member_access(CZ_Co
     NULL_POINTER_ERROR_HANDLE(env_b);
     NULL_POINTER_ERROR_HANDLE(node);
 
-    const CZ_Type* struct_type = cz_type_decay_type(node->struct_member_access.object->decoration->resolved_type);
-    const char* member_name = node->struct_member_access.member->identifier.name;
+    const CZ_Type* struct_type = cz_type_decay_type(node->member_access.object->decoration->resolved_type);
+    const char* member_name = node->member_access.member->identifier.name;
 
     int field_idx = -1;
     for (unsigned int i = 0; i < struct_type->structure.layout->field_count; i++) {
@@ -1141,7 +1141,7 @@ static LLVMValueRef cz_code_generator_generate_lvalue_struct_member_access(CZ_Co
 
     // generate_lvalue already returns the ptr to %Vector (unwrapping ref if needed)
     LLVMValueRef llvm_struct_ptr = cz_code_generator_generate_lvalue(
-        cg, env, env_b, node->struct_member_access.object
+        cg, env, env_b, node->member_access.object
     );
     NULL_POINTER_ERROR_HANDLE(llvm_struct_ptr);
 

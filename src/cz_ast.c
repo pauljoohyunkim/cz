@@ -146,8 +146,9 @@ void cz_ast_root_free(CZ_AST_Node* node) {
                 cz_ast_root_free(node->cast_expression.type);
                 break;
             case CZ_AST_StructMemberAccessNodeType:
-                cz_ast_root_free(node->struct_member_access.object);
-                cz_ast_root_free(node->struct_member_access.member);
+            case CZ_AST_ArrayListElementAccessNodeType:
+                cz_ast_root_free(node->member_access.object);
+                cz_ast_root_free(node->member_access.member);
                 break;
         }
         cz_ast_decoration_free(node->decoration);
@@ -439,9 +440,10 @@ void cz_ast_root_print(const CZ_AST_Node* node, unsigned int depth) {
             cz_ast_root_print(node->cast_expression.type, depth+1);
             break;
         case CZ_AST_StructMemberAccessNodeType:
-            printf("StructMemberAccess\n");
-            cz_ast_root_print(node->struct_member_access.object, depth+1);
-            cz_ast_root_print(node->struct_member_access.member, depth+1);
+        case CZ_AST_ArrayListElementAccessNodeType:
+            printf(node->node_type == CZ_AST_StructMemberAccessNodeType ? "StructMemberAccess\n" : "ArrayListElementAccess\n");
+            cz_ast_root_print(node->member_access.object, depth+1);
+            cz_ast_root_print(node->member_access.member, depth+1);
             break;
     }
 }

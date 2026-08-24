@@ -108,6 +108,7 @@
 ;; --- Postfix Operators (Left-Associative / Highest Operator Precedence) ---
 <postfix>          ::= <postfix> "(" <argument_list> ")"   ;; Function Call
                      | <postfix> "." <identifier>          ;; Struct Member Access
+                     | <postfix> "[" <expression> "]"      ;; Array/List Access
                      | <primary>
 
 ;; --- Primary Leaf Values ---

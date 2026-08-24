@@ -2547,14 +2547,14 @@ static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_
     INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_StructMemberAccessNodeType);
 
     // 1. Check base expression
-    if (cz_semantic_analyzer_check_expression(sa, env, expr->struct_member_access.object) != 1) {
+    if (cz_semantic_analyzer_check_expression(sa, env, expr->member_access.object) != 1) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, 
             "Could not deduce type of the base object for struct access.");
         goto error_cleanup;
     }
 
     // 2. Decay check base expression to strip references safely
-    const CZ_Type* struct_type = expr->struct_member_access.object->decoration->resolved_type;
+    const CZ_Type* struct_type = expr->member_access.object->decoration->resolved_type;
     const CZ_Type* decayed_struct_type = cz_type_decay_type(struct_type);
     NULL_POINTER_ERROR_HANDLE(decayed_struct_type);
     
@@ -2565,7 +2565,7 @@ static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_
     }
 
     // 3. Check if struct member exists (Reading field count off the DECAYED type)
-    const char* member_name = expr->struct_member_access.member->identifier.name;
+    const char* member_name = expr->member_access.member->identifier.name;
     int member_idx = -1;
     for (unsigned int i = 0; i < decayed_struct_type->structure.layout->field_count; i++) {
         if (decayed_struct_type->structure.layout->fields[i].name == member_name ||
@@ -2582,7 +2582,7 @@ static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_
 
     // 4. Inherit L-value and propagate constness
     const CZ_Type* member_type = decayed_struct_type->structure.layout->fields[member_idx].type;
-    CZ_ValueCategory value_cat = expr->struct_member_access.object->decoration->value_category;
+    CZ_ValueCategory value_cat = expr->member_access.object->decoration->value_category;
     
     if (cz_type_is_const(struct_type) && !cz_type_is_const(member_type)) {
         // Safe lookups off your Global Type Table manager
@@ -2598,11 +2598,11 @@ static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_
     decor = cz_ast_decoration_create(
         member_type,
         value_cat,
-        expr->struct_member_access.object->decoration->is_constexpr,
+        expr->member_access.object->decoration->is_constexpr,
         member_type->kind == CZ_TYPE_KIND_REFERENCE,
         env->scope_level
     );
-    decor->is_escapable_ref = expr->struct_member_access.object->decoration->is_escapable_ref;
+    decor->is_escapable_ref = expr->member_access.object->decoration->is_escapable_ref;
     if (decor == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, 
             "Allocating AST decorator failure.");

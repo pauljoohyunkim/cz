@@ -53,7 +53,8 @@ typedef enum {
     CZ_AST_LiteralNodeType,
     CZ_AST_IdentifierNodeType,
     CZ_AST_CastExpressionNodeType,
-    CZ_AST_StructMemberAccessNodeType
+    CZ_AST_StructMemberAccessNodeType,
+    CZ_AST_ArrayListElementAccessNodeType
 } CZ_AST_NodeType;
 
 typedef struct {
@@ -329,7 +330,7 @@ struct CZ_AST_Node {
             CZ_AST_Node* object;
             /** Member field name: IdentifierNode -- which field to access */
             CZ_AST_Node* member;
-        } struct_member_access;
+        } member_access;
     };
 };
 

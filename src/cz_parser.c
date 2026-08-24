@@ -169,6 +169,7 @@ static CZ_Precedence cz_parser_get_binary_operation_precedence(CZ_TokenType toke
             return CZ_PRECEDENCE_MULTIPLICATIVE;
         case CZ_TT_PERIOD:
         case CZ_TT_LEFT_PARENTHESIS:
+        case CZ_TT_LEFT_SQUARE_BRACKET:
             return CZ_PRECEDENCE_CALL_ACCESS;
         default:
             return CZ_PRECEDENCE_NONE;
@@ -1549,13 +1550,13 @@ static CZ_AST_Node* cz_parser_create_expression(CZ_Parser* parser, CZ_Precedence
             parent = cz_ast_node_create(CZ_AST_StructMemberAccessNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
             NULL_POINTER_ERROR_HANDLE(parent);
 
-            parent->struct_member_access.object = lhs; // Left-hand expression moves to object slot
+            parent->member_access.object = lhs; // Left-hand expression moves to object slot
             lhs = NULL;
             
             // The right hand side MUST be a direct identifier name token
             CZ_AST_Node* struct_access_member = cz_parser_create_identifier(parser);
             NULL_POINTER_ERROR_HANDLE(struct_access_member);
-            parent->struct_member_access.member = struct_access_member;
+            parent->member_access.member = struct_access_member;
             struct_access_member = NULL;
 
             lhs = parent;
@@ -1598,6 +1599,28 @@ static CZ_AST_Node* cz_parser_create_expression(CZ_Parser* parser, CZ_Precedence
                 NULL_POINTER_ERROR_HANDLE(right_paren);
             }
 
+
+            lhs = parent;
+            parent = NULL;
+            continue;
+        } else if (next_op == CZ_TT_LEFT_SQUARE_BRACKET) {
+            parent = cz_ast_node_create(CZ_AST_ArrayListElementAccessNodeType, cz_parser_get_line(parser), cz_parser_get_col(parser));
+            NULL_POINTER_ERROR_HANDLE(parent);
+
+            // The expression built so far on the left is the thing being called!
+            parent->member_access.object = lhs; 
+            lhs =  NULL;
+
+            CZ_AST_Node* array_list_access_idx = cz_parser_create_expression(parser, CZ_PRECEDENCE_NONE);
+            NULL_POINTER_ERROR_HANDLE(array_list_access_idx);
+            parent->member_access.member = array_list_access_idx;
+            array_list_access_idx = NULL;
+
+            // ]
+            {
+                CZ_Token* right_square_paren = cz_parser_consume_token(parser, CZ_TT_RIGHT_SQUARE_BRACKET);
+                NULL_POINTER_ERROR_HANDLE(right_square_paren);
+            }
 
             lhs = parent;
             parent = NULL;
