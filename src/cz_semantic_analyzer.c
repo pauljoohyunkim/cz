@@ -50,12 +50,15 @@ static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_
 static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 static int cz_semantic_analyzer_cast_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 
-const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTypeTable* gtt) {
+const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_SemanticAnalyzer* sa, CZ_Environment* env) {
     const CZ_Type* base_type = NULL;
     const char* query_name = NULL;
 
     NULL_POINTER_ERROR_HANDLE(type_node);
-    NULL_POINTER_ERROR_HANDLE(gtt);
+    NULL_POINTER_ERROR_HANDLE(sa);
+
+    CZ_GlobalTypeTable* gtt = sa->gtt;
+
     if (type_node->node_type != CZ_AST_TypeNodeType) goto error_cleanup;
 
     if (type_node->type_expression.is_function_type) {
@@ -65,7 +68,7 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
 
     if (type_node->type_expression.is_array) {
         // Inspect internal first.
-        base_type = cz_type_from_type_node(type_node->type_expression.array.element_type, gtt);
+        base_type = cz_type_from_type_node(type_node->type_expression.array.element_type, sa, env);
         NULL_POINTER_ERROR_HANDLE(base_type);
 
     } else {
@@ -210,6 +213,18 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTyp
 
     // --- PHASE 3: Apply the array/list wrapper if requested by the AST ---
     if (type_node->type_expression.is_array) {
+        // Check array size expression.
+        if (cz_semantic_analyzer_check_expression(sa, env, type_node->type_expression.array.size_expr) != 1) {
+            cz_error_list_push_error(sa->error_list, sa->filename, type_node->line, type_node->col,
+            "Could not check the array size expression.");
+            goto error_cleanup;
+        }
+        if (!type_node->type_expression.array.size_expr->decoration->is_constexpr) {
+            cz_error_list_push_error(sa->error_list, sa->filename, type_node->line, type_node->col,
+            "Array size must be a constexpr numerical literal.");
+            goto error_cleanup;
+        }
+
         // Query if it exists or not.
         CZ_Type query = {
             .kind = CZ_TYPE_KIND_ARRAY,
@@ -486,7 +501,7 @@ static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, 
 
     // 2. Build type for function.
     // 2.1 Build return type
-    const CZ_Type* func_ret_type = cz_type_from_type_node(decl->function_declaration.function.return_type, sa->gtt);
+    const CZ_Type* func_ret_type = cz_type_from_type_node(decl->function_declaration.function.return_type, sa, env);
     if (func_ret_type == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
                                  "Return type unrecognized.");
@@ -502,7 +517,7 @@ static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, 
 
     // 2.2.2 Populate the parameter types list.
     for (unsigned int i = 0; i < func_param_count; i++) {
-        const CZ_Type* func_param_type = cz_type_from_type_node(func_param_list->parameter_list.params[i]->variable_declaration.type, sa->gtt);
+        const CZ_Type* func_param_type = cz_type_from_type_node(func_param_list->parameter_list.params[i]->variable_declaration.type, sa, env);
         NULL_POINTER_ERROR_HANDLE(func_param_type);
         func_param_types[i] = func_param_type;
     }
@@ -620,7 +635,7 @@ static int cz_semantic_analyzer_register_variable_decl(CZ_SemanticAnalyzer* sa, 
     }
 
     // 2. Create type from type node.
-    const CZ_Type* variable_type = cz_type_from_type_node(type_node, sa->gtt);
+    const CZ_Type* variable_type = cz_type_from_type_node(type_node, sa, env);
     if (variable_type == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, type_node->line, type_node->col,
                                  "Type could not be deduced");
@@ -668,7 +683,7 @@ static int cz_semantic_analyzer_register_typedef(CZ_SemanticAnalyzer* sa, CZ_Env
     const CZ_AST_Node* alias_type_node = decl->typedef_declaration.new_type;
 
     // 1. Check if x exists in the global type table. (If not, this is bad)
-    const CZ_Type* base_type = cz_type_from_type_node(base_type_node, sa->gtt);
+    const CZ_Type* base_type = cz_type_from_type_node(base_type_node, sa, env);
     if (base_type == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, base_type_node->line, base_type_node->col,
                                  "Base type could not be deduced.");
@@ -754,7 +769,7 @@ static int cz_semantic_analyzer_register_newtypedef(CZ_SemanticAnalyzer* sa, CZ_
     const CZ_AST_Node* alias_type_node = decl->typedef_declaration.new_type;
 
     // 1. Check if x is in global type table. (If not, this is bad)
-    const CZ_Type* base_type = cz_type_from_type_node(base_type_node, sa->gtt);
+    const CZ_Type* base_type = cz_type_from_type_node(base_type_node, sa, env);
     if (base_type == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, base_type_node->line, base_type_node->col,
                                  "Base type could not be deduced.");
@@ -1117,7 +1132,7 @@ static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_
         }
 
         // 2.2 Get the type of the member
-        const CZ_Type* member_type = cz_type_from_type_node(member_node->variable_declaration.type, sa->gtt);
+        const CZ_Type* member_type = cz_type_from_type_node(member_node->variable_declaration.type, sa, sa->global_env);
         if (member_type == NULL) {
             cz_error_list_push_error(sa->error_list, sa->filename, decl->line, decl->col,
                                     "Type for struct field \"%s\" cannot be deduced", member_name);
@@ -1416,7 +1431,7 @@ static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_Semantic
     }
 
     // Getting the variable type.
-    const CZ_Type* var_type = cz_type_from_type_node(stmt->variable_declaration.type, sa->gtt);
+    const CZ_Type* var_type = cz_type_from_type_node(stmt->variable_declaration.type, sa, env);
     if (var_type == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, stmt->line, stmt->col, "Type for \"%s\" cannot be deduced.", var_name);
         goto error_cleanup;
@@ -2808,7 +2823,7 @@ static int cz_semantic_analyzer_cast_expression(CZ_SemanticAnalyzer* sa, CZ_Envi
         goto error_cleanup;
     }
 
-    const CZ_Type* target_type = cz_type_from_type_node(expr->cast_expression.type, sa->gtt);
+    const CZ_Type* target_type = cz_type_from_type_node(expr->cast_expression.type, sa, env);
     if (target_type == NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
         "Cast expression target type could not be deduced.");

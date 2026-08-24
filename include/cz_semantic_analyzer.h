@@ -31,10 +31,11 @@ typedef struct {
  * @brief Return read-only CZ_Type from Type Expression Node. Will add to GTT if it does not exist.
  * 
  * @param type_node Type expression node
- * @param gtt Global Type Table
+ * @param sa Pointer to CZ_SemanticAnalyzer struct
+ * @param env Current scope
  * @return CZ_Type* Read-only pointer to CZ_Type on success, NULL on failure
  */
-const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTypeTable* gtt);
+const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_SemanticAnalyzer* sa, CZ_Environment* env);
 
 /**
  * @brief Creates semantic analyzer from parser
