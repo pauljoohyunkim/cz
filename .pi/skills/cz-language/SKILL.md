@@ -19,8 +19,25 @@ global_const :: const int32 = 100;
 global_ref :: int32& = global_var;  // Must be initialized
 global_const_ref :: const int32& = global_const;
 
-// Arrays (NOTE: Not yet supported - under development)
-// fixed_array :: int32[10];  // Uncomment when array support is implemented
+// Arrays (now supported)
+// Fixed-size array
+global_array :: int32[10];
+// Array with initialization
+global_array_init :: int32[5] = [1, 2, 3, 4, 5];
+// Array with partial initialization (remaining elements zero-initialized)
+global_array_partial :: int32[5] = [1, 2, 3];
+// Array of structs
+struct Point {
+    x :: float;
+    y :: float;
+}
+global_points :: Point[3] = [
+    Point { .x = 0.0, .y = 0.0 },
+    Point { .x = 1.0, .y = 1.0 },
+    Point { .x = 2.0, .y = 2.0 }
+];
+// Local arrays inside functions (as statements)
+local_array :: float[4] = [1.0, 2.0, 3.0, 4.0];
 ```
 
 ### Function Declarations
@@ -87,6 +104,8 @@ for (; ;) {
 - Note: The left-hand side must be a unary expression. To cast an expression with lower precedence (e.g., an additive expression), parentheses are required: `(x + y) as int32`
 - Member access: `struct_instance.field`
 - Pointer/dereference: implicit with references
+- Array indexing: `array[index]` (index must be int32)
+- Array literal: `[expression, expression, ...]` (used in initialization)
 
 ### Structs
 ```cz
@@ -170,6 +189,44 @@ func matrix_add :: (a :: const Matrix&, b :: const Matrix&) -> Matrix {
 }
 ```
 
+### Array Operations
+```cz
+// Fixed-size array declaration
+buffer :: int32[256];
+
+// Array initialization with literals
+fib :: int32[10] = [0, 1, 1, 2, 3, 5, 8, 13, 21, 34];
+
+// Partial initialization (remaining elements zero-initialized)
+partial :: float[5] = [1.0, 2.0, 3.0];  // [1.0, 2.0, 3.0, 0.0, 0.0]
+
+// Array of structs initialization
+points :: Point[3] = [
+    Point { .x = 0.0, .y = 0.0 },
+    Point { .x = 1.0, .y = 1.0 },
+    Point { .x = 2.0, .y = 2.0 }
+];
+
+// Array indexing (expressions)
+func get_third :: (arr :: int32[5]) -> int32 {
+    return arr[2];  // Zero-based indexing
+}
+
+func set_element :: (arr :: int32[5], index :: int32, value :: int32) -> void {
+    arr[index] = value;  // Index must be in bounds
+}
+
+// Array loop processing
+func array_sum :: (arr :: int32[10]) -> int32 {
+    sum :: int32 = 0;
+    i :: int32;
+    for (i = 0; i < 10; i = i + 1) {
+        sum = sum + arr[i];
+    }
+    return sum;
+}
+```
+
 ### Newtype Usage (Distinct Types)
 ```cz
 newtype int32 Meters;
@@ -246,6 +303,22 @@ func calculate_speed :: (distance :: Meters, time :: Seconds) -> float {
       return y;
   }
   ```
+
+### 6. Array Usage
+- ✅ **DO**: Initialize arrays at declaration: `arr :: int32[5] = [1, 2, 3, 4, 5];`
+- ❌ **DON'T**: Access arrays with out-of-bounds indices (compile-time error if detectable, otherwise undefined behavior)
+- ❌ **DON'T**: Try to return arrays directly from functions (arrays decay to pointers in return context, which is not allowed)
+- ✅ **DO**: Pass arrays by reference when needed: `func process(arr :: int32[10]&) -> void`
+- ✅ **DO**: Use loops with explicit bounds for array iteration:
+  ```cz
+  func print_array :: (arr :: int32[5]) -> void {
+      i :: int32;
+      for (i = 0; i < 5; i = i + 1) {
+          // Process arr[i]
+      }
+  }
+  ```
+- ❌ **DON'T**: Assume arrays know their length (unlike slices in some languages, CZ arrays don't carry length information)
 
 ## Testing with C Main
 
