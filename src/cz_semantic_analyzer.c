@@ -11,6 +11,45 @@
 #define INVALID_NODE_TYPE_ERROR_HANDLE(node, node_type_enum) do { if ((node)->node_type != (node_type_enum)) goto error_cleanup; } while (0)
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
 
+typedef enum {
+    CZ_STRUCT_RECURSIVE_CYCLE_STATE_UNVISITED = 0,
+    CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVING,
+    CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVED
+} CZ_StructRecursiveCycleState;
+static const CZ_Type* cz_type_table_get_or_create_const(CZ_GlobalTypeTable* gtt, const CZ_Type* base_type);
+static bool cz_ast_node_returns_on_all_paths(const CZ_AST_Node* node);
+/* --- PASS 1 --- */
+static int cz_semantic_analyzer_build_global_table(CZ_SemanticAnalyzer* sa);
+static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl);
+static int cz_semantic_analyzer_register_struct_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl);
+static int cz_semantic_analyzer_register_variable_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl);
+static int cz_semantic_analyzer_register_typedef(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl);
+static bool cz_semantic_analyzer_newtypedef_detect_cycle(const CZ_Type* type, const char* name);
+static int cz_semantic_analyzer_register_newtypedef(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl);
+/* --- PASS 2 --- */
+static int cz_semantic_analyzer_struct_cycle_detect(CZ_SemanticAnalyzer* sa, const CZ_Type* type, CZ_StructRecursiveCycleState* states);
+static int cz_semantic_analyzer_full_analyze(CZ_SemanticAnalyzer* sa);
+static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
+static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
+static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
+static int cz_semantic_analyzer_check_statement_list(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* block);
+static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
+static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
+static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
+static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
+static int cz_semantic_analyzer_check_if_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
+static int cz_semantic_analyzer_check_for_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
+static int cz_semantic_analyzer_check_while_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
+static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+static int cz_semantic_analyzer_check_function_call_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+static int cz_semantic_analyzer_cast_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
+
 const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_GlobalTypeTable* gtt) {
     const CZ_Type* base_type = NULL;
     const char* query_name = NULL;
@@ -366,8 +405,6 @@ void cz_semantic_analyzer_free(CZ_SemanticAnalyzer* sa) {
     free(sa);
 }
 
-static int cz_semantic_analyzer_build_global_table(CZ_SemanticAnalyzer* sa);
-static int cz_semantic_analyzer_full_analyze(CZ_SemanticAnalyzer* sa);
 
 // Will be invoking pass 1 and pass 2.
 int cz_semantic_analyzer_analyze(CZ_SemanticAnalyzer* sa) {
@@ -382,11 +419,6 @@ error_cleanup:
 }
 
 /* --- PASS 1 ---*/
-static int cz_semantic_analyzer_register_function_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl);
-static int cz_semantic_analyzer_register_struct_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl);
-static int cz_semantic_analyzer_register_variable_decl(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl);
-static int cz_semantic_analyzer_register_typedef(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl);
-static int cz_semantic_analyzer_register_newtypedef(CZ_SemanticAnalyzer* sa, CZ_Environment* env, const CZ_AST_Node* decl);
 
 /**
  * @brief Pass 1 Function: Scans through global statements.
@@ -766,11 +798,6 @@ error_cleanup:
 /* --- PASS 2 ---*/
 // Needs to check for constness, constexpr, and references.
 
-static int cz_semantic_analyzer_check_function_body(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
-static int cz_semantic_analyzer_check_struct_fields(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
-static int cz_semantic_analyzer_check_global_var_init(CZ_SemanticAnalyzer* sa, CZ_AST_Node* decl);
-static int cz_semantic_analyzer_check_statement_list(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* block);
-static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 
 /**
  * @brief Checks expression and decorates the AST node with CZ_AST_Decoration
@@ -780,7 +807,6 @@ static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Envi
  * @param expr Pointer to CZ_AST_Node
  * @return int 1 if success, 0 if failure.
  */
-static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 
 /**
  * @brief Pass 2 Function: Type checking after global statements have been resolved.
@@ -788,11 +814,6 @@ static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Env
  * @param sa Pointer to CZ_SemanticAnalyzer
  * @return int 1 on success, 0 on failure
  */
-typedef enum {
-    CZ_STRUCT_RECURSIVE_CYCLE_STATE_UNVISITED = 0,
-    CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVING,
-    CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVED
-} CZ_StructRecursiveCycleState;
 
 /**
  * @brief A helper to determine struct cycle.
@@ -1302,12 +1323,6 @@ error_cleanup:
     return 0;
 }
 
-static int cz_semantic_analyzer_check_variable_declaration_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
-static int cz_semantic_analyzer_check_assignment_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
-static int cz_semantic_analyzer_check_return_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
-static int cz_semantic_analyzer_check_if_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
-static int cz_semantic_analyzer_check_for_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
-static int cz_semantic_analyzer_check_while_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt);
 
 static int cz_semantic_analyzer_check_statement(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* stmt) {
     CZ_Environment* inner_env = NULL;
@@ -1968,14 +1983,6 @@ error_cleanup:
     return 0;
 }
 
-static int cz_semantic_analyzer_check_function_call_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
-static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
-static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
-static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
-static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
-static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
-static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
-static int cz_semantic_analyzer_cast_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr);
 
 static int cz_semantic_analyzer_check_expression(CZ_SemanticAnalyzer* sa, CZ_Environment* env, CZ_AST_Node* expr) {
     NULL_POINTER_ERROR_HANDLE(sa);
