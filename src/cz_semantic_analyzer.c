@@ -2064,6 +2064,10 @@ static int cz_semantic_analyzer_check_function_call_expression(CZ_SemanticAnalyz
     NULL_POINTER_ERROR_HANDLE(expr);
     INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_FunctionCallNodeType);
 
+    if (expr->decoration != NULL) {
+        return 1;
+    }
+
     // 1. Check callee and see if it is a function (supports higher-order expressions like (f(3))(2))
     if (cz_semantic_analyzer_check_expression(sa, env, expr->function_call.callee) != 1) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col,
@@ -2158,6 +2162,10 @@ static int cz_semantic_analyzer_check_binary_expression(CZ_SemanticAnalyzer* sa,
     NULL_POINTER_ERROR_HANDLE(env);
     NULL_POINTER_ERROR_HANDLE(expr);
     INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_BinaryExpressionNodeType);
+
+    if (expr->decoration != NULL) {
+        return 1;
+    }
 
     if (cz_semantic_analyzer_check_expression(sa, env, expr->binary_expression.left) != 1) {
         goto error_cleanup;
@@ -2378,6 +2386,10 @@ static int cz_semantic_analyzer_check_unary_expression(CZ_SemanticAnalyzer* sa, 
     NULL_POINTER_ERROR_HANDLE(expr);
     INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_UnaryExpressionNodeType);
 
+    if (expr->decoration != NULL) {
+        return 1;
+    }
+
     if (cz_semantic_analyzer_check_expression(sa, env, expr->unary_expression.operand) != 1) {
         cz_error_list_push_error(sa->error_list, sa->filename, expr->line, expr->col, "Could not check operand for unary operation.");
         goto error_cleanup;
@@ -2457,6 +2469,10 @@ static int cz_semantic_analyzer_check_literal_expression(CZ_SemanticAnalyzer* sa
     NULL_POINTER_ERROR_HANDLE(expr);
     INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_LiteralNodeType);
 
+    if (expr->decoration != NULL) {
+        return 1;
+    }
+
     const CZ_Type* type = NULL;
 
     switch (expr->literal.literal_type) {
@@ -2520,6 +2536,10 @@ static int cz_semantic_analyzer_check_identifier_expression(CZ_SemanticAnalyzer*
     NULL_POINTER_ERROR_HANDLE(expr);
     INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_IdentifierNodeType);
 
+    if (expr->decoration != NULL) {
+        return 1;
+    }
+
     // 1. Look up symbol.
     const CZ_Symbol* symbol = cz_environment_lookup(env, expr->identifier.name, true);
     if (symbol == NULL) {
@@ -2567,6 +2587,10 @@ static int cz_semantic_analyzer_check_struct_access(CZ_SemanticAnalyzer* sa, CZ_
     NULL_POINTER_ERROR_HANDLE(env);
     NULL_POINTER_ERROR_HANDLE(expr);
     INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_StructMemberAccessNodeType);
+
+    if (expr->decoration != NULL) {
+        return 1;
+    }
 
     // 1. Check base expression
     if (cz_semantic_analyzer_check_expression(sa, env, expr->member_access.object) != 1) {
@@ -2647,6 +2671,10 @@ static int cz_semantic_analyzer_check_struct_init(CZ_SemanticAnalyzer* sa, CZ_En
     NULL_POINTER_ERROR_HANDLE(env);
     NULL_POINTER_ERROR_HANDLE(expr);
     INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_StructInitNodeType);
+
+    if (expr->decoration != NULL) {
+        return 1;
+    }
 
     // Reduce chain: expr->struct_declaration.identifier->identifier.name
     const CZ_AST_Node* struct_id_node = expr->struct_declaration.identifier;
@@ -2815,6 +2843,10 @@ static int cz_semantic_analyzer_cast_expression(CZ_SemanticAnalyzer* sa, CZ_Envi
     NULL_POINTER_ERROR_HANDLE(env);
     NULL_POINTER_ERROR_HANDLE(expr);
     INVALID_NODE_TYPE_ERROR_HANDLE(expr, CZ_AST_CastExpressionNodeType);
+
+    if (expr->decoration != NULL) {
+        return 1;
+    }
 
     // 1. Evaluate expression and type check
     if (cz_semantic_analyzer_check_expression(sa, env, expr->cast_expression.expression) != 1) {
