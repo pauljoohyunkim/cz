@@ -16,6 +16,8 @@ typedef enum {
     CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVING,
     CZ_STRUCT_RECURSIVE_CYCLE_STATE_RESOLVED
 } CZ_StructRecursiveCycleState;
+static int cz_constexpr_integer_precompute(const CZ_GlobalTypeTable* gtt, const CZ_AST_Node* node, long* val);
+static int cz_array_size_compute_from_decoration(const CZ_GlobalTypeTable* gtt, const CZ_AST_Node* size_expr, size_t* size);
 static const CZ_Type* cz_type_table_get_or_create_const(CZ_GlobalTypeTable* gtt, const CZ_Type* base_type);
 static bool cz_ast_node_returns_on_all_paths(const CZ_AST_Node* node);
 /* --- PASS 1 --- */
@@ -225,12 +227,19 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_SemanticA
             goto error_cleanup;
         }
 
+        size_t array_size = 0;
+        if (cz_array_size_compute_from_decoration(sa->gtt, type_node->type_expression.array.size_expr, &array_size) != 1) {
+            cz_error_list_push_error(sa->error_list, sa->filename, type_node->line, type_node->col,
+            "Could not determine the array size or invalid array size.");
+            goto error_cleanup;
+        }
+
         // Query if it exists or not.
         CZ_Type query = {
             .kind = CZ_TYPE_KIND_ARRAY,
             .array_info = {
                 .element_type = current_type,
-                .size = 10                      // TODO: FIX THIS SO THAT IT PARSES.
+                .size = array_size
             }
         };
         const CZ_Type* array_type = cz_global_type_table_find_type(gtt, &query);
@@ -274,6 +283,117 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_SemanticA
 
 error_cleanup:
     return NULL;
+}
+
+static int cz_constexpr_integer_precompute(const CZ_GlobalTypeTable* gtt, const CZ_AST_Node* node, long* val) {
+    NULL_POINTER_ERROR_HANDLE(node);
+    NULL_POINTER_ERROR_HANDLE(val);
+
+    // Get "integer types".
+    const CZ_Type* int32_type = cz_global_type_table_find_type_by_name(gtt, "int32");
+    const CZ_Type* uint32_type = cz_global_type_table_find_type_by_name(gtt, "uint32");
+    NULL_POINTER_ERROR_HANDLE(int32_type);
+    NULL_POINTER_ERROR_HANDLE(uint32_type);
+
+    // If decoration does not exist, 
+    if (node->decoration == NULL || !node->decoration->is_constexpr) {
+        goto error_cleanup;
+    }
+    
+    // Resolved type must be integral types.
+    const CZ_Type* resolved_type = cz_type_decay_type(node->decoration->resolved_type);
+    NULL_POINTER_ERROR_HANDLE(resolved_type);
+    if (resolved_type != int32_type && resolved_type != uint32_type) {
+        goto error_cleanup;
+    }
+
+    switch (node->node_type) {
+        case CZ_AST_LiteralNodeType:
+            {
+                long temp = strtol(node->literal.lexeme, NULL, 10);
+                *val = temp;
+            }
+            break;
+        case CZ_AST_UnaryExpressionNodeType:
+            {
+                long temp = 0;
+                if (cz_constexpr_integer_precompute(gtt, node->unary_expression.operand, &temp) != 1) {
+                    goto error_cleanup;
+                }
+                if (node->unary_expression.op == CZ_TT_MINUS) {
+                    *val = -temp;
+                } else {
+                    goto error_cleanup;
+                }
+            }
+            break;
+        case CZ_AST_BinaryExpressionNodeType:
+            {
+                long temp_l = 0;
+                long temp_r = 0;
+                if (cz_constexpr_integer_precompute(gtt, node->binary_expression.left, &temp_l) != 1) {
+                    goto error_cleanup;
+                }
+                if (cz_constexpr_integer_precompute(gtt, node->binary_expression.right, &temp_r) != 1) {
+                    goto error_cleanup;
+                }
+                switch (node->binary_expression.op) {
+                    case CZ_TT_PLUS:
+                        *val = temp_l + temp_r;
+                        break;
+                    case CZ_TT_MINUS:
+                        *val = temp_l - temp_r;
+                        break;
+                    case CZ_TT_STAR:
+                        *val = temp_l * temp_r;
+                        break;
+                    case CZ_TT_SLASH:
+                        *val = temp_l / temp_r;
+                        break;
+                    case CZ_TT_PERCENT:
+                        *val = temp_l % temp_r;
+                        break;
+                    case CZ_TT_AMPERSAND:
+                        *val = temp_l & temp_r;
+                        break;
+                    case CZ_TT_BAR:
+                        *val = temp_l | temp_r;
+                        break;
+                    case CZ_TT_CARET:
+                        *val = temp_l ^ temp_r;
+                        break;
+                }
+            }
+            break;
+    }
+
+
+    return 1;
+
+error_cleanup:
+    return 0;
+}
+
+static int cz_array_size_compute_from_decoration(const CZ_GlobalTypeTable* gtt, const CZ_AST_Node* size_expr, size_t* size) {
+    NULL_POINTER_ERROR_HANDLE(gtt);
+    NULL_POINTER_ERROR_HANDLE(size_expr);
+    NULL_POINTER_ERROR_HANDLE(size);
+
+    long temp = 0;
+    if (cz_constexpr_integer_precompute(gtt, size_expr, &temp) != 1) {
+        goto error_cleanup;
+    }
+
+    if (temp <= 0) {
+        goto error_cleanup;
+    }
+
+    *size = (size_t) temp;
+
+    return 1;
+
+error_cleanup:
+    return 0;
 }
 
 static const CZ_Type* cz_type_table_get_or_create_const(CZ_GlobalTypeTable* gtt, const CZ_Type* base_type) {
