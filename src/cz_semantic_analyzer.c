@@ -230,7 +230,7 @@ const CZ_Type* cz_type_from_type_node(const CZ_AST_Node* type_node, CZ_SemanticA
         size_t array_size = 0;
         if (cz_array_size_compute_from_decoration(sa->gtt, type_node->type_expression.array.size_expr, &array_size) != 1) {
             cz_error_list_push_error(sa->error_list, sa->filename, type_node->line, type_node->col,
-            "Could not determine the array size or invalid array size.");
+            "Could not determine the array size or invalid array size. (Also note that casting is not allowed in array size constexpr)");
             goto error_cleanup;
         }
 

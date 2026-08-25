@@ -1,2 +1,4 @@
-N :: const int32 = 5;
-x :: int32[3*2] = [1,2,3];
+newtype int32 int;
+
+a :: int = 1 as int;
+x :: int32[3u*2u] = [1,2,3];
