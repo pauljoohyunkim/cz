@@ -697,7 +697,8 @@ static CZ_AST_Node* cz_parser_create_type_decl(CZ_Parser* parser, bool is_strong
         NULL_POINTER_ERROR_HANDLE(type_token);
     }
 
-    type = cz_parser_create_base_type(parser);
+    type = cz_parser_create_type(parser);
+    //type = cz_parser_create_base_type(parser);
     NULL_POINTER_ERROR_HANDLE(type);
 
     new_type = cz_parser_create_identifier(parser);

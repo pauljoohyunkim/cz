@@ -9,8 +9,8 @@
                        | <newtype_decl> ";"
 
 ;; --- Type Aliasing ---
-<typedef_decl>       ::= "typedef" <base_type> <identifier>
-<newtype_decl>       ::= "newtype" <base_type> <identifier>
+<typedef_decl>       ::= "typedef" <type> <identifier>
+<newtype_decl>       ::= "newtype" <type> <identifier>
                        
 ;; --- Structural Statements & Blocks ---
 <block>            ::= "{" <statement_list> "}"

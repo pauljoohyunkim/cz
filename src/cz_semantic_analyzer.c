@@ -810,7 +810,14 @@ static int cz_semantic_analyzer_register_typedef(CZ_SemanticAnalyzer* sa, CZ_Env
         goto error_cleanup;
     }
 
-    // 2. Check if y exists in the symbol table. (If yes, this is bad since duplicate definition)
+    // 2. References or const cannot be typedefed.
+    if (base_type->kind == CZ_TYPE_KIND_REFERENCE || cz_type_is_const(base_type)) {
+        cz_error_list_push_error(sa->error_list, sa->filename, base_type_node->line, base_type_node->col,
+                                 "Base type cannot be const or reference.");
+        goto error_cleanup;
+    }
+
+    // 3. Check if y exists in the symbol table. (If yes, this is bad since duplicate definition)
     const CZ_Type* alias_type_attempt = cz_global_type_table_find_type_by_name(sa->gtt, alias_type_node->identifier.name);
     if (alias_type_attempt != NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, base_type_node->line, base_type_node->col,
@@ -818,7 +825,7 @@ static int cz_semantic_analyzer_register_typedef(CZ_SemanticAnalyzer* sa, CZ_Env
         goto error_cleanup;
     }
 
-    // 3. Add y to symbol table, where in the global type table, it is added with name.
+    // 4. Add y to symbol table, where in the global type table, it is added with name.
     if (cz_global_type_table_push_type(sa->gtt, alias_type_node->identifier.name, base_type) != 1) {
         cz_error_list_push_error(sa->error_list, sa->filename, base_type_node->line, base_type_node->col,
                                  "Type \"%s\" could not be registered.", alias_type_node->identifier.name);
@@ -896,7 +903,14 @@ static int cz_semantic_analyzer_register_newtypedef(CZ_SemanticAnalyzer* sa, CZ_
         goto error_cleanup;
     }
 
-    // 2. Check if y is not in global type table. (If yes, this is bad: duplicate definition)
+    // 2. References or const cannot be newtyped.
+    if (base_type->kind == CZ_TYPE_KIND_REFERENCE || cz_type_is_const(base_type)) {
+        cz_error_list_push_error(sa->error_list, sa->filename, base_type_node->line, base_type_node->col,
+                                 "Base type cannot be const or reference.");
+        goto error_cleanup;
+    }
+
+    // 3. Check if y is not in global type table. (If yes, this is bad: duplicate definition)
     const CZ_Type* new_type_lookup_attempt = cz_global_type_table_find_type_by_name(sa->gtt, alias_type_node->identifier.name);
     if (new_type_lookup_attempt != NULL) {
         cz_error_list_push_error(sa->error_list, sa->filename, base_type_node->line, base_type_node->col,
